@@ -2092,6 +2092,7 @@ function getAutoSellRules() {
         protectRelic: true,
         protectCraftEquip: true, craftSets: 1,
         equip: { wpn: { on:false, max:0 }, arm: { on:false, max:0 }, acc: { on:false, max:0 } },
+        d2r: { on:false, maxQuality:'epic', keepAffixCount:5, protectTopTier:true, topTierMax:2, protectSpecial:true, protectEnhance:true, enhanceAt:1, socketMode:'all' },
         misc: {}, overrides: {}
     };
     let r = player.autoSellRules;
@@ -2105,6 +2106,17 @@ function getAutoSellRules() {
     if (r.protectRelic == null) r.protectRelic = true;   // 🏺 v3.1.44 保護遺物（預設開）
     if (r.protectCraftEquip == null) r.protectCraftEquip = true;
     if (r.craftSets == null) r.craftSets = 1;
+    if (!r.d2r || typeof r.d2r !== 'object') r.d2r = {};
+    let dr=r.d2r;
+    if (dr.on == null) dr.on = false;   // 舊存檔維持「八色裝備全部保護」，必須由玩家主動開啟進階過濾。
+    if (typeof D2R_QUALITY_KEYS === 'undefined' || !D2R_QUALITY_KEYS.includes(dr.maxQuality)) dr.maxQuality = 'epic';
+    if (dr.keepAffixCount == null) dr.keepAffixCount = 5;
+    if (dr.protectTopTier == null) dr.protectTopTier = true;
+    if (dr.topTierMax == null) dr.topTierMax = 2;
+    if (dr.protectSpecial == null) dr.protectSpecial = true;
+    if (dr.protectEnhance == null) dr.protectEnhance = true;
+    if (dr.enhanceAt == null) dr.enhanceAt = 1;
+    if (!['all','filled','none'].includes(dr.socketMode)) dr.socketMode = 'all';
     return r;
 }
 // ===== 🔧 v2.6.91 合併 2683 參考版 5 功能 =====
@@ -2148,6 +2160,39 @@ function _asEquipType(d) {
     if (d.type === 'acc') return 'acc';
     return null;
 }
+// 會改變戰鬥流程或特定技能玩法的詞綴。一般傷害、屬性與資源數值不在此列。
+const AUTOSELL_D2R_SPECIAL_AFFIX_CODES = new Set([
+    'kx','ts','pi','ks','sp','fh',
+    'hy','hd','st','os','cb','mcx','gd','scd',
+    'ww','wd','wr','wc','ld','ls','lc','lr',
+    'bh','bn','bt','bc','shd','shn','sht','shc',
+    'vwd','vwn','vws','vwc','fdd','fdn','fdf','fdc',
+    'tjd','tjn','tjs','tjc','med','men','mes','mec',
+    'rbd','rbn','rbf','rbc','ard','arn','arc','acd',
+    'csd','csn','csp','csc','mzd','mzn','mzt','mzc',
+    'trd','trn','trt','trc'
+]);
+function _autoSellSocketProtected(i, dr) {
+    if (typeof equipSocketRows !== 'function') return false;
+    let sockets=equipSocketRows(i); if(!sockets.length)return false;
+    if (!dr || dr.on !== true || dr.socketMode === 'all') return true;
+    return dr.socketMode === 'filled' && sockets.some(Boolean);
+}
+function _autoSellD2rProtected(i, rows, dr) {
+    if (!rows.length) return false;
+    if (!dr || dr.on !== true) return true;
+    let qi=typeof D2R_QUALITY_KEYS !== 'undefined' ? D2R_QUALITY_KEYS.indexOf(i.d2q) : -1;
+    let maxQi=typeof D2R_QUALITY_KEYS !== 'undefined' ? D2R_QUALITY_KEYS.indexOf(dr.maxQuality) : -1;
+    if (qi < 0 || maxQi < 0 || qi > maxQi) return true;
+    let keepCount=Math.max(1,Math.min(10,Math.floor(Number(dr.keepAffixCount)||5)));
+    if (rows.length >= keepCount) return true;
+    let topTier=Math.max(1,Math.min(5,Math.floor(Number(dr.topTierMax)||2)));
+    if (dr.protectTopTier !== false && rows.some(x=>Number(x[2])<=topTier)) return true;
+    if (dr.protectSpecial !== false && rows.some(x=>AUTOSELL_D2R_SPECIAL_AFFIX_CODES.has(x[0]))) return true;
+    let enhanceAt=Math.max(1,Math.min(99,Math.floor(Number(dr.enhanceAt)||1)));
+    if (dr.protectEnhance !== false && Number(i.en||0)>=enhanceAt) return true;
+    return false;
+}
 function _autoSellDecision(i, ruleSnapshot, craftRemain) {   // 🔧 v2.6.77 ruleSnapshot：預覽用「快照複本」判定，不讀（也不寫）live 規則；v2.6.91 craftRemain：製作素材保留額度（逐件扣）
     let r = ruleSnapshot || getAutoSellRules(), d = DB.items[i.id];
     if (!d || i.lock || d.noSell || d.noJunk) return { sell:false };
@@ -2155,8 +2200,6 @@ function _autoSellDecision(i, ruleSnapshot, craftRemain) {   // 🔧 v2.6.77 rul
     let ov = r.overrides[i.id];
     if (ov === 'keep') return { sell:false };
     if (ov === 'sell') return { sell:true, qty:i.cnt };
-    if (typeof d2rAffixRows === 'function' && d2rAffixRows(i).length) return { sell:false };   // D2R 詞綴裝備預設硬保護；玩家仍可用單品「永遠販賣」覆寫。
-    if (typeof equipSocketOpenCount === 'function' && equipSocketOpenCount(i) > 0) return { sell:false };   // 已開孔／已鑲嵌裝備硬保護；個別「永遠販賣」仍可覆寫。
     // 🏛️ v2.7.56 解除封印後的「古老的○○」是普通武器／防具，沒有詞綴且多數無法強化，會立即符合一般裝備販賣規則；整系列優先保護（個別「永遠販賣」例外仍優先，故置於 overrides 之後）。
     if (r.protectOldSeries && (String(i.id).startsWith('wpn_old_') || String(i.id).startsWith('amr_old_'))) return { sell:false };
     if (r.protectRelic !== false && typeof isRelic === 'function' && isRelic(d)) return { sell:false };   // 🏺 v3.1.44 保護遺物（預設開·個別「永遠販賣」例外仍優先）
@@ -2167,6 +2210,8 @@ function _autoSellDecision(i, ruleSnapshot, craftRemain) {   // 🔧 v2.6.77 rul
         let er = r.equip[et];
         if (!er || !er.on || (i.en || 0) > Number(er.max || 0)) return { sell:false };
         if ((r.protectBless && i.bless) || (r.protectAnc && i.anc) || (r.protectAttr && i.attr) || (r.protectSet && i.seteff) || (r.protectLegend && d.legend)) return { sell:false };   // 🔧 v2.6.77 保護傳說裝備
+        let dr=r.d2r||{}, d2rows=typeof d2rAffixRows === 'function' ? d2rAffixRows(i) : [];
+        if (_autoSellSocketProtected(i,dr) || _autoSellD2rProtected(i,d2rows,dr)) return { sell:false };
         return { sell:(Number(i.cnt)||1)>protectedQty, qty:Math.max(0,(Number(i.cnt)||1)-protectedQty) };
     }
     let mr = r.misc[d.type];
@@ -2202,6 +2247,9 @@ function openAutoSellRules() {
     let miscRows = miscTypes.map(t => { let x=r.misc[t]||{on:false,keep:0}; return `<label class="as-row"><input class="as-misc" data-type="${t}" type="checkbox" ${x.on?'checked':''}> ${_asTypeLabel(t)}：每種保留 <input class="as-keep" data-type="${t}" type="number" min="0" value="${x.keep}"> 個，多餘販賣</label>`; }).join('');
     let itemRows = ids.map(id => `<option value="${id}">${DB.items[id]?.n || id}</option>`).join('');
     let exceptionTypeRows = exceptionTypes.map(t => `<option value="${t}">${_asTypeLabel(t)}</option>`).join('');
+    let d2QualityRows = (typeof D2R_QUALITY_KEYS !== 'undefined' ? D2R_QUALITY_KEYS : []).map(k => `<option value="${k}" ${r.d2r.maxQuality===k?'selected':''}>${typeof d2rQualityDef==='function'?d2rQualityDef(k).n:k}</option>`).join('');
+    let d2TierRows = [1,2,3,4,5].map(n=>`<option value="${n}" ${Number(r.d2r.topTierMax)===n?'selected':''}>T1${n>1?'–T'+n:''}</option>`).join('');
+    let d2SocketRows = [['all','保護所有已開孔裝備'],['filled','只保護已鑲嵌裝備'],['none','不因孔洞而保護']].map(([v,n])=>`<option value="${v}" ${r.d2r.socketMode===v?'selected':''}>${n}</option>`).join('');
     let rules = Object.entries(r.overrides).map(([id,v]) => `<div class="as-ex"><span>${DB.items[id]?.n || id}</span><b>${v==='keep'?'永遠保留':'永遠販賣'}</b><button onclick="deleteAutoSellOverride('${id}')">刪除</button></div>`).join('') || '<div class="as-muted">目前沒有個別例外</div>';
     let el=document.createElement('div'); el.id='autosell-rule-modal'; el.innerHTML=`<style>
       #autosell-rule-modal{position:fixed;inset:0;background:#020617aa;z-index:10050;display:flex;align-items:center;justify-content:center;color:#e2e8f0}
@@ -2210,6 +2258,7 @@ function openAutoSellRules() {
     </style><div class="as-box"><div class="as-head"><span>自動販賣規則</span><button onclick="closeAutoSellRules()">Close</button></div>
       <div class="as-sec"><label class="as-row"><input id="as-on" type="checkbox" ${player.autoSellOn!==false?'checked':''}> 啟用自動販賣</label><label class="as-row"><input id="as-global" type="checkbox" ${player.autoSellGlobal?'checked':''}> 套用全部存檔（8 個角色共用此設定）</label><div class="as-row as-btnrow"><span>物品取得／符合規則後，等待</span><input id="as-delay" type="number" min="10" max="86400" value="${r.delaySec}"><span>秒才販賣</span><span class="as-quick-actions"><button type="button" class="as-sell-now-btn" onclick="sellAutoSellItemsNow()">立即賣出</button><button type="button" class="as-sell-now-btn as-sort-now-btn" onclick="sortInventoryNow()">立即排列</button></span></div><div class="as-help">等待期間可取消廢品標記或鎖定物品；「立即賣出」會跳過等待秒數。背包整理方式與自動整理開關請在背包左側的整理按鈕設定，與自動販賣互不影響。</div></div>
       <div class="as-sec"><div class="as-title">裝備條件</div>${equipRows}<label class="as-row"><input id="as-pb" type="checkbox" ${r.protectBless?'checked':''}> 保護祝福裝備</label><label class="as-row"><input id="as-pa" type="checkbox" ${r.protectAnc?'checked':''}> 保護古代裝備</label><label class="as-row"><input id="as-pt" type="checkbox" ${r.protectAttr?'checked':''}> 保護屬性裝備</label><label class="as-row"><input id="as-ps" type="checkbox" ${r.protectSet?'checked':''}> 保護套裝詞綴裝備</label><label class="as-row"><input id="as-pl" type="checkbox" ${r.protectLegend?'checked':''}> 保護傳說裝備</label><label class="as-row"><input id="as-prelic" type="checkbox" ${r.protectRelic!==false?'checked':''}> 保護遺物</label><label class="as-row"><input id="as-pold" type="checkbox" ${r.protectOldSeries?'checked':''}> 保護解封後的「古老的」系列裝備</label><div class="as-help">解除封印完成後立即保護古老的劍、巨劍、弩槍、鱗甲、皮盔甲、長袍及金屬盔甲，避免成品在取得瞬間被規則標為廢品。</div><label class="as-row"><input id="as-pcraft" type="checkbox" ${r.protectCraftEquip?'checked':''}> 保護製作素材裝備；保留可製作 <input id="as-craftsets" type="number" min="1" max="99" value="${r.craftSets}"> 次的數量</label><div class="as-help">系統會掃描全部製作配方，例如配方需要「暗殺軍王之痕 ×1」，保留 1 次就至少留 1 件，多餘數量才依武器規則處理。</div></div>
+      <div class="as-sec"><div class="as-title">八色詞綴裝備過濾（進階）</div><label class="as-row"><input id="as-d2-on" type="checkbox" ${r.d2r.on?'checked':''}> 啟用八色詞綴裝備自動販賣</label><label class="as-row">最高可販賣品質：<select id="as-d2-quality">${d2QualityRows}</select></label><label class="as-row">詞綴數量達 <input id="as-d2-count" type="number" min="1" max="10" value="${r.d2r.keepAffixCount}"> 條以上時保留</label><label class="as-row"><input id="as-d2-tier-on" type="checkbox" ${r.d2r.protectTopTier!==false?'checked':''}> 保護含有 <select id="as-d2-tier">${d2TierRows}</select> 詞綴的裝備</label><label class="as-row"><input id="as-d2-special" type="checkbox" ${r.d2r.protectSpecial!==false?'checked':''}> 保護特殊玩法／職業技能詞綴</label><label class="as-row"><input id="as-d2-enhance" type="checkbox" ${r.d2r.protectEnhance!==false?'checked':''}> 保護強化值達 <input id="as-d2-enhance-at" type="number" min="1" max="99" value="${r.d2r.enhanceAt}"> 以上的裝備</label><label class="as-row">孔洞保護：<select id="as-d2-sockets">${d2SocketRows}</select></label><div class="as-help">安全預設為關閉，舊存檔的八色詞綴與已開孔裝備仍全部保護。啟用後，裝備必須同時通過上方武器／防具／飾品條件、品質上限與所有保護條件才會販賣；「個別例外」仍有最高優先權。</div></div>
       <div class="as-sec"><div class="as-title">材料與一般物品</div>${miscRows}<div class="as-help">任務物品、不可販賣物品與系統保護物品不會被處理。</div></div>
       <div class="as-sec"><div class="as-title">個別例外（全遊戲物品）</div><div class="as-ex-tools"><input id="as-item-search" type="search" placeholder="輸入物品名稱搜尋" oninput="refreshAutoSellItemOptions()"><select id="as-item-type" onchange="refreshAutoSellItemOptions()"><option value="all">全部分類</option>${exceptionTypeRows}</select><select id="as-item-scope" onchange="refreshAutoSellItemOptions()"><option value="all">全部物品</option><option value="held">目前持有</option></select></div><div class="as-override-actions"><select id="as-item">${itemRows}</select><button class="as-keep-btn" onclick="setAutoSellOverride('keep')">永遠保留</button><button class="as-sell-btn" onclick="setAutoSellOverride('sell')">永遠販賣</button></div><div class="as-help">例外依物品本體全局套用，包含未取得物品及其所有強化、祝福、屬性與套裝版本。</div><div id="as-overrides">${rules}</div></div>
       <div class="as-actions"><button onclick="previewAutoSellRules()">預覽符合物品</button><button class="primary" onclick="saveAutoSellRules()">儲存規則</button></div></div>`;
@@ -2221,6 +2270,7 @@ function _readAutoSellForm(ruleSnapshot){   // 🔧 v2.6.77 ruleSnapshot：預�
     let r=ruleSnapshot || getAutoSellRules(); r.delaySec=Math.max(10,Number(document.getElementById('as-delay').value)||60); if(!ruleSnapshot) player.autoSellOn=document.getElementById('as-on').checked;
     ['wpn','arm','acc'].forEach(k=>{r.equip[k].on=document.getElementById('as-e-'+k).checked;r.equip[k].max=Math.max(0,Number(document.getElementById('as-em-'+k).value)||0)});
     r.protectBless=document.getElementById('as-pb').checked;r.protectAnc=document.getElementById('as-pa').checked;r.protectAttr=document.getElementById('as-pt').checked;r.protectSet=document.getElementById('as-ps').checked;r.protectLegend=document.getElementById('as-pl').checked;r.protectRelic=document.getElementById('as-prelic').checked;r.protectOldSeries=document.getElementById('as-pold').checked;r.protectCraftEquip=document.getElementById('as-pcraft').checked;r.craftSets=Math.max(1,Number(document.getElementById('as-craftsets').value)||1);if(!ruleSnapshot)player.autoSellGlobal=document.getElementById('as-global').checked;
+    r.d2r.on=document.getElementById('as-d2-on').checked;r.d2r.maxQuality=document.getElementById('as-d2-quality').value;r.d2r.keepAffixCount=Math.max(1,Math.min(10,Number(document.getElementById('as-d2-count').value)||5));r.d2r.protectTopTier=document.getElementById('as-d2-tier-on').checked;r.d2r.topTierMax=Math.max(1,Math.min(5,Number(document.getElementById('as-d2-tier').value)||2));r.d2r.protectSpecial=document.getElementById('as-d2-special').checked;r.d2r.protectEnhance=document.getElementById('as-d2-enhance').checked;r.d2r.enhanceAt=Math.max(1,Math.min(99,Number(document.getElementById('as-d2-enhance-at').value)||1));r.d2r.socketMode=document.getElementById('as-d2-sockets').value;
     document.querySelectorAll('.as-misc').forEach(x=>{let t=x.dataset.type,k=document.querySelector(`.as-keep[data-type="${t}"]`);r.misc[t]={on:x.checked,keep:Math.max(0,Number(k.value)||0)}}); return r;
 }
 function saveAutoSellRules(){_readAutoSellForm();(player.inv||[]).forEach(i=>{delete i._userKeep;});_saveGlobalAutoSellSettings(player.autoSellGlobal);_asBackup=null;applyAutoSellRules();_renderAutoSellBtn();saveGame();renderTabs();closeAutoSellRules();logSys('<span class="text-amber-300">已儲存自動販賣規則；符合的物品會先進入防呆等待期。</span>')}   // 🔧 v2.6.91 功能5：儲存時把設定寫入/移除全域桶   // 🛡️ 審計#10/#11：儲存＝清除 _userKeep 豁免（規則重編→重新評估）＋捨棄草稿快照（此後 Close 不再還原）
