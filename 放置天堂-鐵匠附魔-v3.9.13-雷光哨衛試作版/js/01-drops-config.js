@@ -883,7 +883,7 @@ const RUNE_DEFS = {
     rune_jah: {n:'Jah 符文',tier:7, slot:'arm', code:'hpPct',value:5,cap:15,p:15000000,d:'HP 上限 +5%。'}
 };
 const RUNE_IDS=Object.keys(RUNE_DEFS);
-RUNE_IDS.forEach(id=>{let r=RUNE_DEFS[id];DB.items[id]={n:r.n,type:'rune',rune:true,runeTier:r.tier,p:r.p,c:r.tier>=5?'text-red-300':(r.tier>=4?'text-orange-300':(r.tier>=3?'text-purple-300':'text-amber-300')),img:'assets/icons/items/rune.svg',noSell:true,noJunk:true,noUse:true,gachaWeight:0,d:r.d};});
+RUNE_IDS.forEach(id=>{let r=RUNE_DEFS[id];DB.items[id]={n:r.n,type:'rune',rune:true,runeTier:r.tier,p:r.p,c:r.tier>=5?'text-red-300':(r.tier>=4?'text-orange-300':(r.tier>=3?'text-purple-300':'text-amber-300')),img:'assets/icons/items/rune.png',noSell:true,noJunk:true,noUse:true,gachaWeight:0,d:r.d};});
 function runeDef(id){return RUNE_DEFS[id]||null;}
 function runeFitsItem(id,item){
     // v3.8.91：所有符文均可鑲入有孔武器／防具，才能完成跨部位字母組合（葉子、潛行）。
