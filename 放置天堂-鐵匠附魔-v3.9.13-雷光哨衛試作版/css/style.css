@@ -3547,7 +3547,8 @@ button.classic-skill-cell { cursor:pointer; }
 .world-lore-book-shell header span { color:#a8a29e; font-size:.78rem; }
 .world-lore-book-shell header b { color:#f6c177; }
 .world-lore-book-intro { flex:0 0 auto; padding:9px 16px; color:#a8a29e; font-size:.8rem; border-bottom:1px solid rgba(120,113,108,.28); }
-.world-lore-book-tools { display:flex; flex:0 0 auto; gap:7px; padding:9px 12px; overflow-x:auto; border-bottom:1px solid rgba(120,113,108,.28); }
+.world-lore-book-tools { display:flex; flex:0 0 auto; gap:7px; padding:9px 12px; overflow-x:auto; scrollbar-width:none; border-bottom:1px solid rgba(120,113,108,.28); }
+.world-lore-book-tools::-webkit-scrollbar { display:none; }
 .world-lore-book-tools button { flex:0 0 auto; padding:6px 11px; color:#a8a29e; font-size:.76rem; font-weight:700; border:1px solid #57534e; border-radius:999px; background:#292524; }
 .world-lore-book-tools button.active { color:#fed7aa; border-color:#b45309; background:#431407; box-shadow:inset 0 0 0 1px rgba(251,146,60,.18); }
 #world-lore-book-body { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; min-height:0; padding:12px; overflow-y:auto; overscroll-behavior:contain; }
@@ -3560,7 +3561,7 @@ button.classic-skill-cell { cursor:pointer; }
 .world-lore-theories { grid-column:1/-1; padding:12px; border:1px solid rgba(120,53,15,.8); border-radius:8px; background:linear-gradient(135deg,rgba(67,20,7,.8),rgba(28,25,23,.9)); }
 .world-lore-theories h3 { margin:0; color:#fdba74; font-size:1rem; }
 .world-lore-theories > p { margin:.25rem 0 .75rem; color:#a8a29e; font-size:.74rem; }
-.world-lore-theories > div { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.world-lore-theories > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
 .world-lore-theory { padding:9px; border:1px solid rgba(234,88,12,.5); border-radius:6px; background:rgba(41,37,36,.75); }
 .world-lore-theory span, .world-lore-theory strong { display:block; }
 .world-lore-theory span { color:#c28555; font-size:.68rem; }
