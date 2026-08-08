@@ -373,11 +373,11 @@
         Object.keys(ITEM_FRAGMENTS).forEach(itemId => {
             let fragment = ITEM_FRAGMENTS[itemId];
             let itemName = (typeof DB !== 'undefined' && DB.items && DB.items[itemId]) ? DB.items[itemId].n : itemId;
-            out.push(Object.assign({ source: '物品・' + itemName, kind: 'item' }, fragment));
+            out.push(Object.assign({ source: '物品・' + itemName, kind: 'item', hint: '仔細查看與這段歷史相關的物品。' }, fragment));
         });
-        Object.keys(AREA_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'area' }, AREA_FRAGMENTS[key])));
-        Object.keys(MOB_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'mob' }, MOB_FRAGMENTS[key])));
-        Object.keys(NPC_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'mob' }, NPC_FRAGMENTS[key])));
+        Object.keys(AREA_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'area', hint: '抵達相關地區後，主動調查附近的痕跡。' }, AREA_FRAGMENTS[key])));
+        Object.keys(MOB_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'mob', hint: '擊敗與這段歷史有關的人物或頭目。' }, MOB_FRAGMENTS[key])));
+        Object.keys(NPC_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'mob', hint: '與知道這段歷史的人物交談。' }, NPC_FRAGMENTS[key])));
         return out.sort((a, b) => Number(a.no) - Number(b.no));
     }
 
@@ -436,8 +436,8 @@
         syncWorldLoreAreaPrompt();
     }
 
-    function worldLoreOnMobEncounter(mob) {
-        reveal(mob && MOB_FRAGMENTS[mob.n], true);
+    function worldLoreOnMobEncounter() {
+        return false;
     }
 
     function worldLoreOnMobKill(mob) {
@@ -487,7 +487,7 @@
         let visible = _worldLoreFilter === 'all' ? all : all.filter(fragment => fragment.kind === _worldLoreFilter);
         body.innerHTML = (_worldLoreFilter === 'all' ? eraHTML(seen) + theoryHTML(seen) : '') + visible.map(fragment => {
             if (!seen.includes(fragment.no)) {
-                return `<article class="world-lore-book-card locked"><div>碎片 ${fragment.no}</div><strong>尚未發現</strong><p>線索仍沉睡在世界的某個角落。</p></article>`;
+                return `<article class="world-lore-book-card locked"><div>碎片 ${fragment.no}</div><strong>尚未發現</strong><p>${fragment.hint || '線索仍沉睡在世界的某個角落。'}</p></article>`;
             }
             return `<article class="world-lore-book-card"><div>碎片 ${fragment.no}・${fragment.source}</div><strong>${fragment.title}</strong>`
                 + fragment.lines.map(line => `<p>${line}</p>`).join('') + `</article>`;
