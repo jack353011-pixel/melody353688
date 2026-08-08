@@ -207,6 +207,13 @@
                 '雪層下仍可見被同一瞬間凍住的道路與界碑，寒氣的源頭一路指向冰之洞窟。',
                 '冰之女王曾協助古亞丁，卻在某次事件後被王國除名；此後她退居洞窟，周圍山區也永遠停在冰雪之中。'
             ]
+        },
+        town_oren: {
+            no: '42', title: '從未停課的魔法城', source: '地區・歐瑞村莊',
+            lines: [
+                '歐瑞的訓練名冊跨越古亞丁與現王國，課程名稱幾度修改，培養魔法師的工作卻從未中斷。',
+                '受訓者後來進入軍隊、學院與宮廷。這座城沒有王座，卻能長期影響王國政治。'
+            ]
         }
     });
 
@@ -328,6 +335,33 @@
         {
             no: 'VII', requires: ['05', '06', '19', '31', '41'], title: '寒冷是除名留下的傷口',
             text: '冰之女王曾為古亞丁提供援助，王室卻在某次事件後抹去她的名字。她退入洞窟時蔓延到整片山區的寒氣，可能不是天災，而是被背棄後留下的結果。'
+        },
+        {
+            no: 'VIII', requires: ['08', '18', '30', '42'], title: '魔法教育也是政治力量',
+            text: '歐瑞長年培養遍布王國的魔法師，象牙塔則保存、修改並解釋魔法紀錄。能決定什麼是正統、什麼能被記住，本身就是不需要王座的權力。'
+        }
+    ]);
+
+    const LORE_ERAS = Object.freeze([
+        {
+            label: '千年前', requires: ['07', '15', '16', '18', '32', '33', '34', '35', '37'],
+            title: '第一次政變與四龍封印',
+            text: '古亞丁在政變期間封印四龍，王朝名義沒有消失，事件經過卻被後世重新書寫。精靈女皇是仍活著的參與者之一。'
+        },
+        {
+            label: '約一百二十年前', requires: ['09', '15', '36'],
+            title: '最後的旁支血脈',
+            text: '公主的父親或母親出自古亞丁王室最後一支旁系。現王國繼承古名與制度，血統卻早已不完整。'
+        },
+        {
+            label: '二十年前', requires: ['09', '18', '23'],
+            title: '政治鬥爭與裂痕重開',
+            text: '公主父母在政治鬥爭中失敗，公主出生於被監視的說話之島；同一場政治風暴也讓希培利亞的時空裂痕短暫開啟。'
+        },
+        {
+            label: '現在', requires: ['09', '10', '20', '36'],
+            title: '從監視之島開始的旅程',
+            text: '公主在王宮規格的監視居所長大。吉倫知道離島密道卻保持沉默，而鬆動過的水龍封印證明千年前的問題仍未結束。'
         }
     ]);
 
@@ -408,6 +442,17 @@
             }).join('') + `</div></section>`;
     }
 
+    function eraHTML(seen) {
+        return `<section class="world-lore-eras"><h3>⌛ 年代斷層</h3><p>線索足夠後才會顯示事件先後；這是目前能拼出的編年，不代表完整歷史。</p><div>`
+            + LORE_ERAS.map(era => {
+                let found = era.requires.filter(no => seen.includes(no)).length;
+                if (found < era.requires.length) {
+                    return `<article class="world-lore-era locked"><span>年代未明・線索 ${found}/${era.requires.length}</span><strong>時間關係尚未確定</strong></article>`;
+                }
+                return `<article class="world-lore-era"><span>${era.label}・已定位</span><strong>${era.title}</strong><p>${era.text}</p></article>`;
+            }).join('') + `</div></section>`;
+    }
+
     function renderWorldLoreBook() {
         let body = document.getElementById('world-lore-book-body');
         let count = document.getElementById('world-lore-book-count');
@@ -423,7 +468,7 @@
             button.classList.toggle('active', filter === _worldLoreFilter);
         });
         let visible = _worldLoreFilter === 'all' ? all : all.filter(fragment => fragment.kind === _worldLoreFilter);
-        body.innerHTML = (_worldLoreFilter === 'all' ? theoryHTML(seen) : '') + visible.map(fragment => {
+        body.innerHTML = (_worldLoreFilter === 'all' ? eraHTML(seen) + theoryHTML(seen) : '') + visible.map(fragment => {
             if (!seen.includes(fragment.no)) {
                 return `<article class="world-lore-book-card locked"><div>碎片 ${fragment.no}</div><strong>尚未發現</strong><p>線索仍沉睡在世界的某個角落。</p></article>`;
             }

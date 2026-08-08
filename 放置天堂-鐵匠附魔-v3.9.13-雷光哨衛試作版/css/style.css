@@ -3569,8 +3569,21 @@ button.classic-skill-cell { cursor:pointer; }
 .world-lore-theory p { margin:.25rem 0 0; color:#d6d3d1; font-size:.74rem; line-height:1.55; }
 .world-lore-theory.locked { border-color:#44403c; }
 .world-lore-theory.locked span, .world-lore-theory.locked strong { color:#57534e; }
+.world-lore-eras { grid-column:1/-1; padding:12px; border:1px solid rgba(59,130,246,.45); border-radius:8px; background:linear-gradient(135deg,rgba(15,23,42,.9),rgba(28,25,23,.9)); }
+.world-lore-eras h3 { margin:0; color:#bfdbfe; font-size:1rem; }
+.world-lore-eras > p { margin:.25rem 0 .75rem; color:#94a3b8; font-size:.74rem; }
+.world-lore-eras > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.world-lore-era { position:relative; padding:10px 10px 10px 14px; border:1px solid rgba(96,165,250,.4); border-radius:6px; background:rgba(30,41,59,.65); }
+.world-lore-era::before { position:absolute; top:12px; bottom:12px; left:6px; width:2px; content:""; background:#60a5fa; }
+.world-lore-era span, .world-lore-era strong { display:block; }
+.world-lore-era span { color:#93c5fd; font-size:.68rem; }
+.world-lore-era strong { margin:.25rem 0; color:#dbeafe; font-size:.82rem; }
+.world-lore-era p { margin:.25rem 0 0; color:#cbd5e1; font-size:.74rem; line-height:1.55; }
+.world-lore-era.locked { border-color:#334155; background:rgba(15,23,42,.45); }
+.world-lore-era.locked::before { background:#334155; }
+.world-lore-era.locked span, .world-lore-era.locked strong { color:#475569; }
 @media (max-width: 640px) { #world-lore-book-body { grid-template-columns:minmax(0,1fr); } .world-lore-book-shell h2 { font-size:1.15rem; } }
-@media (max-width: 640px) { .world-lore-theories > div { grid-template-columns:minmax(0,1fr); } .world-lore-book-tools { padding-inline:10px; } }
+@media (max-width: 640px) { .world-lore-theories > div, .world-lore-eras > div { grid-template-columns:minmax(0,1fr); } .world-lore-book-tools { padding-inline:10px; } }
 .d2-gamble-shop{margin-bottom:16px;padding:14px;border:1px solid rgba(245,158,11,.45);border-radius:10px;background:linear-gradient(135deg,rgba(120,53,15,.3),rgba(15,23,42,.92))}
 .d2-gamble-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .d2-gamble-card{display:grid;grid-template-columns:32px 1fr;grid-template-rows:auto auto;column-gap:8px;text-align:left;align-items:center;padding:9px 10px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#e2e8f0;transition:.15s}
