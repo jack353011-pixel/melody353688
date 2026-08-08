@@ -87,15 +87,182 @@
         }
     });
 
+    const AREA_FRAGMENTS = Object.freeze({
+        sunrise_castle: {
+            no: '13', title: '沒有影子的城墎', source: '地區・日出之國城墎',
+            lines: [
+                '城牆上的日晷全都指向正午，無論此刻是清晨或深夜。',
+                '城內的窗戶一致朝向宮殿，彷彿居民被禁止觀看真正的天空。'
+            ]
+        },
+        sunrise_east: {
+            no: '14', title: '只往東方的足跡', source: '地區・日出之國東之地',
+            lines: [
+                '泥地裡有成千上萬道向東行走的足跡，沒有任何一道折返。',
+                '路旁石碑寫著「迎日之民於此蒙福」，碑後卻刻滿求救的指痕。'
+            ]
+        },
+        sunrise_west: {
+            no: '15', title: '面向落日的墳墓', source: '地區・日出之國西之地',
+            lines: [
+                '這裡的死者全都面向西方下葬，與王庭的葬儀律法完全相反。',
+                '墓碑年份每隔一百年便重複一次，姓名卻從未相同。'
+            ]
+        },
+        sunrise_north: {
+            no: '16', title: '雪下的灰', source: '地區・日出之國北之地',
+            lines: [
+                '北地積雪之下不是凍土，而是一層深不見底的人骨灰。',
+                '灰裡仍有餘溫；每逢黎明，它們便同時低聲數到九千九百九十九。'
+            ]
+        }
+    });
+
+    const MOB_FRAGMENTS = Object.freeze({
+        '白面金毛九尾狐・九尾': {
+            no: '17', title: '玉藻的第二張臉', source: '遭遇・白面金毛九尾狐・九尾',
+            lines: [
+                '人形外皮裂開時，九條尾巴上各浮現一枚不同年代的王印。',
+                '其中八枚已見於史書；最古老的一枚，卻屬於從未存在過的王朝。'
+            ]
+        },
+        '白面金毛九尾狐・殺生石': {
+            no: '18', title: '石中的契約', source: '遭遇・白面金毛九尾狐・殺生石',
+            lines: [
+                '妖狐化石後，石心傳出不屬於她的聲音：「契約仍有效，直到最後一人補齊。」',
+                '那聲音與王城每天宣告黎明的司鐘者一模一樣。'
+            ]
+        },
+        '鵺': {
+            no: '19', title: '夢咒裡的王城', source: '擊敗・鵺',
+            lines: [
+                '鵺讓受害者夢見王城第一次點燃日輪；夢中主持儀式的並不是人類。',
+                '醒來的人都忘了那張臉，只記得它沒有影子。'
+            ]
+        },
+        '天狗': {
+            no: '20', title: '幕後的風', source: '擊敗・天狗',
+            lines: [
+                '天狗倒下時，羽毛沒有落地，而是被一股向上的風吸入天空裂縫。',
+                '裂縫後方沒有星辰，只有巨大齒輪與一條被繃緊的火線。'
+            ]
+        },
+        '阿修羅像': {
+            no: '21', title: '六隻手的用途', source: '擊敗・阿修羅像',
+            lines: [
+                '石像的六隻手並非戰鬥姿勢，而是在共同托住某個圓形重物。',
+                '底座銘文寫著：「日輪墜落之日，六臂者將它送回天上。」'
+            ]
+        },
+        '牛鬼': {
+            no: '22', title: '王庭的運糧車', source: '擊敗・牛鬼',
+            lines: [
+                '牛鬼甲殼下嵌著一枚王庭運糧車的車牌，目的地是已不存在的第十村。',
+                '貨物欄沒有米糧，只記著「活體燃料，一萬」。'
+            ]
+        },
+        '巨大骷髏': {
+            no: '23', title: '萬人共同的遺言', source: '擊敗・巨大骷髏',
+            lines: [
+                '骨骸崩落時，萬人的聲音只說出同一句：「我們不是祭品，我們是證人。」',
+                '最後消失的那顆頭骨很小，額上帶著完整的王族日輪印。'
+            ]
+        }
+    });
+
+    function fragmentList() {
+        let out = [];
+        Object.keys(ITEM_FRAGMENTS).forEach(itemId => {
+            let f = ITEM_FRAGMENTS[itemId];
+            let itemName = (typeof DB !== 'undefined' && DB.items && DB.items[itemId]) ? DB.items[itemId].n : itemId;
+            out.push(Object.assign({ source: '物品・' + itemName }, f));
+        });
+        Object.keys(AREA_FRAGMENTS).forEach(key => out.push(AREA_FRAGMENTS[key]));
+        Object.keys(MOB_FRAGMENTS).forEach(key => out.push(MOB_FRAGMENTS[key]));
+        return out.sort((a, b) => Number(a.no) - Number(b.no));
+    }
+
+    function seenList() {
+        if (typeof player === 'undefined' || !player) return [];
+        if (!Array.isArray(player.worldLoreSeen)) player.worldLoreSeen = [];
+        return player.worldLoreSeen;
+    }
+
+    function reveal(fragment, announce) {
+        if (!fragment || typeof player === 'undefined' || !player) return false;
+        let seen = seenList();
+        if (seen.includes(fragment.no)) return false;
+        seen.push(fragment.no);
+        seen.sort((a, b) => Number(a) - Number(b));
+        if (announce && typeof logSys === 'function') {
+            logSys(`<div class="world-lore-log"><b>◈ 發現世界殘響・碎片 ${fragment.no}</b><strong>${fragment.title}</strong>`
+                + fragment.lines.map(line => `<span>${line}</span>`).join('') + `</div>`);
+        }
+        try { if (typeof saveGame === 'function') saveGame(); } catch (e) {}
+        return true;
+    }
+
     function worldLoreItemHTML(item) {
         const fragment = item && ITEM_FRAGMENTS[item.id];
         if (!fragment) return '';
+        reveal(fragment, false);
         return `<section class="world-lore-fragment"><div class="world-lore-heading">◈ 世界殘響・碎片 ${fragment.no}</div>`
             + `<div><strong>${fragment.title}</strong>`
             + fragment.lines.map(line => `<p>${line}</p>`).join('')
             + `<small>殘響只是被留下的說法，未必是真相。</small></div></section>`;
     }
 
+    function worldLoreOnAreaEnter(mapKey) {
+        reveal(AREA_FRAGMENTS[mapKey], true);
+    }
+
+    function worldLoreOnMobEncounter(mob) {
+        reveal(mob && MOB_FRAGMENTS[mob.n], true);
+    }
+
+    function worldLoreOnMobKill(mob) {
+        reveal(mob && MOB_FRAGMENTS[mob.n], true);
+    }
+
+    function renderWorldLoreBook() {
+        let body = document.getElementById('world-lore-book-body');
+        let count = document.getElementById('world-lore-book-count');
+        if (!body) return;
+        let seen = seenList(), all = fragmentList();
+        if (count) count.textContent = `${seen.length} / ${all.length}`;
+        body.innerHTML = all.map(fragment => {
+            if (!seen.includes(fragment.no)) {
+                return `<article class="world-lore-book-card locked"><div>碎片 ${fragment.no}</div><strong>尚未發現</strong><p>線索仍沉睡在世界的某個角落。</p></article>`;
+            }
+            return `<article class="world-lore-book-card"><div>碎片 ${fragment.no}・${fragment.source}</div><strong>${fragment.title}</strong>`
+                + fragment.lines.map(line => `<p>${line}</p>`).join('') + `</article>`;
+        }).join('');
+    }
+
+    function openWorldLoreBook() {
+        try { if (typeof closeCollectionPanel === 'function') closeCollectionPanel(); } catch (e) {}
+        renderWorldLoreBook();
+        let modal = document.getElementById('world-lore-book');
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeWorldLoreBook() {
+        let modal = document.getElementById('world-lore-book');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    function worldLoreBookBackdrop(event) {
+        if (event && event.target && event.target.id === 'world-lore-book') closeWorldLoreBook();
+    }
+
     window.WORLD_LORE_ITEM_FRAGMENTS = ITEM_FRAGMENTS;
+    window.WORLD_LORE_AREA_FRAGMENTS = AREA_FRAGMENTS;
+    window.WORLD_LORE_MOB_FRAGMENTS = MOB_FRAGMENTS;
     window.worldLoreItemHTML = worldLoreItemHTML;
+    window.worldLoreOnAreaEnter = worldLoreOnAreaEnter;
+    window.worldLoreOnMobEncounter = worldLoreOnMobEncounter;
+    window.worldLoreOnMobKill = worldLoreOnMobKill;
+    window.openWorldLoreBook = openWorldLoreBook;
+    window.closeWorldLoreBook = closeWorldLoreBook;
+    window.worldLoreBookBackdrop = worldLoreBookBackdrop;
 })();

@@ -1181,6 +1181,7 @@ function changeMap(force) {
     if (_changeTarget !== mapState.current && typeof npcClanOnLeaveBattleArea === 'function') npcClanOnLeaveBattleArea(!force);
     if (typeof giltasKeepOnLeave === 'function' && document.getElementById('map-select').value !== mapState.current) giltasKeepOnLeave();   // 🌑 v3.4.16 離開受詛咒聖地（回村/戰敗復活/切圖統一經此·helper 自帶地圖 gate）→ 吉爾塔斯 HP 保留判定＋提示
     mapState.current = document.getElementById('map-select').value;
+    if (typeof worldLoreOnAreaEnter === 'function') worldLoreOnAreaEnter(mapState.current);
     if (!mapState.current.startsWith('town_')) player.lastBattleMap = mapState.current;   // 🔧 記住最後所在的戰鬥地圖，供村莊「出發」按鈕一鍵返回
     { let _c = mapRegionOf(mapState.current); if(_c) { if(!player.lastMapByCat) player.lastMapByCat = {}; player.lastMapByCat[_c] = mapState.current; } }   // 記住各「地區」分類最後到過的地圖（與下拉同鍵）
     mapState.mobs = [null, null, null, null, null];

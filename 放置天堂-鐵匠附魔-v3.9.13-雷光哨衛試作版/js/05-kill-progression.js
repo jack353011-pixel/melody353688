@@ -314,6 +314,7 @@ function doMobTransform(idx) {
     logCombat(mob.transformLogText
         ? `<span class="${getMobColor(mob.lv)}">${mob.n}</span> ${mob.transformLogText}！`
         : `<span class="${getMobColor(mob.lv)}">${mob.n}</span> 的身軀迸發妖力——變身為 <span class="${getMobColor(next.lv)} font-bold">${next.n}</span>！`, 'enemy');   // 🐉 v3.7.59 transformLogText＝前一階自訂變身訊息（完整述句·不接次階名：安塔「受到黑龍之力更深的侵蝕而狂暴」／狂怒「陷入瘋狂，完全失去理智」）；未設者維持通用文
+    if (typeof worldLoreOnMobEncounter === 'function') worldLoreOnMobEncounter(next);
     if (typeof vfxBossEntrance === 'function') { try { vfxBossEntrance(next, mob.transformFxText ? { sub: '◈　頭 目 變 身　◈', name: mob.transformFxText } : null); } catch (e) {} }   // 🌅 v3.4.95 變身名條自訂文字（前一階 transformFxText：玉藻「妖狐展現真面目」／九尾「妖狐露出真身」）
     renderMobs(); updateUI();
 }
@@ -383,6 +384,7 @@ function killMob(idx) {
     // 🔧 轉場建築（往上層的樓梯 / 遺忘之島傳送門）：擊敗即進入下一層/島，不顯示「擊敗了…」戰鬥訊息（race 建築且 noAutoTeleport，排除攻城塔/城門）
     let _hideKillMsg = (mob.race === '建築' && mob.noAutoTeleport);
     if(!_hideKillMsg) logCombat(`擊敗了 <span class="${getMobColor(mob.lv)}">${mob.n}</span>！`, 'player-heavy');  // 👈 新增
+    if (typeof worldLoreOnMobKill === 'function') worldLoreOnMobKill(mob);
     if(typeof runeOnKill==='function')runeOnKill(player);
     // 🤝 v3.7.62 組隊經驗不再拆分：主玩家、每名未倒地傭兵、每隻未倒地寵物各取得完整經驗；既有組隊加成保留。
     let _expEach = mob.exp * (1 + partyExpBonusPct() / 100);

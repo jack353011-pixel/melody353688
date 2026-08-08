@@ -3536,6 +3536,25 @@ button.classic-skill-cell { cursor:pointer; }
 .world-lore-fragment strong { display:block; margin-bottom:.35rem; color:#f5d0a9; }
 .world-lore-fragment p { margin:.3rem 0; }
 .world-lore-fragment small { display:block; margin-top:.55rem; color:#78716c; font-size:.72rem; font-style:italic; }
+.world-lore-log { margin:.35rem 0; padding:.55rem .65rem; border-left:3px solid #b45309; background:rgba(69,26,3,.35); color:#d6d3d1; }
+.world-lore-log b, .world-lore-log strong, .world-lore-log span { display:block; }
+.world-lore-log b { color:#f6c177; }
+.world-lore-log strong { margin:.2rem 0; color:#fed7aa; }
+.world-lore-log span { line-height:1.55; }
+.world-lore-book-shell { display:flex; flex-direction:column; width:min(760px,100%); max-height:92dvh; overflow:hidden; color:#e7e5e4; border:2px solid rgba(180,83,9,.75); border-radius:10px; background:linear-gradient(180deg,#29231f,#171717); box-shadow:0 0 60px rgba(0,0,0,.9); }
+.world-lore-book-shell > header { display:flex; flex:0 0 auto; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px; border-bottom:1px solid rgba(180,83,9,.5); background:linear-gradient(180deg,#442413,#28170f); }
+.world-lore-book-shell h2 { margin:0; color:#fed7aa; font-size:1.4rem; font-weight:800; }
+.world-lore-book-shell header span { color:#a8a29e; font-size:.78rem; }
+.world-lore-book-shell header b { color:#f6c177; }
+.world-lore-book-intro { flex:0 0 auto; padding:9px 16px; color:#a8a29e; font-size:.8rem; border-bottom:1px solid rgba(120,113,108,.28); }
+#world-lore-book-body { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; min-height:0; padding:12px; overflow-y:auto; overscroll-behavior:contain; }
+.world-lore-book-card { padding:11px 12px; border:1px solid rgba(180,83,9,.55); border-radius:7px; background:rgba(41,37,36,.72); }
+.world-lore-book-card > div { color:#d6a56f; font-size:.72rem; }
+.world-lore-book-card strong { display:block; margin:.3rem 0 .4rem; color:#fed7aa; }
+.world-lore-book-card p { margin:.25rem 0; color:#d6d3d1; font-family:"Noto Serif TC","Songti TC",serif; font-size:.84rem; line-height:1.65; }
+.world-lore-book-card.locked { border-color:rgba(87,83,78,.5); background:rgba(28,25,23,.5); }
+.world-lore-book-card.locked > div, .world-lore-book-card.locked strong, .world-lore-book-card.locked p { color:#57534e; }
+@media (max-width: 640px) { #world-lore-book-body { grid-template-columns:minmax(0,1fr); } .world-lore-book-shell h2 { font-size:1.15rem; } }
 .d2-gamble-shop{margin-bottom:16px;padding:14px;border:1px solid rgba(245,158,11,.45);border-radius:10px;background:linear-gradient(135deg,rgba(120,53,15,.3),rgba(15,23,42,.92))}
 .d2-gamble-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .d2-gamble-card{display:grid;grid-template-columns:32px 1fr;grid-template-rows:auto auto;column-gap:8px;text-align:left;align-items:center;padding:9px 10px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#e2e8f0;transition:.15s}
