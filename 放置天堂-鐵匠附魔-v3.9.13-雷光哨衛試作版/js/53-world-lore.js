@@ -366,6 +366,7 @@
     ]);
 
     let _worldLoreFilter = 'all';
+    let _worldLoreCurrentArea = null;
 
     function fragmentList() {
         let out = [];
@@ -415,8 +416,24 @@
             + `<small>殘響只是被留下的說法，未必是真相。</small></div></section>`;
     }
 
+    function syncWorldLoreAreaPrompt() {
+        let prompt = document.getElementById('world-lore-area-prompt');
+        if (!prompt) return;
+        let fragment = AREA_FRAGMENTS[_worldLoreCurrentArea];
+        let show = !!fragment && !seenList().includes(fragment.no);
+        prompt.classList.toggle('hidden', !show);
+    }
+
     function worldLoreOnAreaEnter(mapKey) {
-        reveal(AREA_FRAGMENTS[mapKey], true);
+        _worldLoreCurrentArea = mapKey;
+        syncWorldLoreAreaPrompt();
+    }
+
+    function worldLoreInvestigateArea() {
+        let fragment = AREA_FRAGMENTS[_worldLoreCurrentArea];
+        if (!fragment) return;
+        reveal(fragment, true);
+        syncWorldLoreAreaPrompt();
     }
 
     function worldLoreOnMobEncounter(mob) {
@@ -504,6 +521,7 @@
     window.WORLD_LORE_NPC_FRAGMENTS = NPC_FRAGMENTS;
     window.worldLoreItemHTML = worldLoreItemHTML;
     window.worldLoreOnAreaEnter = worldLoreOnAreaEnter;
+    window.worldLoreInvestigateArea = worldLoreInvestigateArea;
     window.worldLoreOnMobEncounter = worldLoreOnMobEncounter;
     window.worldLoreOnMobKill = worldLoreOnMobKill;
     window.worldLoreOnNpcTalk = worldLoreOnNpcTalk;

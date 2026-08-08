@@ -14,7 +14,7 @@
     <title>放置天堂 - 日出之國</title>
     <link rel="icon" type="image/png" href="assets/favicon.png">   <!-- 🖼️ 瀏覽器分頁圖示(favicon)：把你的圖放到 assets/favicon.png 即生效；可改 href 路徑或副檔名(.ico/.svg) -->
 
-    <link rel="stylesheet" href="css/style.css?v=v3.9.14-world-lore-pdf4">
+    <link rel="stylesheet" href="css/style.css?v=v3.9.14-world-lore-investigate1">
     <link rel="stylesheet" href="css/floating-ui.css?v=v3.9.13-mobile-equipment-back">
     <link rel="stylesheet" href="css/tailwind-built.css"><!-- 🔧 預編譯 Tailwind（取代執行期 JIT tailwind.js）：只含實際用到的 class，省 407KB runtime + 移除持續掃描 DOM 的成本。置於 style.css 之後以保留原 cascade（utility 平手時勝過自訂 class，與舊 JIT 注入順序一致） -->
 </head>
@@ -239,6 +239,11 @@
         <span id="merc-role-hint" class="hidden text-amber-300 font-bold text-base px-3 py-1.5 whitespace-nowrap">目前擔任隊員中</span>
                 </div>
             </div> <!-- 👈 就是少了這個標籤！它是用來把 panel-header 關閉的 -->
+
+            <div id="world-lore-area-prompt" class="hidden" role="status">
+                <span><b>◈ 附近有歷史殘響</b>此處似乎留著一段不屬於現行記錄的痕跡。</span>
+                <button type="button" onclick="worldLoreInvestigateArea()">調查附近殘響</button>
+            </div>
             
             <div id="battle-view" class="p-4"><div id="status-icon-bar" aria-label="角色狀態圖示"></div><div id="mob-list" class="flex gap-4 w-full"></div></div>
                 
@@ -609,7 +614,7 @@
 
     <script src="js/anim-manifest.js?v=v3.8.12-necro-relics"></script>
     <script src="js/00-data.js?v=v3.9.13-mobile-banner-off"></script>
-    <script src="js/53-world-lore.js?v=v3.9.14-world-lore-pdf4"></script>
+    <script src="js/53-world-lore.js?v=v3.9.14-world-lore-investigate1"></script>
 <script src="js/50-mosaic-support-gear.js?v=v3.9.12-mosaic-support"></script>
     <script src="js/01-drops-config.js?v=v3.9.14-rune-alchemy1"></script>
 <script src="js/52-rune-alchemy.js?v=v3.9.14-rune-alchemy1"></script>
