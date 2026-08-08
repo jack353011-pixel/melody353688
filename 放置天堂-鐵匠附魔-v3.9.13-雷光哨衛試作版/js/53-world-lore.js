@@ -255,6 +255,23 @@
         }
     });
 
+    const NPC_FRAGMENTS = Object.freeze({
+        npc_gilen: {
+            no: '36', title: '吉倫沒有回答的問題', source: '交談・吉倫',
+            lines: [
+                '因魔法延壽的吉倫認得古亞丁舊文，也承認說話之島地監底層存在通往大陸的海底通道。',
+                '他知道入口卻沒有告訴公主，只留下一句：「理解之後再決定。」'
+            ]
+        },
+        npc_elfqueen: {
+            no: '37', title: '封龍者關上的門', source: '交談・精靈女皇',
+            lines: [
+                '精靈女皇承認自己參與過千年前的封龍，也承認那時曾與吉倫並肩。',
+                '但她拒絕說明政變當日發生的事：「有些錯誤不能再發生，所以有些門永遠不該打開。」'
+            ]
+        }
+    });
+
     const LORE_THEORIES = Object.freeze([
         {
             no: 'I', requires: ['03', '15', '18', '27'], title: '古亞丁的名字沒有中斷',
@@ -271,6 +288,10 @@
         {
             no: 'IV', requires: ['07', '32', '33', '34', '35'], title: '四龍從未被殺死',
             text: '地、水、火、風四龍留下的是同源封印而非致命傷。海音事件只是法利昂封印曾短暫鬆動的證據，千年前的四龍討伐其實是四龍封印。'
+        },
+        {
+            no: 'V', requires: ['15', '18', '36', '37'], title: '長壽者選擇保持沉默',
+            text: '吉倫與精靈女皇都活過足以接近古亞丁真相的歲月，也都知道現行歷史有缺口；一人要求先理解，一人選擇封門，兩人都沒有把完整答案交給公主。'
         }
     ]);
 
@@ -285,6 +306,7 @@
         });
         Object.keys(AREA_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'area' }, AREA_FRAGMENTS[key])));
         Object.keys(MOB_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'mob' }, MOB_FRAGMENTS[key])));
+        Object.keys(NPC_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'mob' }, NPC_FRAGMENTS[key])));
         return out.sort((a, b) => Number(a.no) - Number(b.no));
     }
 
@@ -333,6 +355,10 @@
 
     function worldLoreOnMobKill(mob) {
         reveal(mob && MOB_FRAGMENTS[mob.n], true);
+    }
+
+    function worldLoreOnNpcTalk(npc) {
+        reveal(npc && NPC_FRAGMENTS[npc.id], true);
     }
 
     function theoryHTML(seen) {
@@ -394,10 +420,12 @@
     window.WORLD_LORE_ITEM_FRAGMENTS = ITEM_FRAGMENTS;
     window.WORLD_LORE_AREA_FRAGMENTS = AREA_FRAGMENTS;
     window.WORLD_LORE_MOB_FRAGMENTS = MOB_FRAGMENTS;
+    window.WORLD_LORE_NPC_FRAGMENTS = NPC_FRAGMENTS;
     window.worldLoreItemHTML = worldLoreItemHTML;
     window.worldLoreOnAreaEnter = worldLoreOnAreaEnter;
     window.worldLoreOnMobEncounter = worldLoreOnMobEncounter;
     window.worldLoreOnMobKill = worldLoreOnMobKill;
+    window.worldLoreOnNpcTalk = worldLoreOnNpcTalk;
     window.worldLoreSetFilter = worldLoreSetFilter;
     window.openWorldLoreBook = openWorldLoreBook;
     window.closeWorldLoreBook = closeWorldLoreBook;
