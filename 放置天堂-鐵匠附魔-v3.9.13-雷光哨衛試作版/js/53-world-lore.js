@@ -367,6 +367,7 @@
 
     let _worldLoreFilter = 'all';
     let _worldLoreCurrentArea = null;
+    let _worldLoreDiscoveryTimer = null;
 
     function fragmentList() {
         let out = [];
@@ -392,6 +393,29 @@
         return player.worldLoreSeen;
     }
 
+    function closeWorldLoreDiscovery() {
+        if (_worldLoreDiscoveryTimer) clearTimeout(_worldLoreDiscoveryTimer);
+        _worldLoreDiscoveryTimer = null;
+        if (typeof document === 'undefined') return;
+        let discovery = document.getElementById('world-lore-discovery');
+        if (discovery) discovery.classList.add('hidden');
+    }
+
+    function showWorldLoreDiscovery(fragment) {
+        if (typeof document === 'undefined') return;
+        let discovery = document.getElementById('world-lore-discovery');
+        let no = document.getElementById('world-lore-discovery-no');
+        let title = document.getElementById('world-lore-discovery-title');
+        let lines = document.getElementById('world-lore-discovery-lines');
+        if (!discovery || !no || !title || !lines) return;
+        no.textContent = `◈ 世界殘響・碎片 ${fragment.no}`;
+        title.textContent = fragment.title;
+        lines.innerHTML = fragment.lines.map(line => `<p>${line}</p>`).join('');
+        discovery.classList.remove('hidden');
+        if (_worldLoreDiscoveryTimer) clearTimeout(_worldLoreDiscoveryTimer);
+        _worldLoreDiscoveryTimer = setTimeout(closeWorldLoreDiscovery, 9000);
+    }
+
     function reveal(fragment, announce) {
         if (!fragment || typeof player === 'undefined' || !player) return false;
         let seen = seenList();
@@ -402,6 +426,7 @@
             logSys(`<div class="world-lore-log"><b>◈ 發現世界殘響・碎片 ${fragment.no}</b><strong>${fragment.title}</strong>`
                 + fragment.lines.map(line => `<span>${line}</span>`).join('') + `</div>`);
         }
+        if (announce) showWorldLoreDiscovery(fragment);
         try { if (typeof saveGame === 'function') saveGame(); } catch (e) {}
         return true;
     }
@@ -529,4 +554,5 @@
     window.openWorldLoreBook = openWorldLoreBook;
     window.closeWorldLoreBook = closeWorldLoreBook;
     window.worldLoreBookBackdrop = worldLoreBookBackdrop;
+    window.closeWorldLoreDiscovery = closeWorldLoreDiscovery;
 })();
