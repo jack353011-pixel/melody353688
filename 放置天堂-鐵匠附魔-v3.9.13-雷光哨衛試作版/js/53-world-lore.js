@@ -217,6 +217,52 @@
         }
     });
 
+    // 同一個故事樞紐可以留下多層證據；玩家每次調查只取出一片，避免把核心史料硬塞到無關地圖。
+    const AREA_EXTRA_FRAGMENTS = Object.freeze({
+        town_talking: Object.freeze([{
+            no: '43', title: '封緘的旁支族譜', source: '地區・說話之島村莊',
+            lines: [
+                '居所書庫裡有一頁被封存的族譜：公主父親或母親，出自約一百二十年前古亞丁王室旁支最後留下的血脈。',
+                '現王國沒有完整繼承古亞丁血統，卻將這名繼承者安置在與王宮同規格、由專人監控的島上。'
+            ]
+        }]),
+        town_aden: Object.freeze([{
+            no: '44', title: '二十年前的流放命令', source: '地區・亞丁城鎮',
+            lines: [
+                '王宮副本把公主父母的敗北寫成「政治流放」，目的地是說話之島；守衛附表卻要求每日回報訪客與行蹤。',
+                '命令旁的舊政變卷宗有相同刪改痕跡。二十年前的鬥爭，像千年前那場被抹去的事件再次發生。'
+            ]
+        }]),
+        talking_island_port: Object.freeze([{
+            no: '45', title: '王室航線的雙聯帳', source: '地區・說話之島港口',
+            lines: [
+                '前一聯記載島與大陸的商船往來，後一聯只記王室抽取的船費、貨稅與獲准登船的人名。',
+                '亞丁大陸與說話之島並非斷絕往來；王室控制的是能離島的航線，以及航線帶來的收入。'
+            ]
+        }]),
+        elf_forest: Object.freeze([{
+            no: '46', title: '樹樁後的骨城', source: '地區・妖魔森林',
+            lines: [
+                '東部森林的樹木被成片砍倒，圍牆與城壘在空地上連成妖魔部落；建築主樑取自巨大怪物骨架。',
+                '骨架數量不是裝飾，而是地位尺度：用得越多，表示主人越強。這套秩序不需要亞丁承認也能運作。'
+            ]
+        }]),
+        heine: Object.freeze([{
+            no: '47', title: '沒有列名的援軍', source: '地區・海音周邊',
+            lines: [
+                '十年前的戰場殘旗仍縫著戰士部族的記號；他們曾在海音危急時出手，城內紀念簿卻找不到援軍姓名。',
+                '倖存者被背棄後仍住在繁華商都邊緣，只留下一句準則：「不要聽他答應什麼，看他願意付出什麼。」'
+            ]
+        }]),
+        town_kent_castle: Object.freeze([{
+            no: '48', title: '兩種城池名冊', source: '地區・肯特城',
+            lines: [
+                '肯特檔案把領地分成「王國法定城池」與「實際控制領地」。妖魔城堡能自行徵稅，仍被王室註記為不具合法性。',
+                '名冊夾著一份政治聯姻草案，原想在某次事件後穩固權力；日期停在二十年前，沒有任何一方完成簽署。'
+            ]
+        }])
+    });
+
     const MOB_FRAGMENTS = Object.freeze({
         '巴風特': {
             no: '26', title: '哈汀召來的異界惡魔', source: '擊敗・巴風特',
@@ -339,6 +385,14 @@
         {
             no: 'VIII', requires: ['08', '18', '30', '42'], title: '魔法教育也是政治力量',
             text: '歐瑞長年培養遍布王國的魔法師，象牙塔則保存、修改並解釋魔法紀錄。能決定什麼是正統、什麼能被記住，本身就是不需要王座的權力。'
+        },
+        {
+            no: 'IX', requires: ['16', '17', '21', '22', '23', '47'], title: '光與暗不是善惡分界',
+            text: '封門、秩序、承擔、選擇、懷疑與行動都是面對舊錯誤的方法。各族真正衝突的是誰能決定代價、何時揭開真相，而不是誰天生代表正義或邪惡。'
+        },
+        {
+            no: 'X', requires: ['09', '15', '24', '25', '45', '46', '48'], title: '王國用制度決定什麼算存在',
+            text: '王國以守衛、航線、糧倉、稅收與城籍控制土地，也以承認或除名控制歷史。妖魔城堡明明能統治與徵稅，卻和古亞丁的斷裂一樣，可以在官方名冊裡被寫成不存在。'
         }
     ]);
 
@@ -359,6 +413,11 @@
             text: '公主父母在政治鬥爭中失敗，公主出生於被監視的說話之島；同一場政治風暴也讓希培利亞的時空裂痕短暫開啟。'
         },
         {
+            label: '十年前', requires: ['47'],
+            title: '戰士援助海音後遭到背棄',
+            text: '戰士曾在海音危急時提供援助，事後卻被排除在城市紀錄之外。繁華重新開始後，他們留在城市邊緣，只相信實際付出的行動。'
+        },
+        {
             label: '現在', requires: ['09', '10', '20', '36'],
             title: '從監視之島開始的旅程',
             text: '公主在王宮規格的監視居所長大。吉倫知道離島密道卻保持沉默，而鬆動過的水龍封印證明千年前的問題仍未結束。'
@@ -369,6 +428,13 @@
     let _worldLoreCurrentArea = null;
     let _worldLoreDiscoveryTimer = null;
 
+    function fragmentsAtArea(mapKey) {
+        let out = [];
+        if (AREA_FRAGMENTS[mapKey]) out.push(AREA_FRAGMENTS[mapKey]);
+        if (AREA_EXTRA_FRAGMENTS[mapKey]) out.push(...AREA_EXTRA_FRAGMENTS[mapKey]);
+        return out;
+    }
+
     function fragmentList() {
         let out = [];
         Object.keys(ITEM_FRAGMENTS).forEach(itemId => {
@@ -377,6 +443,9 @@
             out.push(Object.assign({ source: '物品・' + itemName, kind: 'item', hint: '仔細查看與這段歷史相關的物品。' }, fragment));
         });
         Object.keys(AREA_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'area', hint: '抵達相關地區後，主動調查附近的痕跡。' }, AREA_FRAGMENTS[key])));
+        Object.keys(AREA_EXTRA_FRAGMENTS).forEach(key => AREA_EXTRA_FRAGMENTS[key].forEach(fragment => {
+            out.push(Object.assign({ kind: 'area', hint: '抵達相關地區後，繼續調查同一段歷史留下的其他痕跡。' }, fragment));
+        }));
         Object.keys(MOB_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'mob', hint: '擊敗與這段歷史有關的人物或頭目。' }, MOB_FRAGMENTS[key])));
         Object.keys(NPC_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'mob', hint: '與知道這段歷史的人物交談。' }, NPC_FRAGMENTS[key])));
         return out.sort((a, b) => Number(a.no) - Number(b.no));
@@ -444,9 +513,11 @@
     function syncWorldLoreAreaPrompt() {
         let prompt = document.getElementById('world-lore-area-prompt');
         if (!prompt) return;
-        let fragment = AREA_FRAGMENTS[_worldLoreCurrentArea];
-        let show = !!fragment && !seenList().includes(fragment.no);
-        prompt.classList.toggle('hidden', !show);
+        let seen = seenList();
+        let unseen = fragmentsAtArea(_worldLoreCurrentArea).filter(fragment => !seen.includes(fragment.no));
+        let button = prompt.querySelector('button');
+        prompt.classList.toggle('hidden', unseen.length === 0);
+        if (button) button.textContent = unseen.length > 1 ? `調查附近殘響（${unseen.length}）` : '調查附近殘響';
     }
 
     function worldLoreOnAreaEnter(mapKey) {
@@ -455,7 +526,8 @@
     }
 
     function worldLoreInvestigateArea() {
-        let fragment = AREA_FRAGMENTS[_worldLoreCurrentArea];
+        let seen = seenList();
+        let fragment = fragmentsAtArea(_worldLoreCurrentArea).find(candidate => !seen.includes(candidate.no));
         if (!fragment) return;
         reveal(fragment, true);
         syncWorldLoreAreaPrompt();
@@ -542,6 +614,7 @@
 
     window.WORLD_LORE_ITEM_FRAGMENTS = ITEM_FRAGMENTS;
     window.WORLD_LORE_AREA_FRAGMENTS = AREA_FRAGMENTS;
+    window.WORLD_LORE_AREA_EXTRA_FRAGMENTS = AREA_EXTRA_FRAGMENTS;
     window.WORLD_LORE_MOB_FRAGMENTS = MOB_FRAGMENTS;
     window.WORLD_LORE_NPC_FRAGMENTS = NPC_FRAGMENTS;
     window.worldLoreItemHTML = worldLoreItemHTML;
