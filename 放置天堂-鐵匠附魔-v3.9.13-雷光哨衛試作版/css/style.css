@@ -3547,6 +3547,9 @@ button.classic-skill-cell { cursor:pointer; }
 .world-lore-book-shell header span { color:#a8a29e; font-size:.78rem; }
 .world-lore-book-shell header b { color:#f6c177; }
 .world-lore-book-intro { flex:0 0 auto; padding:9px 16px; color:#a8a29e; font-size:.8rem; border-bottom:1px solid rgba(120,113,108,.28); }
+.world-lore-book-tools { display:flex; flex:0 0 auto; gap:7px; padding:9px 12px; overflow-x:auto; border-bottom:1px solid rgba(120,113,108,.28); }
+.world-lore-book-tools button { flex:0 0 auto; padding:6px 11px; color:#a8a29e; font-size:.76rem; font-weight:700; border:1px solid #57534e; border-radius:999px; background:#292524; }
+.world-lore-book-tools button.active { color:#fed7aa; border-color:#b45309; background:#431407; box-shadow:inset 0 0 0 1px rgba(251,146,60,.18); }
 #world-lore-book-body { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; min-height:0; padding:12px; overflow-y:auto; overscroll-behavior:contain; }
 .world-lore-book-card { padding:11px 12px; border:1px solid rgba(180,83,9,.55); border-radius:7px; background:rgba(41,37,36,.72); }
 .world-lore-book-card > div { color:#d6a56f; font-size:.72rem; }
@@ -3554,7 +3557,19 @@ button.classic-skill-cell { cursor:pointer; }
 .world-lore-book-card p { margin:.25rem 0; color:#d6d3d1; font-family:"Noto Serif TC","Songti TC",serif; font-size:.84rem; line-height:1.65; }
 .world-lore-book-card.locked { border-color:rgba(87,83,78,.5); background:rgba(28,25,23,.5); }
 .world-lore-book-card.locked > div, .world-lore-book-card.locked strong, .world-lore-book-card.locked p { color:#57534e; }
+.world-lore-theories { grid-column:1/-1; padding:12px; border:1px solid rgba(120,53,15,.8); border-radius:8px; background:linear-gradient(135deg,rgba(67,20,7,.8),rgba(28,25,23,.9)); }
+.world-lore-theories h3 { margin:0; color:#fdba74; font-size:1rem; }
+.world-lore-theories > p { margin:.25rem 0 .75rem; color:#a8a29e; font-size:.74rem; }
+.world-lore-theories > div { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.world-lore-theory { padding:9px; border:1px solid rgba(234,88,12,.5); border-radius:6px; background:rgba(41,37,36,.75); }
+.world-lore-theory span, .world-lore-theory strong { display:block; }
+.world-lore-theory span { color:#c28555; font-size:.68rem; }
+.world-lore-theory strong { margin:.25rem 0; color:#fed7aa; font-size:.82rem; }
+.world-lore-theory p { margin:.25rem 0 0; color:#d6d3d1; font-size:.74rem; line-height:1.55; }
+.world-lore-theory.locked { border-color:#44403c; }
+.world-lore-theory.locked span, .world-lore-theory.locked strong { color:#57534e; }
 @media (max-width: 640px) { #world-lore-book-body { grid-template-columns:minmax(0,1fr); } .world-lore-book-shell h2 { font-size:1.15rem; } }
+@media (max-width: 640px) { .world-lore-theories > div { grid-template-columns:minmax(0,1fr); } .world-lore-book-tools { padding-inline:10px; } }
 .d2-gamble-shop{margin-bottom:16px;padding:14px;border:1px solid rgba(245,158,11,.45);border-radius:10px;background:linear-gradient(135deg,rgba(120,53,15,.3),rgba(15,23,42,.92))}
 .d2-gamble-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .d2-gamble-card{display:grid;grid-template-columns:32px 1fr;grid-template-rows:auto auto;column-gap:8px;text-align:left;align-items:center;padding:9px 10px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#e2e8f0;transition:.15s}

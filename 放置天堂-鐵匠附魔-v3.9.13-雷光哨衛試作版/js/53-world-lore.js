@@ -84,6 +84,62 @@
                 '無數骨骸在夢裡反覆看見同一個清晨：王城歡呼、太陽升起，而他們的故鄉從地圖上消失。',
                 '夢的最後，沒有名字的孩子問道：「下一次黎明，輪到哪裡？」'
             ]
+        },
+        relic_sr_kettle_lid: {
+            no: '24', title: '不曾煮過食物的釜',
+            lines: [
+                '鍋蓋內側沾著與封魂符相同的硃砂，刮痕排成「一人一刻，不得停火」。',
+                '嗚釜守著的似乎不是廚房，而是一座被王庭改名為御膳房的焚魂爐。'
+            ]
+        },
+        relic_sr_kama_pot: {
+            no: '25', title: '只給祭品的藥',
+            lines: [
+                '藥壺底部刻著陰陽寮配方：止血、醒神、延命，唯獨沒有治癒疾病的藥材。',
+                '旁註寫著：「燃料必須在看見日輪前保持清醒。」'
+            ]
+        },
+        relic_sr_neck_scarf: {
+            no: '26', title: '高過城牆的目擊者',
+            lines: [
+                '圍巾末端繡著轆轤首的供詞：她將脖頸伸過城牆時，看見日輪懸在一條鐵鏈下。',
+                '審問官在供詞旁批示：「妖怪不懂天空，此頁焚毀。」'
+            ]
+        },
+        relic_sr_kama_blade: {
+            no: '27', title: '早了一息的刀痕',
+            lines: [
+                '尾刃上殘留一截王城鐘繩。切口時間比第九次黎明的鐘聲早了一息。',
+                '官方記錄卻說鐘聲從未中斷；也許那一天，響起的根本不是鐘。'
+            ]
+        },
+        relic_sr_kappa_plate: {
+            no: '28', title: '河床下的九口鐘',
+            lines: [
+                '尻子玉映出一段不屬於持有者的記憶：乾涸河床埋著九口大小相同的晨鐘。',
+                '每口鐘內都有一座王城；其中八座已成廢墟，第九座仍在遠處響著。'
+            ]
+        },
+        relic_sr_nue_tail: {
+            no: '29', title: '鵺吞下的第一場夢',
+            lines: [
+                '黑尾裡封著鵺最古老的夢：真正的太陽墜落海中，眾王在黑暗裡爭奪最後一束火。',
+                '夢醒後，第一任日輪王戴上了沒有影子的王冠。'
+            ]
+        },
+        relic_sr_asura_arm: {
+            no: '30', title: '托日者的反證',
+            lines: [
+                '臂甲六面各刻一段誓詞，前五面效忠王庭，第六面卻寫著：「我們托住的不是太陽。」',
+                '那一面曾被熔毀，字跡卻在每次黎明後重新出現。'
+            ]
+        },
+        relic_sr_child_ring: {
+            no: '31', title: '孩子留下的黑戒',
+            lines: [
+                '黑戒內圈刻著一個沒有列入祭典名冊的乳名，以及「第十村，唯一返還者」。',
+                '戒指會在王族靠近時恢復溫度，像是在等待某個遲到了九個紀元的人。'
+            ]
         }
     });
 
@@ -170,15 +226,32 @@
         }
     });
 
+    const LORE_THEORIES = Object.freeze([
+        {
+            no: 'I', requires: ['04', '07', '09', '13', '20'], title: '被轉動的黎明',
+            text: '日出之國的太陽可能早已熄滅。王庭以萬魂續燃某種懸掛於天空幕後的人工日輪，並把每一次重啟稱為新的黎明。'
+        },
+        {
+            no: 'II', requires: ['10', '11', '18', '23', '31'], title: '少掉的一人',
+            text: '祭典需要一萬人，實際獻上九千九百九十九人。缺席者或許是帶有王印的孩子，也是契約至今未能結束的原因。'
+        },
+        {
+            no: 'III', requires: ['06', '14', '16', '22', '25'], title: '必須清醒的燃料',
+            text: '被帶往東方的人不是單純被殺。他們被迫清醒地目睹假日升起，恐懼與記憶可能才是日輪真正燃燒的東西。'
+        }
+    ]);
+
+    let _worldLoreFilter = 'all';
+
     function fragmentList() {
         let out = [];
         Object.keys(ITEM_FRAGMENTS).forEach(itemId => {
             let f = ITEM_FRAGMENTS[itemId];
             let itemName = (typeof DB !== 'undefined' && DB.items && DB.items[itemId]) ? DB.items[itemId].n : itemId;
-            out.push(Object.assign({ source: '物品・' + itemName }, f));
+            out.push(Object.assign({ source: '物品・' + itemName, kind: 'item' }, f));
         });
-        Object.keys(AREA_FRAGMENTS).forEach(key => out.push(AREA_FRAGMENTS[key]));
-        Object.keys(MOB_FRAGMENTS).forEach(key => out.push(MOB_FRAGMENTS[key]));
+        Object.keys(AREA_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'area' }, AREA_FRAGMENTS[key])));
+        Object.keys(MOB_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'mob' }, MOB_FRAGMENTS[key])));
         return out.sort((a, b) => Number(a.no) - Number(b.no));
     }
 
@@ -224,19 +297,39 @@
         reveal(mob && MOB_FRAGMENTS[mob.n], true);
     }
 
+    function theoryHTML(seen) {
+        return `<section class="world-lore-theories"><h3>◇ 線索交會</h3><p>集齊指定殘響後才會形成推論；推論仍可能是錯的。</p><div>`
+            + LORE_THEORIES.map(theory => {
+                let found = theory.requires.filter(no => seen.includes(no)).length;
+                if (found < theory.requires.length) {
+                    return `<article class="world-lore-theory locked"><span>推論 ${theory.no}・線索 ${found}/${theory.requires.length}</span><strong>尚無法拼合</strong></article>`;
+                }
+                return `<article class="world-lore-theory"><span>推論 ${theory.no}・已拼合</span><strong>${theory.title}</strong><p>${theory.text}</p></article>`;
+            }).join('') + `</div></section>`;
+    }
+
     function renderWorldLoreBook() {
         let body = document.getElementById('world-lore-book-body');
         let count = document.getElementById('world-lore-book-count');
         if (!body) return;
         let seen = seenList(), all = fragmentList();
         if (count) count.textContent = `${seen.length} / ${all.length}`;
-        body.innerHTML = all.map(fragment => {
+        document.querySelectorAll('#world-lore-book-tools button').forEach(button => {
+            button.classList.toggle('active', button.dataset.loreFilter === _worldLoreFilter);
+        });
+        let visible = _worldLoreFilter === 'all' ? all : all.filter(fragment => fragment.kind === _worldLoreFilter);
+        body.innerHTML = (_worldLoreFilter === 'all' ? theoryHTML(seen) : '') + visible.map(fragment => {
             if (!seen.includes(fragment.no)) {
                 return `<article class="world-lore-book-card locked"><div>碎片 ${fragment.no}</div><strong>尚未發現</strong><p>線索仍沉睡在世界的某個角落。</p></article>`;
             }
             return `<article class="world-lore-book-card"><div>碎片 ${fragment.no}・${fragment.source}</div><strong>${fragment.title}</strong>`
                 + fragment.lines.map(line => `<p>${line}</p>`).join('') + `</article>`;
         }).join('');
+    }
+
+    function worldLoreSetFilter(filter) {
+        _worldLoreFilter = ['all', 'item', 'area', 'mob'].includes(filter) ? filter : 'all';
+        renderWorldLoreBook();
     }
 
     function openWorldLoreBook() {
@@ -262,6 +355,7 @@
     window.worldLoreOnAreaEnter = worldLoreOnAreaEnter;
     window.worldLoreOnMobEncounter = worldLoreOnMobEncounter;
     window.worldLoreOnMobKill = worldLoreOnMobKill;
+    window.worldLoreSetFilter = worldLoreSetFilter;
     window.openWorldLoreBook = openWorldLoreBook;
     window.closeWorldLoreBook = closeWorldLoreBook;
     window.worldLoreBookBackdrop = worldLoreBookBackdrop;
