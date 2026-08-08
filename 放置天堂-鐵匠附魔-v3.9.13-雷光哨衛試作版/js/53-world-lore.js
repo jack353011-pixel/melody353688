@@ -353,6 +353,59 @@
         }
     });
 
+    // 人物不會第一次見面就說出全部；先帶回相關物證，再交談才會解開第二層證詞。
+    const NPC_EXTRA_FRAGMENTS = Object.freeze({
+        npc_gilen: Object.freeze([{
+            no: '49', requires: ['09', '10', '36', '43', '44', '45'], title: '兩條離島路線', source: '追問・吉倫',
+            lines: [
+                '當族譜、流放令與港口帳放在他面前，吉倫終於承認：公主的一條離島路受王室查驗，另一條藏在地監海底。',
+                '他早知道兩條路都存在。選擇沉默不是因為無知，而是認為公主還沒理解每條路會讓誰付出代價。'
+            ]
+        }]),
+        npc_elfqueen: Object.freeze([{
+            no: '50', requires: ['16', '22', '37', '46'], title: '分裂不是血統', source: '追問・精靈女皇',
+            lines: [
+                '界碑與骨城的證據讓精靈女皇不再否認：黑暗妖精同樣源自妖精森林，十年大戰以前雙方仍共享相同的祖先。',
+                '真正使族群分裂的不是血統，而是誰有資格決定門能否打開、代價應由誰承受。她仍相信自己的封門沒有錯。'
+            ]
+        }]),
+        npc_duwen: Object.freeze([{
+            no: '51', requires: ['20', '47'], title: '城裡沒有那面旗', source: '追問・多文',
+            lines: [
+                '多文認出海音周邊的殘旗，也證實戰士曾在十年前替這座城作戰；他拒絕說出下令背棄援軍的人。',
+                '他只指向城內沒有戰士姓名的紀念簿：「承諾可以重寫，付出過什麼不能。」'
+            ]
+        }]),
+        npc_kent_guard: Object.freeze([{
+            no: '52', requires: ['24', '45', '48'], title: '治安之外的回報', source: '追問・肯特守衛隊長',
+            lines: [
+                '守衛隊長拿出的派駐令分成兩欄：公開職責是治安與護衛，密封職責是監視地方、傳遞人員與物資情報。',
+                '妖精森林、沉默洞穴、希培利亞、火龍窟與妖魔城堡不在名冊內；不是因為王國不想監視，而是制度還無法直接伸進去。'
+            ]
+        }]),
+        npc_shenien: Object.freeze([{
+            no: '53', requires: ['18', '23', '44'], title: '裂痕記得同一天', source: '追問・希蓮恩',
+            lines: [
+                '希蓮恩把亞丁流放命令的日期與希培利亞重現紀錄疊在一起：政治鬥爭結束的那一天，時空裂痕也短暫開啟。',
+                '她不斷言兩者必有因果，只提醒：「同時發生不是真相，但故意把同一天拆成兩段歷史，也不是偶然。」'
+            ]
+        }]),
+        npc_procel: Object.freeze([{
+            no: '54', requires: ['21', '40'], title: '不是授勳的試煉', source: '追問・普洛凱爾',
+            lines: [
+                '普洛凱爾讀完威頓成年禮與火龍窟階梯的拓印，否認那些試煉是為了選出英雄。',
+                '每一階都在確認龍騎士能否承受龍魂與封印反噬；通過者獲得的不是榮耀，而是繼續守下去的資格。'
+            ]
+        }]),
+        npc_brudica: Object.freeze([{
+            no: '55', requires: ['16', '22', '46'], title: '敗退不是答案', source: '追問・布魯迪卡',
+            lines: [
+                '布魯迪卡承認黑暗妖精在十年大戰中敗退，也承認沉默洞穴的族人仍記得妖精森林曾是故鄉。',
+                '但敗北只決定他們住在哪裡，不能證明精靈女皇有權替所有人拒絕代價：「知道後仍要選，才是我們離開的理由。」'
+            ]
+        }])
+    });
+
     const LORE_THEORIES = Object.freeze([
         {
             no: 'I', requires: ['03', '15', '18', '27'], title: '古亞丁的名字沒有中斷',
@@ -393,6 +446,10 @@
         {
             no: 'X', requires: ['09', '15', '24', '25', '45', '46', '48'], title: '王國用制度決定什麼算存在',
             text: '王國以守衛、航線、糧倉、稅收與城籍控制土地，也以承認或除名控制歷史。妖魔城堡明明能統治與徵稅，卻和古亞丁的斷裂一樣，可以在官方名冊裡被寫成不存在。'
+        },
+        {
+            no: 'XI', requires: ['49', '50', '51', '52', '53', '54', '55'], title: '證人保護的是自己的選擇',
+            text: '吉倫、精靈女皇、戰士、守衛與各族導師並非不知道歷史，而是各自省略會動搖自身信念的部分。把物證帶回去追問，才看得見沉默背後不是同一個理由。'
         }
     ]);
 
@@ -435,6 +492,13 @@
         return out;
     }
 
+    function fragmentsAtNpc(npcId) {
+        let out = [];
+        if (NPC_FRAGMENTS[npcId]) out.push(NPC_FRAGMENTS[npcId]);
+        if (NPC_EXTRA_FRAGMENTS[npcId]) out.push(...NPC_EXTRA_FRAGMENTS[npcId]);
+        return out;
+    }
+
     function fragmentList() {
         let out = [];
         Object.keys(ITEM_FRAGMENTS).forEach(itemId => {
@@ -448,6 +512,9 @@
         }));
         Object.keys(MOB_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'mob', hint: '擊敗與這段歷史有關的人物或頭目。' }, MOB_FRAGMENTS[key])));
         Object.keys(NPC_FRAGMENTS).forEach(key => out.push(Object.assign({ kind: 'mob', hint: '與知道這段歷史的人物交談。' }, NPC_FRAGMENTS[key])));
+        Object.keys(NPC_EXTRA_FRAGMENTS).forEach(key => NPC_EXTRA_FRAGMENTS[key].forEach(fragment => {
+            out.push(Object.assign({ kind: 'mob', hint: '先找到與此人證詞相關的物證，再回去交談追問。' }, fragment));
+        }));
         return out.sort((a, b) => Number(a.no) - Number(b.no));
     }
 
@@ -542,7 +609,13 @@
     }
 
     function worldLoreOnNpcTalk(npc) {
-        reveal(npc && NPC_FRAGMENTS[npc.id], true);
+        if (!npc) return;
+        let seen = seenList();
+        let fragment = fragmentsAtNpc(npc.id).find(candidate => {
+            if (seen.includes(candidate.no)) return false;
+            return !candidate.requires || candidate.requires.every(no => seen.includes(no));
+        });
+        reveal(fragment, true);
     }
 
     function theoryHTML(seen) {
@@ -617,6 +690,7 @@
     window.WORLD_LORE_AREA_EXTRA_FRAGMENTS = AREA_EXTRA_FRAGMENTS;
     window.WORLD_LORE_MOB_FRAGMENTS = MOB_FRAGMENTS;
     window.WORLD_LORE_NPC_FRAGMENTS = NPC_FRAGMENTS;
+    window.WORLD_LORE_NPC_EXTRA_FRAGMENTS = NPC_EXTRA_FRAGMENTS;
     window.worldLoreItemHTML = worldLoreItemHTML;
     window.worldLoreOnAreaEnter = worldLoreOnAreaEnter;
     window.worldLoreInvestigateArea = worldLoreInvestigateArea;
