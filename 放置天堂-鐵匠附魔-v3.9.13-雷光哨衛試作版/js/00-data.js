@@ -1326,11 +1326,11 @@ const DB = {
         "new_item_uncurse": { n: "解除詛咒的卷軸", type: "misc", p: 0, c: "text-cyan-200", d: "於象牙塔『碧恩』處用來移除裝備的詛咒（無法直接使用；沒有卷軸時碧恩也可收費 100 萬金幣解除）。", noUse: true, gachaWeight: 0 },
         // 🚫 v3.2.17「肉 new_item_143」已隨舊項圈夥伴系統移除（誘捕改用 漂浮之眼肉 等專屬誘捕道具）
         "new_item_144": { n: "夏洛伯之爪", p: 1, c: "text-blue-300", gachaWeight: 0 },   // 🔧 試煉材料統一藍色
-        "new_item_145": { n: "阿吐巴圖騰", p: 667, gachaWeight: 0 },
-        "new_item_146": { n: "那魯加圖騰", p: 334, gachaWeight: 0 },
-        "new_item_147": { n: "都達瑪拉圖騰", p: 167, gachaWeight: 0 },
-        "new_item_148": { n: "甘地圖騰", p: 100, gachaWeight: 0 },
-        "new_item_149": { n: "羅孚圖騰", p: 167, gachaWeight: 0 },
+        "new_item_145": { n: "阿吐巴圖騰", p: 667, gachaWeight: 0, d: "燃柳收購桌上最值錢的妖魔圖騰。背面的多道記號，記著它在獵人與地下商人之間轉過幾次手。" },
+        "new_item_146": { n: "那魯加圖騰", p: 334, gachaWeight: 0, d: "燃柳地下市場收購的妖魔圖騰。對許多新手而言，它是第一筆真正的獵物收入。" },
+        "new_item_147": { n: "都達瑪拉圖騰", p: 167, gachaWeight: 0, d: "從燃柳周邊妖魔身上夾回的圖騰。收購者只看部落記號，不問它怎麼來。" },
+        "new_item_148": { n: "甘地圖騰", p: 100, gachaWeight: 0, d: "常見於燃柳收購桌的妖魔圖騰。價錢不高，卻足以讓邊境獵人再買一次補給。" },
+        "new_item_149": { n: "羅孚圖騰", p: 167, gachaWeight: 0, d: "沿妖魔城堡與森林小路流入燃柳的圖騰。圖騰小角留著地下商人的收購刀痕。" },
         "new_item_150": { n: "魔法寶石", p: 99, gachaWeight: 0 },
         "mat_moonlight_breath": { n: "月光之氣息", type: "etc", p: 5000, noUse: true, gachaWeight: 0, c: "text-sky-200", d: "月華凝鍊而成的氣息，賽巴斯寶石加工的稀有材料。" },
         // ===== 雷德的復仇：任務道具（蕾雅部下的證明物，無法裝備）=====
