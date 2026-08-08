@@ -1392,6 +1392,8 @@ function openModal(item, isEq, slot) {
     document.getElementById('modal-item-name').className = `text-2xl font-bold mb-3 border-b border-slate-600 pb-3 flex justify-between items-center ${getItemColor(item)}`;
     
     let desc = buildItemDescHTML(item);
+    // 世界觀只在玩家主動檢查物品時出現；背包卡片與裝備比較欄不塞入長篇說明。
+    if (typeof worldLoreItemHTML === 'function') desc += worldLoreItemHTML(item, d);
     let _modalEquipItem = d.type === 'wpn' || d.type === 'arm' || d.type === 'acc';
     let _modalCanEquip = !_modalEquipItem || checkCanEquip(item);
     if (!isEq && _modalEquipItem && !_modalCanEquip) {

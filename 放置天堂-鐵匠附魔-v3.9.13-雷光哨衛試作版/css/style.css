@@ -3296,26 +3296,39 @@ button.classic-skill-cell { cursor:pointer; }
         max-width: none !important;
         box-sizing: border-box !important;
     }
-    #item-modal > div:not(#modal-compare) { flex: 1 1 auto; min-height: 0; padding: 14px !important; overflow-y: auto; overscroll-behavior: contain; }
+    #item-modal > div:not(#modal-compare) {
+        display: flex !important;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+        padding: 14px !important;
+        overflow: hidden;
+    }
     /* 比較欄依內容決定高度；舊版用 38dvh 當 flex-basis，空欄位也會吃掉近四成畫面。 */
     #modal-compare:not(.hidden) { flex: 0 0 auto; max-height: 22dvh !important; padding: 10px 12px !important; overflow-y: auto; overscroll-behavior: contain; }
     #modal-item-name { font-size: 18px !important; margin-bottom: 8px !important; padding-bottom: 8px !important; }
-    /* 說明內含 details/div 等區塊內容，必須由內容撐高後再接操作列；
-       否則部分手機瀏覽器會沿用舊 <p> 的行盒高度，讓後方按鈕蓋住完整能力。 */
+    /* 能力與世界殘響使用獨立捲動區；操作列保留自己的版面，不會覆蓋說明。 */
     #modal-item-desc {
         display: block !important;
-        height: auto !important;
-        max-height: none !important;
+        flex: 1 1 auto;
+        height: 0 !important;
         min-height: 120px !important;
         margin-bottom: 12px !important;
-        overflow: visible !important;
+        padding-right: 4px;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
         overflow-wrap: anywhere;
         font-size: 14px !important;
     }
     #modal-item-desc .item-detail-full[open] > div { color: #cbd5e1; }
     #modal-actions {
         position: static !important;
+        flex: 0 1 auto;
         clear: both;
+        max-height: 45dvh;
+        overflow-x: hidden;
+        overflow-y: auto;
         gap: 7px !important;
         padding-top: 10px;
         border-top: 1px solid rgba(100,116,139,.45);
@@ -3517,6 +3530,12 @@ button.classic-skill-cell { cursor:pointer; }
 .item-detail-full { margin-top:.3rem; }
 .item-detail-full > summary { color:#60a5fa; font-weight:700; }
 .item-detail-full[open] > summary { color:#93c5fd; }
+.world-lore-fragment { margin-top:.8rem; padding:.65rem .7rem; border:1px solid rgba(180,83,9,.65); border-radius:6px; background:linear-gradient(135deg,rgba(69,26,3,.28),rgba(15,23,42,.7)); }
+.world-lore-heading { margin-bottom:.5rem; color:#f6c177; font-size:.88rem; font-weight:800; letter-spacing:.04em; }
+.world-lore-fragment > div:last-child { color:#d6d3d1; font-family:"Noto Serif TC","Songti TC",serif; font-size:.88rem; line-height:1.7; }
+.world-lore-fragment strong { display:block; margin-bottom:.35rem; color:#f5d0a9; }
+.world-lore-fragment p { margin:.3rem 0; }
+.world-lore-fragment small { display:block; margin-top:.55rem; color:#78716c; font-size:.72rem; font-style:italic; }
 .d2-gamble-shop{margin-bottom:16px;padding:14px;border:1px solid rgba(245,158,11,.45);border-radius:10px;background:linear-gradient(135deg,rgba(120,53,15,.3),rgba(15,23,42,.92))}
 .d2-gamble-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .d2-gamble-card{display:grid;grid-template-columns:32px 1fr;grid-template-rows:auto auto;column-gap:8px;text-align:left;align-items:center;padding:9px 10px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#e2e8f0;transition:.15s}
