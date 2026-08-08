@@ -357,6 +357,7 @@
     const NPC_EXTRA_FRAGMENTS = Object.freeze({
         npc_gilen: Object.freeze([{
             no: '49', requires: ['09', '10', '36', '43', '44', '45'], title: '兩條離島路線', source: '追問・吉倫',
+            lead: '吉倫掃過你帶來的紀錄，沒有繼續回答。還缺能同時證明王室監控、港口航線與地監密道的物證。',
             lines: [
                 '當族譜、流放令與港口帳放在他面前，吉倫終於承認：公主的一條離島路受王室查驗，另一條藏在地監海底。',
                 '他早知道兩條路都存在。選擇沉默不是因為無知，而是認為公主還沒理解每條路會讓誰付出代價。'
@@ -364,6 +365,7 @@
         }]),
         npc_elfqueen: Object.freeze([{
             no: '50', requires: ['16', '22', '37', '46'], title: '分裂不是血統', source: '追問・精靈女皇',
+            lead: '精靈女皇拒絕談論十年大戰。只有同時帶回妖精森林禁令、沉默洞穴界碑與妖魔森林痕跡，才能迫使她面對分裂以前的歷史。',
             lines: [
                 '界碑與骨城的證據讓精靈女皇不再否認：黑暗妖精同樣源自妖精森林，十年大戰以前雙方仍共享相同的祖先。',
                 '真正使族群分裂的不是血統，而是誰有資格決定門能否打開、代價應由誰承受。她仍相信自己的封門沒有錯。'
@@ -371,6 +373,7 @@
         }]),
         npc_duwen: Object.freeze([{
             no: '51', requires: ['20', '47'], title: '城裡沒有那面旗', source: '追問・多文',
+            lead: '多文看向海音城外，叫你不要只讀城內的碑。先比較水都留下的官方紀錄，以及周邊戰場沒有被收走的東西。',
             lines: [
                 '多文認出海音周邊的殘旗，也證實戰士曾在十年前替這座城作戰；他拒絕說出下令背棄援軍的人。',
                 '他只指向城內沒有戰士姓名的紀念簿：「承諾可以重寫，付出過什麼不能。」'
@@ -378,6 +381,7 @@
         }]),
         npc_kent_guard: Object.freeze([{
             no: '52', requires: ['24', '45', '48'], title: '治安之外的回報', source: '追問・肯特守衛隊長',
+            lead: '守衛隊長只承認公開勤務。糧倉、王室航線與城籍名冊之間若沒有共同證據，他不會讓你查看密封派駐令。',
             lines: [
                 '守衛隊長拿出的派駐令分成兩欄：公開職責是治安與護衛，密封職責是監視地方、傳遞人員與物資情報。',
                 '妖精森林、沉默洞穴、希培利亞、火龍窟與妖魔城堡不在名冊內；不是因為王國不想監視，而是制度還無法直接伸進去。'
@@ -385,6 +389,7 @@
         }]),
         npc_shenien: Object.freeze([{
             no: '53', requires: ['18', '23', '44'], title: '裂痕記得同一天', source: '追問・希蓮恩',
+            lead: '希蓮恩說日期比故事可靠。先找出象牙塔的兩份年代、希培利亞重現紀錄，以及亞丁二十年前真正發出的命令。',
             lines: [
                 '希蓮恩把亞丁流放命令的日期與希培利亞重現紀錄疊在一起：政治鬥爭結束的那一天，時空裂痕也短暫開啟。',
                 '她不斷言兩者必有因果，只提醒：「同時發生不是真相，但故意把同一天拆成兩段歷史，也不是偶然。」'
@@ -392,6 +397,7 @@
         }]),
         npc_procel: Object.freeze([{
             no: '54', requires: ['21', '40'], title: '不是授勳的試煉', source: '追問・普洛凱爾',
+            lead: '普洛凱爾不評論外人眼中的英雄試煉。威頓的成年禮與火龍窟階梯都留下拓印後，他才願意說明試煉真正挑選的是什麼。',
             lines: [
                 '普洛凱爾讀完威頓成年禮與火龍窟階梯的拓印，否認那些試煉是為了選出英雄。',
                 '每一階都在確認龍騎士能否承受龍魂與封印反噬；通過者獲得的不是榮耀，而是繼續守下去的資格。'
@@ -399,6 +405,7 @@
         }]),
         npc_brudica: Object.freeze([{
             no: '55', requires: ['16', '22', '46'], title: '敗退不是答案', source: '追問・布魯迪卡',
+            lead: '布魯迪卡要你先看過兩邊留下的邊界：妖精森林的門、沉默洞穴的界碑，以及妖魔森林在戰後形成的秩序。',
             lines: [
                 '布魯迪卡承認黑暗妖精在十年大戰中敗退，也承認沉默洞穴的族人仍記得妖精森林曾是故鄉。',
                 '但敗北只決定他們住在哪裡，不能證明精靈女皇有權替所有人拒絕代價：「知道後仍要選，才是我們離開的理由。」'
@@ -534,22 +541,48 @@
         _worldLoreDiscoveryTimer = null;
         if (typeof document === 'undefined') return;
         let discovery = document.getElementById('world-lore-discovery');
-        if (discovery) discovery.classList.add('hidden');
+        if (discovery) {
+            discovery.classList.add('hidden');
+            delete discovery.dataset.mode;
+        }
     }
 
-    function showWorldLoreDiscovery(fragment) {
+    function showWorldLoreCard(card) {
         if (typeof document === 'undefined') return;
         let discovery = document.getElementById('world-lore-discovery');
         let no = document.getElementById('world-lore-discovery-no');
         let title = document.getElementById('world-lore-discovery-title');
         let lines = document.getElementById('world-lore-discovery-lines');
-        if (!discovery || !no || !title || !lines) return;
-        no.textContent = `◈ 世界殘響・碎片 ${fragment.no}`;
-        title.textContent = fragment.title;
-        lines.innerHTML = fragment.lines.map(line => `<p>${line}</p>`).join('');
+        let footnote = document.getElementById('world-lore-discovery-footnote');
+        if (!discovery || !no || !title || !lines || !footnote) return;
+        discovery.dataset.mode = card.mode || 'discovery';
+        no.textContent = card.label;
+        title.textContent = card.title;
+        lines.innerHTML = card.lines.map(line => `<p>${line}</p>`).join('');
+        footnote.textContent = card.footnote;
         discovery.classList.remove('hidden');
         if (_worldLoreDiscoveryTimer) clearTimeout(_worldLoreDiscoveryTimer);
         _worldLoreDiscoveryTimer = setTimeout(closeWorldLoreDiscovery, 9000);
+    }
+
+    function showWorldLoreDiscovery(fragment) {
+        showWorldLoreCard({
+            mode: 'discovery',
+            label: `◈ 世界殘響・碎片 ${fragment.no}`,
+            title: fragment.title,
+            lines: fragment.lines,
+            footnote: '已收入世界殘響，可在「成長 → 圖鑑收藏」重新閱讀。'
+        });
+    }
+
+    function showWorldLoreLead(npc, fragment, missingCount) {
+        showWorldLoreCard({
+            mode: 'lead',
+            label: '◇ 人物證詞尚未鬆動',
+            title: `${npc.n || '對方'}仍不願回答`,
+            lines: [fragment.lead || '對方似乎仍在等待能支持你追問的物證。', `尚缺 ${missingCount} 組相關物證。`],
+            footnote: '尚未收入圖鑑；找到相關地點的物證後，再回來交談追問。'
+        });
     }
 
     function reveal(fragment, announce) {
@@ -615,7 +648,15 @@
             if (seen.includes(candidate.no)) return false;
             return !candidate.requires || candidate.requires.every(no => seen.includes(no));
         });
-        reveal(fragment, true);
+        if (fragment) {
+            reveal(fragment, true);
+            return;
+        }
+        let locked = fragmentsAtNpc(npc.id).find(candidate => !seen.includes(candidate.no) && candidate.requires);
+        if (locked) {
+            let missingCount = locked.requires.filter(no => !seen.includes(no)).length;
+            showWorldLoreLead(npc, locked, missingCount);
+        }
     }
 
     function theoryHTML(seen) {

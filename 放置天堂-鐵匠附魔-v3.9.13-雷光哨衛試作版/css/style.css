@@ -3597,6 +3597,9 @@ button.classic-skill-cell { cursor:pointer; }
 .world-lore-discovery-card > strong { display:block; margin:5px 0 7px; color:#ffedd5; font-size:1.05rem; }
 #world-lore-discovery-lines p { margin:4px 0; color:#d6d3d1; font-family:"Noto Serif TC","Songti TC",serif; font-size:.8rem; line-height:1.55; }
 .world-lore-discovery-card small { display:block; margin-top:8px; padding-top:7px; color:#a8a29e; font-size:.68rem; border-top:1px solid rgba(120,113,108,.35); }
+#world-lore-discovery[data-mode="lead"] .world-lore-discovery-card { border-color:#64748b; background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(24,24,27,.98)); box-shadow:0 12px 45px rgba(0,0,0,.78),0 0 24px rgba(100,116,139,.2); }
+#world-lore-discovery[data-mode="lead"] .world-lore-discovery-card header span { color:#93c5fd; }
+#world-lore-discovery[data-mode="lead"] .world-lore-discovery-card > strong { color:#e2e8f0; }
 @keyframes world-lore-discovery-in { from { opacity:0; transform:translateY(-10px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
 @media (max-width: 640px) { #world-lore-book-body { grid-template-columns:minmax(0,1fr); } .world-lore-book-shell h2 { font-size:1.15rem; } }
 @media (max-width: 640px) { .world-lore-theories > div, .world-lore-eras > div { grid-template-columns:minmax(0,1fr); } .world-lore-book-tools { padding-inline:10px; } }
