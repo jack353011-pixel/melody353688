@@ -830,7 +830,8 @@ const GEM_RANKS = [
 ];
 const GEM_IDS = [];
 Object.keys(GEM_COLORS).forEach(color => GEM_RANKS.forEach((rank,index) => {
-    let id=`gem_${color}_${index+1}`, c=GEM_COLORS[color], img=`assets/icons/items/gem-${color}.svg`;
+    // 使用 PNG 避免部分 Android 手機瀏覽器在長清單延遲載入 SVG 時留下空白圖示。
+    let id=`gem_${color}_${index+1}`, c=GEM_COLORS[color], img=`assets/icons/items/gem-${color}.png`;
     GEM_IDS.push(id);
     DB.items[id]={n:`${rank.n}${c.n}`,type:'gem',gem:true,gemColor:color,gemRank:index+1,p:rank.value,c:`text-${color==='white'?'slate':color==='yellow'?'yellow':color==='purple'?'purple':color}-${color==='red'?'400':'300'}`,img:img||undefined,noSell:true,noJunk:true,noUse:true,gachaWeight:0,d:'可鑲嵌於已開啟的裝備空孔；武器與防具會產生不同能力。'};
 }));
