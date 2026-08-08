@@ -3569,6 +3569,15 @@ button.classic-skill-cell { cursor:pointer; }
 .world-lore-theory p { margin:.25rem 0 0; color:#d6d3d1; font-size:.74rem; line-height:1.55; }
 .world-lore-theory.locked { border-color:#44403c; }
 .world-lore-theory.locked span, .world-lore-theory.locked strong { color:#57534e; }
+.world-lore-leads { grid-column:1/-1; padding:12px; border:1px solid rgba(100,116,139,.65); border-radius:8px; background:linear-gradient(135deg,rgba(30,41,59,.9),rgba(28,25,23,.9)); }
+.world-lore-leads h3 { margin:0; color:#bfdbfe; font-size:1rem; }
+.world-lore-leads > p { margin:.25rem 0 .75rem; color:#94a3b8; font-size:.74rem; }
+.world-lore-leads > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.world-lore-lead-note { padding:9px; border:1px solid rgba(100,116,139,.55); border-radius:6px; background:rgba(30,41,59,.65); }
+.world-lore-lead-note span, .world-lore-lead-note strong { display:block; }
+.world-lore-lead-note span { color:#93c5fd; font-size:.68rem; }
+.world-lore-lead-note strong { margin:.25rem 0; color:#e2e8f0; font-size:.84rem; }
+.world-lore-lead-note p { margin:0; color:#cbd5e1; font-family:"Noto Serif TC","Songti TC",serif; font-size:.76rem; line-height:1.55; }
 .world-lore-eras { grid-column:1/-1; padding:12px; border:1px solid rgba(59,130,246,.45); border-radius:8px; background:linear-gradient(135deg,rgba(15,23,42,.9),rgba(28,25,23,.9)); }
 .world-lore-eras h3 { margin:0; color:#bfdbfe; font-size:1rem; }
 .world-lore-eras > p { margin:.25rem 0 .75rem; color:#94a3b8; font-size:.74rem; }
@@ -3602,7 +3611,7 @@ button.classic-skill-cell { cursor:pointer; }
 #world-lore-discovery[data-mode="lead"] .world-lore-discovery-card > strong { color:#e2e8f0; }
 @keyframes world-lore-discovery-in { from { opacity:0; transform:translateY(-10px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
 @media (max-width: 640px) { #world-lore-book-body { grid-template-columns:minmax(0,1fr); } .world-lore-book-shell h2 { font-size:1.15rem; } }
-@media (max-width: 640px) { .world-lore-theories > div, .world-lore-eras > div { grid-template-columns:minmax(0,1fr); } .world-lore-book-tools { padding-inline:10px; } }
+@media (max-width: 640px) { .world-lore-theories > div, .world-lore-eras > div, .world-lore-leads > div { grid-template-columns:minmax(0,1fr); } .world-lore-book-tools { padding-inline:10px; } }
 @media (max-width: 640px) { #world-lore-area-prompt { align-items:stretch; flex-direction:column; gap:7px; margin-inline:8px; } #world-lore-area-prompt button { width:100%; min-height:42px; } }
 @media (max-width: 640px) { #world-lore-discovery { top:auto; bottom:72px; width:calc(100vw - 16px); } .world-lore-discovery-card { max-height:52dvh; padding:11px 12px; overflow-y:auto; } .world-lore-discovery-card > strong { font-size:.96rem; } }
 .d2-gamble-shop{margin-bottom:16px;padding:14px;border:1px solid rgba(245,158,11,.45);border-radius:10px;background:linear-gradient(135deg,rgba(120,53,15,.3),rgba(15,23,42,.92))}

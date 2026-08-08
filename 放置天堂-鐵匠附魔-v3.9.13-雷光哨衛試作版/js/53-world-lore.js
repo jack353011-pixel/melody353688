@@ -529,11 +529,27 @@
         if (typeof player === 'undefined' || !player) return [];
         if (player.worldLoreVersion !== LORE_VERSION) {
             player.worldLoreSeen = [];
+            player.worldLoreLeadsSeen = [];
             player.worldLoreVersion = LORE_VERSION;
             try { if (player.cls && typeof saveGame === 'function') saveGame(); } catch (e) {}
         }
         if (!Array.isArray(player.worldLoreSeen)) player.worldLoreSeen = [];
         return player.worldLoreSeen;
+    }
+
+    function leadSeenList() {
+        if (typeof player === 'undefined' || !player) return [];
+        if (!Array.isArray(player.worldLoreLeadsSeen)) player.worldLoreLeadsSeen = [];
+        return player.worldLoreLeadsSeen;
+    }
+
+    function rememberWorldLoreLead(fragment) {
+        if (!fragment || typeof player === 'undefined' || !player) return;
+        let heard = leadSeenList();
+        if (heard.includes(fragment.no)) return;
+        heard.push(fragment.no);
+        heard.sort((a, b) => Number(a) - Number(b));
+        try { if (typeof saveGame === 'function') saveGame(); } catch (e) {}
     }
 
     function closeWorldLoreDiscovery() {
@@ -581,7 +597,7 @@
             label: '◇ 人物證詞尚未鬆動',
             title: `${npc.n || '對方'}仍不願回答`,
             lines: [fragment.lead || '對方似乎仍在等待能支持你追問的物證。', `尚缺 ${missingCount} 組相關物證。`],
-            footnote: '尚未收入圖鑑；找到相關地點的物證後，再回來交談追問。'
+            footnote: '追問方向已記入「世界殘響 → 未解證詞」；找到相關物證後，再回來交談。'
         });
     }
 
@@ -655,8 +671,24 @@
         let locked = fragmentsAtNpc(npc.id).find(candidate => !seen.includes(candidate.no) && candidate.requires);
         if (locked) {
             let missingCount = locked.requires.filter(no => !seen.includes(no)).length;
+            rememberWorldLoreLead(locked);
             showWorldLoreLead(npc, locked, missingCount);
         }
+    }
+
+    function leadNotesHTML(seen) {
+        let heard = leadSeenList();
+        let notes = [];
+        Object.keys(NPC_EXTRA_FRAGMENTS).forEach(key => NPC_EXTRA_FRAGMENTS[key].forEach(fragment => {
+            if (heard.includes(fragment.no) && !seen.includes(fragment.no)) notes.push(fragment);
+        }));
+        if (!notes.length) return '';
+        return `<section class="world-lore-leads"><h3>◇ 未解證詞</h3><p>只記錄你親自追問過的人；取得物證後再回去交談。</p><div>`
+            + notes.map(fragment => {
+                let found = fragment.requires.filter(no => seen.includes(no)).length;
+                return `<article class="world-lore-lead-note"><span>${fragment.source}・物證 ${found}/${fragment.requires.length}</span>`
+                    + `<strong>證詞仍未鬆動</strong><p>${fragment.lead}</p></article>`;
+            }).join('') + `</div></section>`;
     }
 
     function theoryHTML(seen) {
@@ -696,7 +728,7 @@
             button.classList.toggle('active', filter === _worldLoreFilter);
         });
         let visible = _worldLoreFilter === 'all' ? all : all.filter(fragment => fragment.kind === _worldLoreFilter);
-        body.innerHTML = (_worldLoreFilter === 'all' ? eraHTML(seen) + theoryHTML(seen) : '') + visible.map(fragment => {
+        body.innerHTML = (_worldLoreFilter === 'all' ? leadNotesHTML(seen) + eraHTML(seen) + theoryHTML(seen) : '') + visible.map(fragment => {
             if (!seen.includes(fragment.no)) {
                 return `<article class="world-lore-book-card locked"><div>碎片 ${fragment.no}</div><strong>尚未發現</strong><p>${fragment.hint || '線索仍沉睡在世界的某個角落。'}</p></article>`;
             }
