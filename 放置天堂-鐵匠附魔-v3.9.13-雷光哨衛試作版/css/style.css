@@ -3300,9 +3300,26 @@ button.classic-skill-cell { cursor:pointer; }
     /* 比較欄依內容決定高度；舊版用 38dvh 當 flex-basis，空欄位也會吃掉近四成畫面。 */
     #modal-compare:not(.hidden) { flex: 0 0 auto; max-height: 22dvh !important; padding: 10px 12px !important; overflow-y: auto; overscroll-behavior: contain; }
     #modal-item-name { font-size: 18px !important; margin-bottom: 8px !important; padding-bottom: 8px !important; }
-    #modal-item-desc { font-size: 14px !important; margin-bottom: 12px !important; min-height: 120px !important; }
+    /* 說明內含 details/div 等區塊內容，必須由內容撐高後再接操作列；
+       否則部分手機瀏覽器會沿用舊 <p> 的行盒高度，讓後方按鈕蓋住完整能力。 */
+    #modal-item-desc {
+        display: block !important;
+        height: auto !important;
+        max-height: none !important;
+        min-height: 120px !important;
+        margin-bottom: 12px !important;
+        overflow: visible !important;
+        overflow-wrap: anywhere;
+        font-size: 14px !important;
+    }
     #modal-item-desc .item-detail-full[open] > div { color: #cbd5e1; }
-    #modal-actions { gap: 7px !important; }
+    #modal-actions {
+        position: static !important;
+        clear: both;
+        gap: 7px !important;
+        padding-top: 10px;
+        border-top: 1px solid rgba(100,116,139,.45);
+    }
     #modal-actions button, #modal-actions label, #item-modal > div:not(#modal-compare) > button { min-height: 38px; padding: 6px 8px !important; font-size: 14px !important; }
     #item-modal > div:not(#modal-compare) > button { margin-top: 8px !important; }
 
