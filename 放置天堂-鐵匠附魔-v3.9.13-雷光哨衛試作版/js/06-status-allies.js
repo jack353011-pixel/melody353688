@@ -1937,6 +1937,9 @@ function allyWeaponProcs(ally, target, hitInfo, instOverride) {
                 let _jsa = DB.items[ally.eq.shield.id];
                 if (_jsa && _jsa.judgmentThunder && _jsa.judgmentThunder.requireWpn === wpnInst.id) _spA = _jsa.judgmentThunder;
             }
+            if (_spA && _spA.skn === '審判落雷' && (ally.buffs.sk_kurt_thunder_edict || 0) > 0) {
+                _spA = Object.assign({}, _spA, { flat: (_spA.flat || 0) + (DB.skills.sk_kurt_thunder_edict.kurtJudgmentFlatBonus || 0) });
+            }
             if (st) { if (_spA) allyProcWeaponSpell(ally, st, _spA, _en); else allyProcFreeMagicSkill(ally, st, wpn.procSkill, _en, false, wpn); }
         }
     }

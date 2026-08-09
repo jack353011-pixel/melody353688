@@ -690,6 +690,10 @@ function weaponSpellProc(target, attackHit, instOverride) {
         let _jshd = DB.items[player.eq.shield.id];
         if (_jshd && _jshd.judgmentThunder && _jshd.judgmentThunder.requireWpn === inst.id) _spEff = _jshd.judgmentThunder;
     }
+    // ⚡ 雷霆敕令只強化克特劍盾合一後的審判落雷；複製資料，避免永久改寫 DB。
+    if (_spEff && _spEff.skn === '審判落雷' && (player.buffs.sk_kurt_thunder_edict || 0) > 0) {
+        _spEff = Object.assign({}, _spEff, { flat: (_spEff.flat || 0) + (DB.skills.sk_kurt_thunder_edict.kurtJudgmentFlatBonus || 0) });
+    }
     if (_spEff) procWeaponSpell(t, _spEff, en);
     else if (wpn.procSkill) procFreeMagicSkill(t, wpn.procSkill, en, false, wpn);   // 🔧 武器免費施法：階級依潘朵拉權重／傳說／遺物判定
 }
