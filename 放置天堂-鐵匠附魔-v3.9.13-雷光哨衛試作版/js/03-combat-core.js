@@ -1933,6 +1933,77 @@ function applyPledgeEnemyScaling(mob) {
     mob.regenEvery = scaledEnemyThresholdValue(L, 50, 10, 20);        // 50~100：每2秒回40；50以下：每1秒回15
 }
 
+// ===== 👑 軍團首領耐久 =====
+// 首領生成時依「實際在場戰力」一次性提高 HP；不提高攻擊力，單人完全不變。
+// 傭兵是完整角色快照，權重較高；多實體召喚術以整組計算，避免低階 6 隻被當成 6 名完整角色。
+// 倍率固定在該首領身上，隊員倒地後不回降；三段變身由 doMobTransform 繼承初始倍率。
+const BOSS_ARMY_RAID_IDS = new Set([
+    'antaras', 'fafurion', 'valakas', 'lindvior',
+    'sanct_giltas', 'sanct_dantes',
+    'ant_antharas_eroded', 'ant_antharas_fury', 'ant_antharas_mad'
+]);
+function _bossArmyAlive(list, hpKey) {
+    return (Array.isArray(list) ? list : []).filter(x => x && !x._downed && ((x[hpKey] != null ? x[hpKey] : 1) > 0));
+}
+function _bossArmyIllusionCount(ownerList) {
+    return ownerList.filter(o => {
+        if (!o || o.mastery !== 'i_illusion') return false;
+        let b = o.buffs || {};
+        return (b.sk_illu_ogre || 0) > 0 || (b.sk_illu_lich || 0) > 0 || (b.sk_illu_golem || 0) > 0;
+    }).length;
+}
+function bossArmySnapshot() {
+    let allies = _bossArmyAlive((player && player.allies) || [], 'curHp');
+    let pets = [];
+    let summons = [];
+    let skeletons = [];
+    let mercSummons = [];
+    try { if (typeof petsOutList === 'function') pets = _bossArmyAlive(petsOutList(), 'hp'); } catch (e) {}
+    try { if (typeof summonV2List === 'function') summons = _bossArmyAlive(summonV2List(), 'hp'); } catch (e) {}
+    try { if (typeof necroSkeletonList === 'function') skeletons = _bossArmyAlive(necroSkeletonList(), 'hp'); } catch (e) {}
+    try { if (typeof mercSummonList === 'function') mercSummons = _bossArmyAlive(mercSummonList(), 'hp'); } catch (e) {}
+    let playerSummonGroup = summons.length > 0 || !!(player && (player.summon || player.charmed));
+    let illusionOwners = [];
+    if (player && !player.dead && (player.hp || 0) > 0) illusionOwners.push(player);
+    illusionOwners = illusionOwners.concat(allies);
+    return {
+        allies: allies.length,
+        pets: pets.length,
+        playerSummonGroup: playerSummonGroup ? 1 : 0,
+        skeletonGroup: skeletons.length > 0 ? 1 : 0,
+        mercSummons: mercSummons.length,
+        illusions: _bossArmyIllusionCount(illusionOwners)
+    };
+}
+function bossArmyHpMultiplier(mob, mobId, snapshot) {
+    if (!mob || !mob.boss || mob.siegeEnemy || mob.race === '建築') return 1;
+    let s = snapshot || bossArmySnapshot();
+    let raw = 1
+        + s.allies * 0.65
+        + s.pets * 0.15
+        + s.playerSummonGroup * 0.50
+        + s.skeletonGroup * 0.35
+        + s.mercSummons * 0.25
+        + s.illusions * 0.25;
+    let cap = BOSS_ARMY_RAID_IDS.has(mobId) ? 5.5 : 8;
+    return Math.round(Math.max(1, Math.min(cap, raw)) * 100) / 100;
+}
+function applyBossArmyScaling(mob, mobId, inherited) {
+    if (!mob) return 1;
+    if (mob._armyHpMult != null) return mob._armyHpMult;
+    if (!mob.boss || mob.siegeEnemy || mob.race === '建築') return 1;   // 一般怪／城門不建立快照，避免每次補怪都掃描整支隊伍
+    let snapshot = inherited && inherited._armySnapshot ? inherited._armySnapshot : bossArmySnapshot();
+    let mult = inherited && inherited._armyHpMult != null
+        ? Math.max(1, Number(inherited._armyHpMult) || 1)
+        : bossArmyHpMultiplier(mob, mobId, snapshot);
+    mob._armySnapshot = snapshot;
+    mob._armyHpMult = mult;
+    if (mult <= 1) return mult;
+    mob.hp = Math.max(1, Math.floor((Number(mob.hp) || 1) * mult));
+    mob.curHp = mob.hp;
+    return mult;
+}
+
 // 生命的祝福：每 tick 推進；達到間隔時為場上所有血盟怪物（HP 未滿）回復，持續期滿自動結束
 function pledgeBlessTick() {
     let pb = mapState.pledgeBless;
@@ -1968,6 +2039,7 @@ function spawnMob(idx) {
             let _ab = DB.mobs[_aid]; if (!_ab) return;
             mapState.mobs[idx] = { ..._ab, curHp: _ab.hp, uid: uid(), _born: ++_mobBornSeq, _bornMs: Date.now(), _magCd: {}, justHit: false, st: newMobStatus() };
             applySherineBuff(idx);   // 🐉 v3.7.61 初始區域頭目也套用席琳世界，與後續變身階段一致
+            applyBossArmyScaling(mapState.mobs[idx], _aid);
             if (_ab.hard) initHardSkin(mapState.mobs[idx]);
             if (_ab.boss && typeof vfxBossEntrance === 'function') vfxBossEntrance(mapState.mobs[idx]);
             renderMobs(); return;
@@ -1983,6 +2055,7 @@ function spawnMob(idx) {
         let _b = DB.mobs[_id]; if(!_b) return;
         mapState.mobs[idx] = { ..._b, curHp: _b.hp, uid: uid(), _born: ++_mobBornSeq, _bornMs: Date.now(), _magCd: {}, justHit: false, st: newMobStatus() };
         applySherineBuff(idx);   // 🔮 軍王之室／底比斯歐西里斯祭壇也吃「席琳的世界」強化＋_sherine（與一般出怪一致；不含恩賜 grace；須在 initHardSkin 之前）
+        applyBossArmyScaling(mapState.mobs[idx], _id);
         if(mapState.mobs[idx].hard) initHardSkin(mapState.mobs[idx]);
         if (_b.boss && typeof vfxBossEntrance === 'function') { try { vfxBossEntrance(mapState.mobs[idx]); } catch (e) {} }   // 🐉 v3.4.95 軍王之室／祭壇頭目也播出場特效
         return;
@@ -2188,6 +2261,7 @@ function spawnMob(idx) {
     }
     if(base.siegeEnemy) applySiegeEnemyScaling(mapState.mobs[idx]);   // 攻城敵人：依玩家等級縮放
     applySherineBuff(idx);   // 🔮 席琳的世界強化＋_sherine（與時空裂痕共用 applySherineBuff）
+    applyBossArmyScaling(mapState.mobs[idx], mobId);   // 👑 軍團耐久：席琳 HP 倍率後再依在場戰力一次性縮放
     if(mapState.mobs[idx].hard) initHardSkin(mapState.mobs[idx]);   // 🔧 硬皮：依等級/頭目/席琳世界初始化硬皮值（須在席琳 _sherine 標記之後）
     // 🔧 攻城城門/守護塔 HP 跨地圖保留（兩座城共用 gateHp/towerHp，依當前攻城城池的城門/塔名稱判定）
     if(base.siegeEnemy && player.siege) {
@@ -2198,7 +2272,10 @@ function spawnMob(idx) {
     // 🌑 v3.3.33 吉爾塔斯 HP 保留（黑暗妖精聖地.md）：戰敗時持完整的召喚球→js/05 revive 消耗 1 顆並記錄 player.giltasKeep；
     //    下次進入受詛咒聖地首次生成時還原 HP（一次性·還原即清除→之後離開再進＝全新吉爾塔斯）
     if(mobId === 'sanct_giltas' && player.giltasKeep && player.giltasKeep.hp > 0) {
-        mapState.mobs[idx].curHp = Math.min(mapState.mobs[idx].hp, player.giltasKeep.hp);
+        let _gkPct = Number(player.giltasKeep.hpPct);
+        mapState.mobs[idx].curHp = Number.isFinite(_gkPct) && _gkPct > 0
+            ? Math.max(1, Math.min(mapState.mobs[idx].hp, Math.floor(mapState.mobs[idx].hp * Math.min(1, _gkPct))))
+            : Math.min(mapState.mobs[idx].hp, player.giltasKeep.hp);   // 舊存檔相容：沒有 hpPct 時沿用固定 HP
         player.giltasKeep = null;
         logSys('<span class="text-red-300">完整的召喚球之力仍束縛著吉爾塔斯——牠的傷勢沒有癒合！</span>');
     }

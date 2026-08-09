@@ -310,6 +310,7 @@ function doMobTransform(idx) {
     let next = { ...base, curHp: base.hp, uid: uid(), _born: mob._born, _magCd: {}, justHit: false, st: newMobStatus(), _bornMs: mob._bornMs || Date.now(), _justTransformedTick: state.ticks };
     mapState.mobs[idx] = next;
     if (typeof applySherineBuff === 'function') { try { applySherineBuff(idx); } catch (e) {} }   // 🔮 審查修：席琳的世界強化跨變身沿用（與 spawnMob/spawnRiftMob 同序·須在 initHardSkin 之前）
+    if (typeof applyBossArmyScaling === 'function') applyBossArmyScaling(next, mob.transformTo, mob);   // 👑 變身鏈沿用第一階生成時的軍團倍率，隊員中途倒地不降低後續階段 HP
     if (base.hard) initHardSkin(next);
     logCombat(mob.transformLogText
         ? `<span class="${getMobColor(mob.lv)}">${mob.n}</span> ${mob.transformLogText}！`
@@ -1341,6 +1342,7 @@ function spawnRiftMob(idx) {
     let base = DB.mobs[mobId];
     mapState.mobs[idx] = { ...base, curHp: base.hp, uid: uid(), _born: ++_mobBornSeq, _magCd: {}, justHit: false, st: newMobStatus() };
     applySherineBuff(idx);   // 🔮 時空裂痕也吃席琳世界：怪物強化＋_sherine（詞綴／×3掉／×2傷由 _sherine 帶動）；須在 initHardSkin 前
+    if (typeof applyBossArmyScaling === 'function') applyBossArmyScaling(mapState.mobs[idx], mobId);   // 👑 裂痕頭目同樣依在場軍團取得一次性 HP 倍率
     if (mapState.mobs[idx].hard) initHardSkin(mapState.mobs[idx]);
     applySherineGrace(idx);   // 🔮 席琳的恩賜（1% 機率）
     if (base.boss && typeof vfxBossEntrance === 'function') { try { vfxBossEntrance(mapState.mobs[idx]); } catch (e) {} }   // 🐉 v3.4.95 時空裂痕頭目也播出場特效（函式內部吃 _vfxMute → 補跑不播）
@@ -1414,7 +1416,8 @@ function checkLvUp() {
 
 // 🌑 v3.4.16 吉爾塔斯 HP 保留（統一收口·用戶：戰鬥中「離開」也適用）：離開 受詛咒的黑暗妖精聖地 的所有路徑
 //    （回村/戰敗復活/切換地圖→changeMap js/11、瞬移→doTeleport js/02）皆呼叫本函式（內自帶地圖 gate·各路徑一次觸發不重複）。
-//    吉爾塔斯存活「且已受傷」＋身上有 完整的召喚球 → 消耗 1 顆、記錄 player.giltasKeep={hp}（js/03 spawnMob 還原·一次性）＋系統提示；
+//    吉爾塔斯存活「且已受傷」＋身上有 完整的召喚球 → 消耗 1 顆、記錄剩餘 HP 與比例（js/03 spawnMob 還原·一次性）＋系統提示；
+//    軍團耐久會依重新入場時的隊伍改變最大 HP，故新版優先按 hpPct 還原相同傷勢比例；舊存檔僅有 hp 時仍相容。
 //    沒有球 → 清除殘留紀錄（重進＝全新吉爾塔斯）；滿血未傷 → 不消耗（保留滿血＝重生等效·省球）。
 function giltasKeepOnLeave() {
     if (!mapState || mapState.current !== 'cursed_dark_elf_sanctuary') return;
@@ -1423,8 +1426,9 @@ function giltasKeepOnLeave() {
     if (_gb && _gb.curHp < _gb.hp && _oi >= 0) {
         let _ob = player.inv[_oi];
         if ((_ob.cnt || 1) > 1) _ob.cnt -= 1; else player.inv.splice(_oi, 1);
-        player.giltasKeep = { hp: Math.max(1, Math.floor(_gb.curHp)) };
-        logSys(`<span class="text-cyan-300">完整的召喚球碎裂，將吉爾塔斯的傷勢（剩餘 HP ${player.giltasKeep.hp.toLocaleString()}）封印在原地——直到你再次進入前，牠不會恢復。</span>`);
+        let _keepPct = Math.max(0.000001, Math.min(1, _gb.curHp / Math.max(1, _gb.hp)));
+        player.giltasKeep = { hp: Math.max(1, Math.floor(_gb.curHp)), hpPct: _keepPct };
+        logSys(`<span class="text-cyan-300">完整的召喚球碎裂，將吉爾塔斯的傷勢（剩餘 ${(100 * _keepPct).toFixed(1)}%）封印在原地——直到你再次進入前，牠不會恢復。</span>`);
         try { renderTabs(true); } catch (e) {}
     } else if (player.giltasKeep) {
         player.giltasKeep = null;   // 沒有完整的召喚球（或吉爾塔斯滿血）：清除殘留紀錄（重新進入＝全新吉爾塔斯）
