@@ -331,11 +331,12 @@
         let serial=0,equipment=gemEquipmentRows();
         let gear=equipment.length?equipment.map(row=>{
             let sockets=equipSocketRows(row.it);
-            let opts=owned.filter(id=>runeCount(id)>0&&runeFitsItem(id,row.it)).map(id=>`<option value="${id}">${DB.items[id].n} ×${runeCount(id)}（${runeDef(id).d}）</option>`).join('');
+            let opts=owned.filter(id=>runeCount(id)>0&&runeFitsItem(id,row.it)).map(id=>{let active=runeSingleEffectFitsItem(id,row.it);return `<option value="${id}">${DB.items[id].n} ×${runeCount(id)}（${active?runeDef(id).d:'僅供符文之語；單符文效果不生效'}）</option>`;}).join('');
             let slots=sockets.map((socket,index)=>{
                 if(socket){
-                    let isRune=socket.kind==='rune',r=isRune?runeDef(socket.id):null,fee=r?Math.floor(r.p*.3):0;
-                    return `<div class="gc-gem-slot"><span>孔 ${index+1}：${(DB.items[socket.id]&&DB.items[socket.id].n)||socket.id}${r?'・'+r.d:''}</span>${isRune?`<button onclick="growthRemoveRune('${esc(row.key)}',${index})">拆除 ${fee.toLocaleString()}</button>`:'<small class="text-slate-500">寶石孔位</small>'}</div>`;
+                    let isRune=socket.kind==='rune',r=isRune?runeDef(socket.id):null,fee=r?Math.floor(r.p*.3):0,active=r&&runeSingleEffectFitsItem(socket.id,row.it);
+                    let effect=r?(active?r.d:'單符文效果不生效（僅供符文之語）'):'';
+                    return `<div class="gc-gem-slot"><span>孔 ${index+1}：${(DB.items[socket.id]&&DB.items[socket.id].n)||socket.id}${effect?'・'+effect:''}</span>${isRune?`<button onclick="growthRemoveRune('${esc(row.key)}',${index})">拆除 ${fee.toLocaleString()}</button>`:'<small class="text-slate-500">寶石孔位</small>'}</div>`;
                 }
                 let sid='gc-rune-select-'+serial++;
                 return `<div class="gc-gem-slot"><span>孔 ${index+1}：空</span>${opts?`<select id="${sid}">${opts}</select><button onclick="growthInsertRune('${esc(row.key)}',${index},document.getElementById('${sid}').value)">鑲嵌</button>`:'<small class="text-slate-500">沒有符合部位的符文</small>'}</div>`;

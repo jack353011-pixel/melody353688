@@ -867,7 +867,7 @@ const RUNE_DEFS = {
     rune_el:  {n:'El 符文', tier:1, slot:'wpn', code:'killHp', value:2, cap:10, p:50000, d:'擊殺時恢復 2% 最大 HP。'},
     rune_eld: {n:'Eld 符文',tier:1, slot:'wpn', code:'killMp', value:2, cap:10, p:50000, d:'擊殺時恢復 2% 最大 MP。'},
     rune_tir: {n:'Tir 符文',tier:1, slot:'wpnhelm',code:'mpCost', value:3, cap:15, p:60000, d:'技能 MP 消耗降低 3%。'},
-    rune_nef: {n:'Nef 符文',tier:1, slot:'arm', code:'knock', value:3, cap:15, p:60000, d:'一般攻擊命中時 3% 機率使敵人延遲行動。'},
+    rune_nef: {n:'Nef 符文',tier:1, slot:'arm', code:'knock', value:3, cap:15, p:60000, d:'受到直接攻擊時 3% 機率使攻擊者延遲行動。'},
     rune_eth: {n:'Eth 符文',tier:2, slot:'wpn', code:'ignoreDef',value:3,cap:15,p:120000,d:'物理攻擊忽略目標 3% 傷害減免與硬皮。'},
     rune_ith: {n:'Ith 符文',tier:2, slot:'wpn', code:'bossDmg',value:3,cap:15,p:120000,d:'對頭目的一般攻擊傷害提高 3%。'},
     rune_tal: {n:'Tal 符文',tier:2, slot:'arm', code:'poisonRed',value:20,cap:60,p:120000,d:'中毒持續時間縮短 20%。'},
@@ -893,6 +893,10 @@ const RUNE_DEFS = {
 const RUNE_IDS=Object.keys(RUNE_DEFS);
 RUNE_IDS.forEach(id=>{let r=RUNE_DEFS[id];DB.items[id]={n:r.n,type:'rune',rune:true,runeTier:r.tier,p:r.p,c:r.tier>=5?'text-red-300':(r.tier>=4?'text-orange-300':(r.tier>=3?'text-purple-300':'text-amber-300')),img:'assets/icons/items/rune.png',noSell:true,noJunk:true,noUse:true,gachaWeight:0,d:r.d};});
 function runeDef(id){return RUNE_DEFS[id]||null;}
+function runeCodeCap(code){
+    let caps=RUNE_IDS.map(id=>runeDef(id)).filter(r=>r&&r.code===code).map(r=>Math.max(0,Number(r.cap)||0));
+    return caps.length?Math.max.apply(null,caps):Number.MAX_SAFE_INTEGER;
+}
 function runeFitsItem(id,item){
     // v3.8.91：所有符文均可鑲入有孔武器／防具，才能完成跨部位字母組合（葉子、潛行）。
     // 單顆效果仍由 runeSingleEffectFitsItem 依原始 slot 限制，不會因跨部位鑲嵌而取得錯誤能力。
@@ -988,7 +992,7 @@ function activeRuneword(item){
 const RUNEWORD_EQUIP_LIMIT=3;
 const RUNEWORD_SLOT_PRIORITY=['wpn','offwpn','armor','shield','helm','cloak','tshirt','gloves','boots'];
 function equippedRunewordRows(owner){
-    if(!owner||owner!==player||!owner.eq)return [];
+    if(!owner||!owner.eq)return [];
     let keys=Object.keys(owner.eq),rank=k=>{let i=RUNEWORD_SLOT_PRIORITY.indexOf(k);return i<0?100+keys.indexOf(k):i;};
     let rows=keys.filter(k=>owner.eq[k]).sort((a,b)=>rank(a)-rank(b)).map(slot=>{
         let item=owner.eq[slot],word=activeRuneword(item);return word?{slot,item,word}:null;
@@ -1004,10 +1008,15 @@ function runewordPaused(owner,item){
     let row=equippedRunewordRows(owner).find(r=>r.item===item);
     return !!(row&&!row.enabled);
 }
+function runewordItemOwner(item){
+    if(!item||typeof player!=='object'||!player)return null;
+    if(player.eq&&Object.values(player.eq).includes(item))return player;
+    return (player.allies||[]).find(a=>a&&a.eq&&Object.values(a.eq).includes(item))||null;
+}
 function runewordHint(item){
     let active=activeRuneword(item);
     if(active){
-        let row=equippedRunewordRows(typeof player==='object'?player:null).find(r=>r.item===item);
+        let owner=runewordItemOwner(item),row=equippedRunewordRows(owner).find(r=>r.item===item);
         if(row&&!row.enabled)return `已形成：${active.n}（全身最多 ${RUNEWORD_EQUIP_LIMIT} 組，暫停生效；單符文效果保留）`;
         return row?`已啟用：${active.n}`:`已形成：${active.n}（裝備後生效）`;
     }
@@ -1020,7 +1029,7 @@ function runewordHint(item){
     return runes.length?'符文順序、部位或指定孔數不符合':'尚未放入符文';
 }
 function runewordEquipTotals(owner){
-    let out={};if(!owner||owner!==player||!owner.eq)return out; // 第一版傭兵只吃單符文。
+    let out={};if(!owner||!owner.eq)return out;
     equippedRunewordRows(owner).filter(row=>row.enabled).forEach(row=>{Object.entries(row.word.effects).forEach(([k,v])=>out[k]=(out[k]||0)+v);});
     return out;
 }
@@ -1028,8 +1037,11 @@ function runeEquipTotals(owner){
     let out={};if(!owner||!owner.eq)return out;
     Object.values(owner.eq).filter(Boolean).forEach(it=>equipSocketRows(it).filter(Boolean).forEach(s=>{
         let r=s&&s.kind==='rune'&&runeDef(s.id);if(!r||!runeSingleEffectFitsItem(s.id,it))return;
-        out[r.code]=Math.min(r.cap,(out[r.code]||0)+r.value);
+        out[r.code]=(out[r.code]||0)+r.value;
     }));
+    // 同一能力可能由不同階符文提供不同上限（如 Ith/Gul、Eth/Mal、Eld/Vex）。
+    // 先完整加總、再套該能力的最高合法上限，避免裝備欄掃描順序改變最終數值。
+    Object.keys(out).forEach(code=>out[code]=Math.min(runeCodeCap(code),out[code]));
     // ♾️ 飾品鍊金符文：與普通單符文共用同一能力上限；融合只提高利用率，不能繞過既有硬上限。
     if(typeof alchemyAccessoryTotals==='function'){
         let _alchemy=alchemyAccessoryTotals(owner);

@@ -863,6 +863,7 @@ function allyQiguAttack(ally, t, wpn) {
     dmg = Math.max(1, Math.floor(dmg * elementCounterMult(ele, t.e)));   // ⚔️ 屬性剋制倍率（取代舊 +6 固定加值）
     dmg = Math.max(1, Math.floor(dmg * royalAllyMult()));   // 👑 王族魅力加成：傭兵造成傷害 ×(1+魅力/200)
     if(typeof d2rHuntDamage==='function')dmg=d2rHuntDamage(ally,t,dmg,ele);
+    if(typeof runeOutgoingDamage==='function')dmg=runeOutgoingDamage(ally,t,dmg);
     t.curHp -= dmg; t.justHit = (ele !== 'none') ? ele : 'magic';
     if (t.st && t.st.mrhalf > 0) t.st.mrhalf = 0;
     mobWake(t);
@@ -911,6 +912,8 @@ function allyAttackOnce(ally, _arrowDelay) {   // 🏹 v3.2.14 _arrowDelay(選�
         dmg = Math.max(1, Math.floor(dmg * wpnEnFinalMult(ally.eq && ally.eq.wpn)));   // 🔧 武器強化 +11~+20：最終傷害倍率（傭兵法師光箭普攻·與玩家普攻一致）
         dmg = Math.max(1, Math.floor(dmg * allyRlFuryMult(ally)));   // 🔴😡 v2.6.18 紅獅5×狂怒5造傷（法師光箭普攻·原全無·鏡像玩家 procLightArrow）
         dmg = Math.max(1, Math.floor(dmg * royalAllyMult()));   // 👑 王族魅力加成：傭兵造成傷害 ×(1+魅力/200)
+        if (typeof d2rHuntDamage === 'function') dmg = d2rHuntDamage(ally, t, dmg, _light.ele || 'none');
+        if (typeof runeOutgoingDamage === 'function') dmg = runeOutgoingDamage(ally, t, dmg);
         t.curHp -= dmg; if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(ally, t, dmg); t.justHit = 'magic'; mobWake(t);
         if (typeof reflectWallOnDamage === 'function') reflectWallOnDamage(t, dmg, 'magic', ally);   // 🌑 v3.4.14 血壁空間：法師光箭普攻主擊＝魔法反射（普攻主擊反射·玩家傭兵一致）
         if (t.curHp > 0 && ally._setIron5 && typeof ironGuardTaunt === 'function' && ironGuardTaunt(t, ally)) logCombat(`<span class="font-bold" style="color:#93c5fd;text-shadow:0 0 6px #3b82f6;">【協力·${ally._allyName}·鐵衛 5/5】</span>嘲諷 <span class="${getMobColor(t.lv)}">${t.n}</span>！（3 秒）`, 'player-special');
@@ -967,7 +970,8 @@ function allyAttackOnce(ally, _arrowDelay) {   // 🏹 v3.2.14 _arrowDelay(選�
         let wpnRoll = (heavy || (!isRanged && ally.buffs && ally.buffs.sk_elf_flamesoul > 0)) ? dice : roll(1, dice);   // 🔥 v3.1.77 烈焰之魂（傭兵）：近距離一般攻擊武器擲骰必定最大值（鏡像玩家 js/03:861·原傭兵維持此 buff 白扣 MP）
         let _hsT = mobHardSkin(t);   // 🔧 穿透精通用：被硬皮扣減前的量
         let _hsSub = (wpn && wpn.ignHardSkin) ? 0 : _hsT;   // 🗡️ 貫穿（暗黑十字弓）：傭兵攻擊無視硬皮額外減傷（_hsT 仍保留供穿透精通加回）
-        let dmg = Math.max(1, Math.floor((wpnRoll + dmgB) * critMult) + (d.extraDmg||0) - (t.dr||0) - _hsSub);   // 🔧 硬皮：額外物理減傷（貫穿時不扣）
+        let _rIgnA=((typeof runeEquipTotals==='function'?runeEquipTotals(ally):{}).ignoreDef||0)/100;
+        let dmg = Math.max(1, Math.floor((wpnRoll + dmgB) * critMult) + (d.extraDmg||0) - Math.floor(((t.dr||0)+_hsSub)*(1-_rIgnA)));   // 🔧 硬皮：額外物理減傷（貫穿時不扣）；Eth/Mal 忽略部分物理減免
         { let _unb = allyUnbonusBonus(ally, t); if (_unb) dmg += _unb; }   // 🔧 對不死/狼人加成 +1D20（與玩家一致；在看破/殺戮倍率前加入）
         if (t._trauma && t._trauma.until > state.ticks) dmg += (t._trauma.dmg || 5) * (t._trauma.s || 1);   // 🏺 v3.7.20 創傷（傭兵物理·鏡像玩家 getPhysicalDmg）：目標受物理傷害 +5×層數
         if (ally._giltasFuryUntil > state.ticks && ally.eq && ally.eq.wpn && ally.eq.wpn.id === 'wpn_giltas_sword') dmg += (typeof pvpEvilBonus === 'function' ? pvpEvilBonus(10) : 0);   // 🗡️ 吉爾塔斯之劍（傭兵）：擊殺後 10 秒內依主玩家邪惡值提高額外傷害（滿邪惡 +10）
@@ -1020,8 +1024,10 @@ function allyAttackOnce(ally, _arrowDelay) {   // 🏹 v3.2.14 _arrowDelay(選�
         if (wpn && wpn.pierceMainMult) dmg = Math.max(1, Math.floor(dmg * wpn.pierceMainMult));   // 🏺 v3.6.44 艾爾摩尖頭槍（傭兵鏡像）：一般攻擊主目標傷害 ×1.3
         if (wpn && wpn.selfBreakProc && Math.random() < 0.03) { dmg = Math.max(1, Math.floor(dmg * 1.5)); if (!ally.statuses) ally.statuses = {}; ally.statuses.broken = (wpn.selfBreakProc.dur || 5) * 10; }   // 🐍 v3.1.76 特產易碎泥偶（傭兵）：3% 傷害×1.5＋自身壞物術（期間傷害-20%·鏡像玩家 js/04:122）
         if (ally.d && ally.d.instakillFull && t.curHp === t.hp) { let _rif = mapState.mobs.findIndex(m => m && m.uid === t.uid); if (_rif !== -1 && tryInstakill(t, { p: ally.d.instakillFull, tag: null }, `【協力·${ally._allyName}】隱蔽的死亡草葉`, _rif)) return; }   // 🏺 v3.1.76 隱蔽的死亡草葉（傭兵）：命中滿血非BOSS怪機率即死（鏡像玩家 js/04:72）
+        if(typeof d2rHuntDamage==='function')dmg=d2rHuntDamage(ally,t,dmg,getWpnEle(ally.eq ? ally.eq.wpn : null,wpn,ally));
         if(typeof d2rGameplayMainDamage==='function')dmg=d2rGameplayMainDamage(ally,dmg);
         if(typeof d2rPerfectStrike==='function'){let _psa=d2rPerfectStrike(ally,dmg);dmg=_psa.dmg;if(_psa.proc)logCombat(`<span class="text-yellow-200 font-bold">【協力·${ally._allyName}·完美一擊】</span>造成額外傷害！`,'player-heavy','mercenary');}
+        if(typeof runeOutgoingDamage==='function')dmg=runeOutgoingDamage(ally,t,dmg);
         markBossPhysicalHit(t);
         t.curHp -= dmg; let _mainTakenA = bossResilienceDamageTaken(t, dmg); t.justHit = getWpnEle(ally.eq ? ally.eq.wpn : null, wpn, ally); if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(ally, t, _mainTakenA); mobWake(t);
         if(typeof d2rGameplaySplash==='function')d2rGameplaySplash(ally,t,_mainTakenA,isRanged);
@@ -1172,6 +1178,7 @@ function allyDualWieldOffhandAttack(ally, t) {
     dmg = Math.max(1, Math.floor(dmg * elementCounterMult(getWpnEle(ally.eq.offwpn, owpn, ally), t.e)));   // ⚔️ 副手武器屬性剋制倍率
     dmg = allyOffhandDmgMods(ally, owpn, t, dmg);   // ⚔️ v3.5.97 副手扣血前的傷害修飾（selfBreakProc／eleBonusDmg）
     dmg = Math.max(1, dmg);
+    if(typeof runeOutgoingDamage==='function')dmg=runeOutgoingDamage(ally,t,dmg);
     if (t.curHp > 0) wearHardSkin(t, ally.eq.offwpn.id, r.heavy, false, true, ally.classicMode);
     let mark = (r.heavy && r.crit) ? '會心一擊' : (r.crit ? '爆擊' : (r.heavy ? '重擊' : ''));
     logCombat(`<span class="font-bold" style="color:#fbbf24;text-shadow:0 0 6px #d97706;">【協力·${ally._allyName}·迅猛雙斧】</span>副手 ${owpn.n} 追擊 <span class="${getMobColor(t.lv)}">${t.n}</span>，造成 ${dmg} 點傷害${mark?'（'+mark+'!）':''}。`, 'player');
@@ -1535,7 +1542,8 @@ function allyStrikeRoll(ally, t, opts) {
     let isCrit = !graze && (opts.forceCrit || (Math.random()*100 < critR));   // 🏅 反擊精通（傭兵）：反擊/居合必定爆擊；🥊 v2.6.20 擦傷不爆
     let critMult = isCrit ? (1 + critD/100) : 1;
     let wpnRoll = (heavy || (!isRanged && ally.buffs && ally.buffs.sk_elf_flamesoul > 0)) ? dice : roll(1, dice);   // 🔥 v3.1.77 烈焰之魂（傭兵·連擊/反擊/居合/副手共用·鏡像玩家 js/03:861）
-    let dmg = Math.max(1, Math.floor((wpnRoll + dmgB) * critMult) + (d.extraDmg||0) - (t.dr||0) - mobHardSkin(t));   // 🔧 硬皮：額外物理減傷
+    let _rIgn=((typeof runeEquipTotals==='function'?runeEquipTotals(ally):{}).ignoreDef||0)/100;
+    let dmg = Math.max(1, Math.floor((wpnRoll + dmgB) * critMult) + (d.extraDmg||0) - Math.floor(((t.dr||0)+mobHardSkin(t))*(1-_rIgn)));   // 🔧 硬皮：額外物理減傷；Eth/Mal 忽略部分物理減免
     { let _unb = allyUnbonusBonus(ally, t); if (_unb) dmg += _unb; }   // 🔧 對不死/狼人加成 +1D20（與玩家一致；連擊/魔擊共用此計算）
     if (opts.mult) dmg = Math.max(1, Math.floor(dmg * opts.mult));
     if (graze) dmg = Math.max(1, Math.floor(dmg * 0.5));   // 🥊 v2.6.20 擦傷 50%（鏡像玩家 833）
@@ -2615,7 +2623,10 @@ function processAllyStatusTick(ally) {
     if (!ally || ally._downed) return false;
     let st = ally.statuses; if (!st) { ally.statuses = {}; return false; }
     for (let k in st) {
-        if (st[k] > 0 && k !== 'poisonDmg' && k !== 'poisonTick' && k !== 'burnDmg' && k !== 'burnTick' && k !== 'scaldDmg' && k !== 'scaldTick' && k !== 'bleedDmg' && k !== 'bleedTick') st[k]--;
+        if (st[k] > 0 && k !== 'poisonDmg' && k !== 'poisonTick' && k !== 'burnDmg' && k !== 'burnTick' && k !== 'scaldDmg' && k !== 'scaldTick' && k !== 'bleedDmg' && k !== 'bleedTick') {
+            let _rr=typeof runeEquipTotals==='function'?runeEquipTotals(ally):{},_red=({poison:_rr.poisonRed,burn:_rr.burnRed,paralyze:_rr.paralyzeRed,freeze:_rr.freezeRed})[k]||0;
+            st[k]-=1/Math.max(.4,1-_red/100);
+        }
     }
     let nm = '協力·' + ally._allyName;
     if (st.poison > 0 && st.poisonTick > 0 && state.ticks % st.poisonTick === 0) { ally.curHp -= st.poisonDmg; if (typeof dotMpRefundTo === 'function') dotMpRefundTo(ally, st.poisonDmg); logCombat(`${nm} 受到劇毒傷害 ${st.poisonDmg} 點。`, 'enemy'); }   // 🏺 v3.7.52 受困幽魂的淚滴（傭兵）：DoT 損血回 MP

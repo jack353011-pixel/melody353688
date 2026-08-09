@@ -1006,7 +1006,8 @@ function buildItemDescHTML(item) {
             let _name=(DB.items[x.id]&&DB.items[x.id].n)||x.name||x.id||'已鑲嵌';
             let _eff=x.kind==='gem'&&typeof gemEffectForItem==='function'?gemEffectForItem(x.id,item):null;
             let _rune=x.kind==='rune'&&typeof runeDef==='function'?runeDef(x.id):null;
-            return `孔 ${i+1}：${_name}${_eff?`（${_eff.label}）`:_rune?`（${_rune.d}）`:''}`;
+            let _runeActive=_rune&&typeof runeSingleEffectFitsItem==='function'&&runeSingleEffectFitsItem(x.id,item);
+            return `孔 ${i+1}：${_name}${_eff?`（${_eff.label}）`:_rune?`（${_runeActive?_rune.d:'單符文效果不生效；僅供符文之語'}）`:''}`;
         }).join('｜') : '尚未開孔';
         desc += `<br><span class="text-cyan-300 font-bold">◆ 插槽 ${_socketRows.length}/${_socketMax}（已鑲嵌 ${_filled}）</span><br><span class="text-slate-400">${_slots}</span>`;
         if (!_compactHead) _compactHead = `<span class="text-cyan-300 font-bold">◆ 孔 ${_socketRows.length}/${_socketMax}</span>`;
@@ -1018,7 +1019,8 @@ function buildItemDescHTML(item) {
     }
     if (d.rune && typeof runeDef === 'function') desc += `<br><span class="text-amber-300 font-bold">ᚱ 單符文</span><br><span class="text-slate-300">${runeDef(item.id).d} 不可合成；請鑲入符合部位的空孔。</span>`;
     if(typeof activeRuneword==='function'){let _rw=activeRuneword(item);if(_rw){
-        let _paused=typeof runewordPaused==='function'&&runewordPaused(player,item),_equipped=!!(player&&player.eq&&Object.values(player.eq).includes(item));
+        let _rwOwner=typeof runewordItemOwner==='function'?runewordItemOwner(item):(player&&player.eq&&Object.values(player.eq).includes(item)?player:null);
+        let _paused=typeof runewordPaused==='function'&&runewordPaused(_rwOwner,item),_equipped=!!_rwOwner;
         let _rwLines=typeof runewordEffectLines==='function'?runewordEffectLines(_rw):[_rw.d];
         let _stateText=_paused?`全身最多 ${typeof RUNEWORD_EQUIP_LIMIT==='number'?RUNEWORD_EQUIP_LIMIT:3} 組，這件目前暫停；只保留單符文效果。`:_equipped?'已裝備，以下屬性正在生效。':'以下屬性會在裝備後生效。';
         let _lineClass=_paused?'text-slate-400':'text-amber-100';

@@ -1612,7 +1612,7 @@ function _enemyAttackAllyInner(mob, ally, isBasicAttack = false) {
     if ((d.physDrGated || 0) > 0 && state.ticks >= (ally._physDrCd || 0)) { totalDmg = Math.floor(totalDmg * (1 - Math.min(90, d.physDrGated) / 100)); ally._physDrCd = state.ticks + 30; }   // 🐍 v3.1.76 祭祀儀式陶罐（傭兵）：受一般攻擊傷害 -%·每 3 秒 1 次（每傭兵獨立節流·鏡像玩家 js/04:812）
     // 盾牌/臂甲格檔（同玩家公式；經典模式停用·🏺 v3.5.27 長槍＋塔盾成對＝100%且經典亦可·鏡像玩家）
     { let _alp = ally.eq && ally.eq.shield && ally.eq.shield.id === 'relic_guard_towershield' && ally.eq.wpn && ally.eq.wpn.id === 'relic_bk_lance';
-      if (ally.eq && ally.eq.shield && (!player.classicMode || _alp)) { let _sh = DB.items[ally.eq.shield.id]; let _bc = _alp ? 100 : ((_sh && _sh.block) ? (heavy ? _sh.block : _sh.block * 0.3) : 0); if (_bc > 0 && Math.random() * 100 < _bc) totalDmg = Math.floor(totalDmg * 0.5); } }
+      if (ally.eq && ally.eq.shield && (!ally.classicMode || _alp)) { let _sh = DB.items[ally.eq.shield.id],_rwb=(typeof runewordEquipTotals==='function'?runewordEquipTotals(ally):{}).block||0; let _bc = _alp ? 100 : (((_sh && _sh.block) ? (heavy ? _sh.block : _sh.block * 0.3) : 0)+_rwb); if (_bc > 0 && Math.random() * 100 < _bc) totalDmg = Math.floor(totalDmg * 0.5); } }
     totalDmg = Math.floor(totalDmg * mobRageDmgMult(mob));   // 🔥 HP<門檻：攻擊傭兵也套用狂暴傷害
     if (isBasicAttack && typeof ironGuardTauntWeakensAttack === 'function' && ironGuardTauntWeakensAttack(mob)) totalDmg = Math.floor(totalDmg * 0.9);   // 🔮 鐵衛 5/5：受嘲諷目標的一般攻擊傷害 -10%
     totalDmg = Math.max(1, Math.floor(Math.max(1, totalDmg) * riftDamageMult()));   // 🌀 裂痕加成（與玩家一致）
@@ -1629,9 +1629,11 @@ function _enemyAttackAllyInner(mob, ally, isBasicAttack = false) {
         if (mob.curHp <= 0) { let _mi = mapState.mobs.findIndex(m => m && m.uid === mob.uid); if (_mi !== -1) killMob(_mi); }
         return;
     }
+    if(typeof runeIncomingDamage==='function')totalDmg=runeIncomingDamage(ally,totalDmg);
     if(typeof d2rTriggerIncoming==='function')totalDmg=d2rTriggerIncoming(ally,totalDmg,mob,'physical');
     ally.curHp -= totalDmg;
     if(typeof d2rAfterIncoming==='function')d2rAfterIncoming(ally,totalDmg,mob,'physical');
+    if(typeof runeOnDamaged==='function')runeOnDamaged(ally,mob);
     if (isBasicAttack && totalDmg > 0) corrosiveJellySkinOnBasicHit(mob, ally);
     // 🏺 v3.7.52 高崙的生命印記（傭兵）：受到重擊時 MR-100·3 秒（js/02 通用消費·js/03 到期重算）
     if (heavy && ally.eq && ally.eq.helm) {
@@ -2042,9 +2044,11 @@ function _applyMobMagicToAllyInner(mob, sk, ally) {
         dmg = Math.max(0, Math.floor(dmg * raceDrMult(ally, mob)));   // 🏺 v3.7.52 隨從的護身斗篷（傭兵·魔法）
         dmg = allyDollDamageReduced(ally, dmg);   // 🆕 v2.6.10 #3：魔法娃娃機率減免（受魔法傷害）
         dmg = shieldDmgReduceProc(ally, dmg);   // 🌑 v3.3.33 反叛者的盾牌（傭兵鏡像·魔法）
+        if(typeof runeIncomingDamage==='function')dmg=runeIncomingDamage(ally,dmg);
         if(typeof d2rTriggerIncoming==='function')dmg=d2rTriggerIncoming(ally,dmg,mob,'magic');
         ally.curHp -= dmg;
         if(typeof d2rAfterIncoming==='function')d2rAfterIncoming(ally,dmg,mob,'magic');
+        if(typeof runeOnDamaged==='function')runeOnDamaged(ally,mob);
         if (dmg > 0 && !ally._stunCycle) { ally._atkCd = (ally._atkCd || 0) + ((ally.d && ally.d.hitstun) || 0); ally._stunCycle = true; }   // ⚔️ 天堂職業硬直（傭兵·魔法）：延遲下次攻擊·每週期一次
         logCombat(`<span class="${getMobColor(mob.lv)}">${mob.n}</span> 施放${sk.skn || '魔法'}，對 ${nm} 造成 ${dmg} 點魔法傷害。`, 'enemy');
         if (sk.vamp || sk.vampFull) { let heal = sk.vampFull ? dmg : roll(sk.vamp[0], sk.vamp[1]); mob.curHp = Math.min(mob.hp, mob.curHp + heal); }

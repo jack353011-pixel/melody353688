@@ -387,7 +387,10 @@ function killMob(idx) {
     let _hideKillMsg = (mob.race === '建築' && mob.noAutoTeleport);
     if(!_hideKillMsg) logCombat(`擊敗了 <span class="${getMobColor(mob.lv)}">${mob.n}</span>！`, 'player-heavy');  // 👈 新增
     if (typeof worldLoreOnMobKill === 'function') worldLoreOnMobKill(mob);
-    if(typeof runeOnKill==='function')runeOnKill(player);
+    if(typeof runeOnKill==='function'){
+        runeOnKill(player);
+        (player.allies||[]).filter(a=>a&&!a._downed).forEach(a=>runeOnKill(a));
+    }
     // 🤝 v3.7.62 組隊經驗不再拆分：主玩家、每名未倒地傭兵、每隻未倒地寵物各取得完整經驗；既有組隊加成保留。
     let _expEach = mob.exp * (1 + partyExpBonusPct() / 100);
     let _balanceExp = typeof balanceMult === 'function' ? balanceMult('exp') : 1;
