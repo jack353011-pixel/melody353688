@@ -2956,6 +2956,7 @@ function d2rOnHit(owner, target, dealtDamage) {
             let val=Math.max(1,Math.floor(r[1]*valueMult));
             if (eleMap[r[0]] && target.curHp>0) {
                 let ele=eleMap[r[0]], dmg=Math.max(1,Math.floor(val*elementCounterMult(ele,target.e)));
+                if(typeof d2rHuntDamage==='function')dmg=d2rHuntDamage(owner,target,dmg,ele);
                 target.curHp-=dmg; target.justHit=ele; target._spellHurt=true; mobWake(target);
                 logCombat(`<span class="font-bold text-amber-300">【D2R·${nameMap[r[0]]}附傷】</span>追加 ${dmg} 點傷害。`,'player-special');
             } else if (r[0]==='ph') {
@@ -2994,6 +2995,7 @@ function qiguPlayerAttack(target, wpn) {
     dmg = Math.max(1, Math.floor(dmg * wpnEnFinalMult(player.eq.wpn)));   // 武器強化 +11~+20 最終倍率
     dmg = Math.max(1, Math.floor(dmg * rlFuryMult()));   // 🔮 紅獅5/5＋😡狂怒5/5
     dmg = Math.max(1, Math.floor(dmg * fragileMult(target) * illuLvMult(player)));   // 🔮 脆弱/破甲；🔮 幻術士等級加成 ×(1+等級/50)
+    if(typeof d2rHuntDamage==='function')dmg=d2rHuntDamage(player,target,dmg,ele);
     dmg=runeOutgoingDamage(player,target,dmg);
     target.curHp -= dmg;
     d2rOnHit(player, target, dmg);
