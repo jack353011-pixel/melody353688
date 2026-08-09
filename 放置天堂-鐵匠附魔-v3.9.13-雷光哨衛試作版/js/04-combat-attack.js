@@ -1319,6 +1319,7 @@ function _enemyPhysicalAttackInner(mob, idx, stunChance = 0, atkDmg = null, atkD
         totalDmg=runeIncomingDamage(player,totalDmg);
         if(typeof d2rTriggerIncoming==='function')totalDmg=d2rTriggerIncoming(player,totalDmg,mob,'physical');
         player.hp -= totalDmg;
+        if(typeof d2rAfterIncoming==='function')d2rAfterIncoming(player,totalDmg,mob,'physical');
         runeOnDamaged(player,mob);
         if (isBasicAttack && totalDmg > 0) corrosiveJellySkinOnBasicHit(mob, player);
         // 🏺 v3.7.20 長老的黑曜水晶球（crushTornado）：被重擊時 → 對敵方全體施放龍捲風（procFreeMagicSkill target:'all' 自動掃全場·免費施放）
@@ -1629,6 +1630,7 @@ function _enemyAttackAllyInner(mob, ally, isBasicAttack = false) {
     }
     if(typeof d2rTriggerIncoming==='function')totalDmg=d2rTriggerIncoming(ally,totalDmg,mob,'physical');
     ally.curHp -= totalDmg;
+    if(typeof d2rAfterIncoming==='function')d2rAfterIncoming(ally,totalDmg,mob,'physical');
     if (isBasicAttack && totalDmg > 0) corrosiveJellySkinOnBasicHit(mob, ally);
     // 🏺 v3.7.52 高崙的生命印記（傭兵）：受到重擊時 MR-100·3 秒（js/02 通用消費·js/03 到期重算）
     if (heavy && ally.eq && ally.eq.helm) {
@@ -2040,6 +2042,7 @@ function _applyMobMagicToAllyInner(mob, sk, ally) {
         dmg = shieldDmgReduceProc(ally, dmg);   // 🌑 v3.3.33 反叛者的盾牌（傭兵鏡像·魔法）
         if(typeof d2rTriggerIncoming==='function')dmg=d2rTriggerIncoming(ally,dmg,mob,'magic');
         ally.curHp -= dmg;
+        if(typeof d2rAfterIncoming==='function')d2rAfterIncoming(ally,dmg,mob,'magic');
         if (dmg > 0 && !ally._stunCycle) { ally._atkCd = (ally._atkCd || 0) + ((ally.d && ally.d.hitstun) || 0); ally._stunCycle = true; }   // ⚔️ 天堂職業硬直（傭兵·魔法）：延遲下次攻擊·每週期一次
         logCombat(`<span class="${getMobColor(mob.lv)}">${mob.n}</span> 施放${sk.skn || '魔法'}，對 ${nm} 造成 ${dmg} 點魔法傷害。`, 'enemy');
         if (sk.vamp || sk.vampFull) { let heal = sk.vampFull ? dmg : roll(sk.vamp[0], sk.vamp[1]); mob.curHp = Math.min(mob.hp, mob.curHp + heal); }
@@ -2472,6 +2475,7 @@ function _applyMobMagicInner(mob, sk) {
         dmg=runeIncomingDamage(player,dmg);
         if(typeof d2rTriggerIncoming==='function')dmg=d2rTriggerIncoming(player,dmg,mob,'magic');
         player.hp -= dmg;
+        if(typeof d2rAfterIncoming==='function')d2rAfterIncoming(player,dmg,mob,'magic');
         runeOnDamaged(player,mob);
         if (dmg > 0) _relicOnDamageHeal();   // 🏺 遺物 白螞蟻蛋殼：受魔法傷害時亦觸發受擊自癒（5 秒節流·physical/magic 共用冷卻）
         if (dmg > 0) _relicOnHurtCast(mob);   // 🏺 遺物 法師的護身短刀：受魔法傷害時亦 20% 免費施放自動攻擊法術
