@@ -77,6 +77,7 @@ function summonAttack(sm, owner) {
         if(!((r === 20) || (r !== 1 && hv >= r))) { if (typeof vfxMiss === 'function') vfxMiss(t); logCombat(`${sm.n} 的攻擊未命中。`, 'miss'); return; }
         let dmg = Math.max(1, roll(sm.dmgDice[0], sm.dmgDice[1]) + cha + _sgb.dmg + (_teamAtk ? _teamAtk.ed : 0) - (t.dr || 0));
         dmg += traumaPhysicalBonus(t);
+        if(typeof orbFollowerOutgoingDamage==='function')dmg=orbFollowerOutgoingDamage(owner,t,dmg,'none');
         markBossPhysicalHit(t);
         t.justHit = 'normal'; t.curHp -= dmg; mobWake(t);
         logCombat(`<span class="text-purple-300">${sm.n}</span> 攻擊 <span class="${getMobColor(t.lv)}">${t.n}</span>，造成 ${dmg} 點傷害。`, 'player');
@@ -108,6 +109,7 @@ function summonAttack(sm, owner) {
             t.justHit = 'normal';
             markBossPhysicalHit(t);
         }
+        if(typeof orbFollowerOutgoingDamage==='function')dmg=orbFollowerOutgoingDamage(owner,t,dmg,sm.kind==='ranged'?(sm.ele||'none'):'none');
         t.curHp -= dmg; mobWake(t);
         logCombat(`<span class="text-purple-300">${sm.n}</span> 攻擊 <span class="${getMobColor(t.lv)}">${t.n}</span>，造成 ${dmg} 點傷害。`, 'player');
     }
@@ -141,6 +143,7 @@ function summonTick(sm, clearFn, owner) {
                     let raw = (roll(sm.proc.dmgDice[0], sm.proc.dmgDice[1]) + procFlat) * summonDamageMult(sm, owner, false);
                     pd = Math.max(1, Math.floor(raw) - (t.dr || 0) - hardSkin);
                 }
+                if(typeof orbFollowerOutgoingDamage==='function')pd=orbFollowerOutgoingDamage(owner,t,pd,sm.proc.ele||'none');
                 t.curHp -= pd; t.justHit = sm.proc.ele !== 'none' ? sm.proc.ele : 'magic';
                 logCombat(`${sm.n} 發動 ${sm.proc.name}，額外造成 ${pd} 點傷害。`, 'magic');
                 let idx = mapState.mobs.findIndex(m => m && m.uid === t.uid);

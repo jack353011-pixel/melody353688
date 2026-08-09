@@ -960,6 +960,7 @@ function petAttackOnce(p, d, target, forceCrit, addDmg, skName) {
             let atkMult = (d.damageMult || 1) * (d.attackMult || 1);
             dmg = Math.max(1, (d.attackMult || 1) > 1 ? Math.ceil(dmg * atkMult) : Math.floor(dmg * atkMult));   // 🦎 蜥蜴普攻以同級黃金龍為底再套角色倍率；其餘寵物維持原取整
             if (skName && typeof _relicPetSkillMult === 'function') dmg = Math.max(1, Math.floor(dmg * _relicPetSkillMult()));
+            if (typeof orbFollowerOutgoingDamage === 'function') dmg = orbFollowerOutgoingDamage(player, target, dmg, 'none');
             markBossPhysicalHit(target);
             target.curHp -= dmg; if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(target, dmg, skName ? 'magic' : 'melee'); target.justHit = 'none'; mobWake(target);   // 🌅 巨大骷髏：寵物普攻＝近距離、寵物技能＝魔法
             let _pw = p && p.eq && p.eq.wpn ? DB.items[p.eq.wpn.id] : null;
@@ -1044,6 +1045,7 @@ function petCastSkill(p, d, target) {
                 dmg = Math.max(1, (d.magicMult || 1) > 1 ? Math.ceil(dmg * magicMult) : Math.floor(dmg * magicMult));   // 🦎 蜥蜴魔法以同級黃金龍為底再套角色倍率；其餘寵物維持原取整
                 if (typeof _relicPetSkillMult === 'function') dmg = Math.max(1, Math.floor(dmg * _relicPetSkillMult()));   // 🏺 馴獸師的訓狗棒：寵物技能×1.5
                 if (sk.n && sk.n.includes('冰錐') && typeof equipSkillDmgMult === 'function') dmg = Math.max(1, Math.floor(dmg * equipSkillDmgMult(DB.skills.sk_ice_spike, 'sk_ice_spike')));   // 🏺 v3.2.35 暴走兔最愛的胡蘿蔔：攜帶的暴走兔/高等暴走兔施放的冰錐也 ×1.5（掃玩家裝備 skillDmgMult.sk_ice_spike·與訓狗棒相乘）
+                if (typeof orbFollowerOutgoingDamage === 'function') dmg = orbFollowerOutgoingDamage(player, m, dmg, sk.ele || 'none');
                 m.curHp -= dmg; if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(m, dmg, 'magic'); m.justHit = sk.ele || 'none'; mobWake(m);   // 🌅 巨大骷髏：寵物傷害技能視為魔法
                 let _fz = false;   // 🦎 v3.6.43 詛咒蜥蜴冰雪暴：freezeCh% 機率冰凍 4 秒（頭目免疫冰凍·比照 js/04 BOSS_IMMUNE）
                 if (sk.freezeCh && m.curHp > 0 && Math.random() * 100 < sk.freezeCh && !(m.boss && typeof BOSS_IMMUNE !== 'undefined' && BOSS_IMMUNE.includes('freeze'))) {
@@ -1091,6 +1093,7 @@ function enemyAttackPet(mob, p) {
     if (typeof ironGuardTauntWeakensAttack === 'function' && ironGuardTauntWeakensAttack(mob)) dmg = Math.floor(dmg * 0.9);   // 🔮 鐵衛 5/5：受嘲諷目標的一般攻擊傷害 -10%
     dmg = Math.max(1, Math.floor(dmg * riftDamageMult()));
     if (petDevotionGuardOn(p)) dmg = 0;   // 🏺 v3.6.44 珍愛夥伴的執念：復活後 8 秒受到傷害 −100%
+    if (dmg > 0 && typeof orbFollowerIncomingDamage === 'function') dmg = orbFollowerIncomingDamage(player, dmg);
     p.hp -= dmg;
     _petAnimAct(p, 'hurt');
     if (!p._stunCycle) { p._atkCd = (p._atkCd || 0) + d.stunTicks; p._stunCycle = true; }   // 硬直：延後下次攻擊
@@ -1133,6 +1136,7 @@ function applyMobMagicToPet(mob, sk, p) {
     dmg = Math.max(1, Math.floor(Math.max(1, dmg * shMul) * (typeof teamDmgReduceMult === 'function' ? teamDmgReduceMult(true) : 1) * petMasteryTakenMult() * petArmorDmgReduceMult(p)));   // 👑 夥伴精通：受到傷害 −50%；🏺 寵物專用盔甲：受傷 ×(1−petDmgReduce)
     dmg = Math.max(1, Math.floor(dmg * riftDamageMult()));
     if (petDevotionGuardOn(p)) dmg = 0;   // 🏺 v3.6.44 珍愛夥伴的執念：復活後 8 秒受到傷害 −100%（魔法亦免）
+    if (dmg > 0 && typeof orbFollowerIncomingDamage === 'function') dmg = orbFollowerIncomingDamage(player, dmg);
     p.hp -= dmg; _petAnimAct(p, 'hurt');
     if (!p._stunCycle) { p._atkCd = (p._atkCd || 0) + d.stunTicks; p._stunCycle = true; }
     logCombat(`<span class="${getMobColor(mob.lv)}">${mob.n}</span> 施放${sk.skn || '魔法'}，對 ${nm} 造成 ${dmg} 點魔法傷害。`, 'enemy');

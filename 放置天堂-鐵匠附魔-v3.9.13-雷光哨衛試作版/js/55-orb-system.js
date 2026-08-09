@@ -1,4 +1,4 @@
-// ========== 🔮 寶珠系統 v1 ==========
+// ========== 🔮 寶珠系統 v2 ==========
 // 寶石強化數值、符文提供配方；寶珠改變流派節奏。固定核心／共鳴／守護三格，避免三顆純攻擊寶珠造成乘算膨脹。
 const ORB_MAX_LEVEL = 5;
 const ORB_UPGRADE_COST = {1:30,2:60,3:120,4:240};
@@ -12,16 +12,19 @@ const ORB_DEFS = {
     orb_dawn:{slot:'core',icon:'🌅',n:'曙光寶珠',color:'#fde68a',story:'第一道光不是為勝者升起，而是為仍願意踏出城門的人。'},
     orb_dusk:{slot:'core',icon:'🌘',n:'暮影寶珠',color:'#a5b4fc',story:'黃昏收走將熄的名字，讓最後一擊不必記住死者的臉。'},
     orb_cycle:{slot:'core',icon:'♻️',n:'四象寶珠',color:'#f0abfc',story:'火追逐風，風推動水，水滲入土，土又把餘燼送回火中。四象從不在同一處停留。'},
+    orb_command:{slot:'core',icon:'👑',n:'王印寶珠',color:'#fbbf24',story:'破裂的王印沒有命令任何人。群獸卻在持有者舉手時，同時望向了城門。'},
     orb_echo:{slot:'resonance',icon:'〽️',n:'回響寶珠',color:'#e879f9',story:'被遺忘的咒語仍在空殿回返，直到有人再次聽見。'},
     orb_hunter:{slot:'resonance',icon:'🜲',n:'獵魂寶珠',color:'#facc15',story:'獵人不追逐足跡；他等待戰利品的靈魂先暴露方向。'},
     orb_rhythm:{slot:'resonance',icon:'🎵',n:'律動寶珠',color:'#67e8f9',story:'第五次鐘聲永遠比前四次更重，因為守夜人只敲給仍醒著的人聽。'},
     orb_focus:{slot:'resonance',icon:'◉',n:'凝息寶珠',color:'#93c5fd',story:'法師將未曾出口的咒文封在珠心，魔力滿盈時才聽得見。'},
     orb_momentum:{slot:'resonance',icon:'➰',n:'追擊寶珠',color:'#fb7185',story:'第一道裂痕只是一個記號；直到第五次回返，獵物才明白自己從未逃離。'},
+    orb_bond:{slot:'resonance',icon:'🐾',n:'羈絆寶珠',color:'#f9a8d4',story:'馴獸師的名字早已磨去，珠面仍留著一大一小、並肩向前的足印。'},
     orb_iron:{slot:'guard',icon:'🛡️',n:'鐵壁寶珠',color:'#94a3b8',story:'城牆崩毀後，仍有一小塊石頭記得自己曾保護過誰。'},
     orb_devour:{slot:'guard',icon:'🩸',n:'噬魔寶珠',color:'#fda4af',story:'它吞食逸散的法力，卻用溫熱的血回報持有者。'},
     orb_recovery:{slot:'guard',icon:'🌿',n:'回生寶珠',color:'#6ee7b7',story:'被踩碎的嫩芽沒有復仇，只從足印中央重新生長。'},
     orb_aegis:{slot:'guard',icon:'🔷',n:'靈幕寶珠',color:'#818cf8',story:'古代術士把最後一層結界縮成珠子，留給無法回家的學徒。'},
-    orb_bastion:{slot:'guard',icon:'🧱',n:'磐壘寶珠',color:'#d6d3d1',story:'守軍離去後，無名石匠仍砌完最後一道牆；那面牆不認得王旗，只認得迎面而來的刀。'}
+    orb_bastion:{slot:'guard',icon:'🧱',n:'磐壘寶珠',color:'#d6d3d1',story:'守軍離去後，無名石匠仍砌完最後一道牆；那面牆不認得王旗，只認得迎面而來的刀。'},
+    orb_shelter:{slot:'guard',icon:'🕯️',n:'庇護寶珠',color:'#fde68a',story:'最後一根蠟燭沒有照亮主人，只替伏在門邊等待的夥伴留住了一夜溫度。'}
 };
 
 function orbClampInt(v,min,max){return Math.max(min,Math.min(max,Math.floor(Number(v)||0)));}
@@ -68,6 +71,9 @@ function orbAegisPct(level){return 7+orbClampInt(level,1,5);}                  /
 function orbCyclePct(level){return 3+orbClampInt(level,1,5);}                  // 交替元素傷害 +4%～8%
 function orbMomentumPct(level,stacks){return Math.min(4,(2+.4*orbClampInt(level,1,5))*orbClampInt(stacks,0,5)/5);} // 同目標 5 層，上限 2.4%～4%
 function orbBastionPct(level){return 7+orbClampInt(level,1,5);}                // 物理最終減傷 8%～12%
+function orbCommandPct(level){return 5+orbClampInt(level,1,5);}                // 寵物／召喚物最終傷害 +6%～10%
+function orbBondPct(level){return .25+.15*orbClampInt(level,1,5);}             // 每 5 秒回復召喚者 0.4%～1% 最大 MP
+function orbShelterPct(level){return 7+orbClampInt(level,1,5);}                // 寵物／召喚物最終減傷 8%～12%
 function orbTargetCondition(target,kind){
     if(typeof d2rTargetCondition==='function')return d2rTargetCondition(target,kind);
     let st=target&&(target.st||target.statuses)||{};
@@ -144,6 +150,32 @@ function orbAfterIncoming(owner,dmg){
 }
 function orbLootMultiplier(owner){let orbs=orbEnsure(owner),x=orbEquipped(owner,'resonance',orbs);return x&&x.id==='orb_hunter'?1+orbHunterPct(x.level)/100:1;}
 
+// 隨從只讀自己的召喚者：玩家的寶珠作用於玩家寵物／召喚物；傭兵寶珠只作用於該傭兵的召喚物。
+function orbFollowerOwner(entity){
+    if(typeof player!=='object'||!player)return null;
+    if(!entity)return player;
+    if(player.summon===entity||player.charmed===entity||(player.summonsV2||[]).includes(entity))return player;
+    return (player.allies||[]).find(a=>a&&a.summon===entity)||player;
+}
+function orbFollowerOutgoingDamage(owner,target,dmg,ele){
+    dmg=Math.max(0,Number(dmg)||0);if(!owner||!target||!dmg)return Math.max(0,Math.floor(dmg));
+    let orbs=orbEnsure(owner),core=orbEquipped(owner,'core',orbs),pct=core&&core.id==='orb_command'?orbCommandPct(core.level):0;
+    let resonance=orbEquipped(owner,'resonance',orbs);
+    if(resonance&&resonance.id==='orb_bond'){
+        let now=typeof state==='object'&&state?state.ticks:0,mmp=Math.max(0,Number(owner.mmp)||0),mp=Math.max(0,Number(owner.mp)||0);
+        if(mmp>0&&mp<mmp&&now>=(owner._orbBondAt||0)){
+            let gain=Math.min(mmp-mp,Math.max(1,Math.floor(mmp*orbBondPct(resonance.level)/100)));
+            if(gain>0){owner.mp=mp+gain;owner._orbBondAt=now+50;if(typeof logCombat==='function')logCombat(`<span class="font-bold" style="color:#f9a8d4">【羈絆寶珠】</span>夥伴的回響使召喚者回復 ${gain} MP。`,'magic',owner===player?'player':'mercenary');}
+        }
+    }
+    return Math.max(1,Math.floor(dmg*(100+pct)/100));
+}
+function orbFollowerIncomingDamage(owner,dmg){
+    dmg=Math.max(0,Math.floor(Number(dmg)||0));if(!owner||!dmg)return dmg;
+    let orbs=orbEnsure(owner),guard=orbEquipped(owner,'guard',orbs);
+    return guard&&guard.id==='orb_shelter'?Math.max(1,Math.floor(dmg*(1-orbShelterPct(guard.level)/100))):dmg;
+}
+
 function orbDropPoolForMob(mob,slot){
     let ids=[],race=String(mob&&mob.race||''),ele=String(mob&&mob.e||'none'),mr=Math.max(0,Number(mob&&mob.mr)||0);
     if(!slot||slot==='core'){
@@ -152,17 +184,20 @@ function orbDropPoolForMob(mob,slot){
         if(race==='惡魔'||mob&&mob.un)ids.push('orb_dusk');
         else if(!elemental||mob&&mob.boss)ids.push('orb_dawn');
         if(mob&&(mob.boss||mob.hard))ids.push('orb_cycle');
+        if(race==='動物'||race==='元素')ids.push('orb_command');
     }
     if(!slot||slot==='resonance'){
         let special=false;
         if(race==='惡魔'||mob&&mob.un||mr>=30){ids.push('orb_echo','orb_focus');special=true;}
         if(mob&&mob.boss||mob&&mob.hard){ids.push('orb_rhythm','orb_momentum');special=true;}
+        if(race==='動物'||race==='元素'){ids.push('orb_bond');special=true;}
         if(!special)ids.push('orb_hunter');
     }
     if(!slot||slot==='guard'){
         if(mob&&mob.hard||race==='巨人'||race==='高崙')ids.push('orb_iron','orb_bastion');
         if(race==='惡魔'||mob&&mob.un||mr>=30)ids.push('orb_aegis');
         else ids.push('orb_devour','orb_recovery');
+        if(race==='動物'||race==='元素')ids.push('orb_shelter');
     }
     if(slot&&!ids.length)ids=Object.keys(ORB_DEFS).filter(id=>ORB_DEFS[id].slot===slot);
     if(!ids.length)ids=Object.keys(ORB_DEFS);
@@ -211,17 +246,20 @@ function orbPowerText(id,level){
     if(id==='orb_dawn')return `命中 HP 90% 以上敵人時，傷害 +${orbCoreBonus(lv)}%`;
     if(id==='orb_dusk')return `命中 HP 30% 以下敵人時，傷害 +${orbCoreBonus(lv)}%`;
     if(id==='orb_cycle')return `元素傷害與上一次不同時，傷害 +${orbCyclePct(lv)}%（火／水／地／風）`;
+    if(id==='orb_command')return `自己召喚的寵物與召喚物造成的直接傷害 +${orbCommandPct(lv)}%`;
     if(d.slot==='core')return `${d.ele==='fire'?'火':d.ele==='water'?'水':d.ele==='earth'?'地':'風'}屬性命中${d.condition}敵人時，傷害 +${orbCoreBonus(lv)}%`;
     if(id==='orb_echo')return `${orbEchoRate(lv)}% 機率使本次傷害提高 50%（不會再次觸發）`;
     if(id==='orb_hunter')return `一般物品掉落率 +${orbHunterPct(lv)}%（不影響寶石、符文與寶珠）`;
     if(id==='orb_rhythm')return `每第 5 次傷害提高 ${orbRhythmPct(lv)}%（平均最高 4%）`;
     if(id==='orb_focus')return `MP 90% 以上時，傷害 +${orbFocusPct(lv).toFixed(1).replace(/\.0$/,'')}%`;
     if(id==='orb_momentum')return `3 秒內持續命中同一目標可疊 5 層，傷害最高 +${orbMomentumPct(lv,5).toFixed(1).replace(/\.0$/,'')}%`;
+    if(id==='orb_bond')return `自己的寵物或召喚物造成直接傷害時，每 5 秒最多回復 ${orbBondPct(lv).toFixed(2).replace(/0+$/,'').replace(/\.$/,'')}% 最大 MP`;
     if(id==='orb_iron')return `受到的最終傷害 -${orbIronPct(lv)}%`;
     if(id==='orb_devour')return `造成元素傷害時，每 5 秒最多回復 ${orbDevourPct(lv).toFixed(2).replace(/0+$/,'').replace(/\.$/,'')}% 最大 HP`;
     if(id==='orb_recovery')return `受傷後回復該次傷害的 ${orbRecoveryPct(lv)}%（致死傷害無效）`;
     if(id==='orb_aegis')return `受到的魔法最終傷害 -${orbAegisPct(lv)}%`;
     if(id==='orb_bastion')return `受到的物理最終傷害 -${orbBastionPct(lv)}%`;
+    if(id==='orb_shelter')return `自己召喚的寵物與召喚物受到的最終傷害 -${orbShelterPct(lv)}%`;
     return '';
 }
 function orbRenderPanel(){
@@ -237,10 +275,10 @@ function orbRenderPanel(){
         let d=ORB_DEFS[id],row=o.owned[id],lv=row?row.level:1,equipped=o.equipped[d.slot]===id,cost=row&&lv<ORB_MAX_LEVEL?ORB_UPGRADE_COST[lv]:0;
         return `<article class="gc-orb-card ${row?'owned':'locked'}"><header><b style="color:${d.color}">${d.icon} ${d.n}</b><small>${ORB_SLOT_NAME[d.slot]}・${row?ORB_RANK_NAME[lv]+' Lv.'+lv:'尚未取得'}</small></header><p>${orbPowerText(id,lv)}</p><details><summary>殘響敘述</summary><p>${d.story}</p></details><div>${row?`<button ${equipped?'disabled':''} onclick="growthEquipOrb('${id}')">${equipped?'裝備中':'裝備'}</button><button ${lv>=ORB_MAX_LEVEL||o.dust<cost?'disabled':''} onclick="growthUpgradeOrb('${id}')">${lv>=ORB_MAX_LEVEL?'已滿級':`升級 ${cost} 粉塵`}</button>`:'<span class="text-slate-500">擊敗頭目或強敵取得</span>'}</div></article>`;
     }).join('');
-    return `<div class="gc-orbs"><div class="gc-orb-summary"><b>寶珠粉塵：${o.dust.toLocaleString()}</b><span>已收集 ${ownedCount}/${Object.keys(ORB_DEFS).length}・固定三欄；核心最高 10%，共鳴平均／常駐最高 4%。</span>${o.trialClaimed?'':'<button onclick="growthClaimTrialOrbs()">領取試作寶珠</button>'}</div><div class="gc-orb-slots">${slotRows}</div><h3>寶珠配置</h3><div class="gc-orb-presets">${presetRows}</div><h3>寶珠收藏</h3><div class="gc-orb-grid">${cards}</div><p class="text-slate-400">前三次擊敗頭目會依序保底核心、共鳴、守護寶珠；之後頭目 12%、強敵 0.2%、一般敵人 0.02%。種類依怪物元素、種族與防禦特性決定；重複寶珠轉為 15 粉塵；連續 4 顆重複後，下一顆優先補未收集種類。寶珠傷害不會遞迴觸發寶珠。</p></div>`;
+    return `<div class="gc-orbs"><div class="gc-orb-summary"><b>寶珠粉塵：${o.dust.toLocaleString()}</b><span>已收集 ${ownedCount}/${Object.keys(ORB_DEFS).length}・固定三欄；核心負責傷害條件，共鳴調整戰鬥節奏，守護負責生存。</span>${o.trialClaimed?'':'<button onclick="growthClaimTrialOrbs()">領取試作寶珠</button>'}</div><div class="gc-orb-slots">${slotRows}</div><h3>寶珠配置</h3><div class="gc-orb-presets">${presetRows}</div><h3>寶珠收藏</h3><div class="gc-orb-grid">${cards}</div><p class="text-slate-400">前三次擊敗頭目會依序保底核心、共鳴、守護寶珠；之後頭目 12%、強敵 0.2%、一般敵人 0.02%。種類依怪物元素、種族與防禦特性決定；重複寶珠轉為 15 粉塵；連續 4 顆重複後，下一顆優先補未收集種類。寵物與召喚物只讀其召喚者的寶珠；寶珠傷害不會遞迴觸發寶珠。</p></div>`;
 }
 function orbResetRuntime(owner){
-    if(!owner)return;owner._orbCycleEle='';owner._orbRhythmCount=0;owner._orbMomentumUid='';owner._orbMomentumStacks=0;owner._orbMomentumUntil=0;
+    if(!owner)return;owner._orbCycleEle='';owner._orbRhythmCount=0;owner._orbMomentumUid='';owner._orbMomentumStacks=0;owner._orbMomentumUntil=0;owner._orbBondAt=0;
 }
 function growthSaveOrbPreset(index){
     index=Number(index);let o=orbEnsure(player);if(!o||!Number.isInteger(index)||index<0||index>=o.presets.length)return;
