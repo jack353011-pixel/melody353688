@@ -1333,6 +1333,7 @@ function d2rAfterIncoming(owner,dmg) {
     if(ct.rcv&&hp<mhp){let heal=Math.min(mhp-hp,Math.floor(dmg*ct.rcv/100));if(heal>0){owner[hpKey]=hp+heal;hp+=heal;logCombat(`<span class="text-emerald-300 font-bold">【傷勢回流】</span>恢復 ${heal} 點 HP。`,'heal',channel);}}
     if(ct.bar&&now>=(owner._d2rBarrierCd||0)){let guard=Math.floor(dmg*ct.bar/100),cap=Math.max(1,Math.floor(mhp*.15));guard=Math.min(cap,guard);if(guard>0){owner._d2rShield=Math.max(owner._d2rShield||0,guard);owner._d2rBarrierCd=now+50;logCombat(`<span class="text-cyan-300 font-bold">【傷勢壁壘】</span>獲得 ${guard} 點護盾（5 秒冷卻）。`,'player-special',channel);}}
     if(ct.rip){let fresh=now>=(owner._d2rRiposteUntil||0);owner._d2rRipostePct=ct.rip;owner._d2rRiposteUntil=now+50;if(fresh)logCombat(`<span class="text-orange-300 font-bold">【反擊意志】</span>傷害 +${ct.rip}%（5 秒）。`,'player-special',channel);}
+    if(typeof orbAfterIncoming==='function')orbAfterIncoming(owner,dmg);
 }
 function d2rTriggerOnTeamKill(mob) {
     if(!mob||mob.race==='建築')return;
