@@ -486,6 +486,11 @@ d.mr += (baseMr + bonusMr);
             }
         });
     }
+    // 🔱 歐林的項鍊＋西瑪戒指：只在兩件同時裝備時授予套裝治療技能。
+    if (setCheck['orin'] >= 2) {
+        if (!player.grantedSkills.includes('sk_vow_echo')) player.grantedSkills.push('sk_vow_echo');
+        if (!player.skills.includes('sk_vow_echo')) player.skills.push('sk_vow_echo');
+    }
     // 裝備／背包來源消失時，裝備技能與已施放的增益一起失效，避免卸裝後仍殘留完整持續時間。
     _previousGrantedSkills.forEach(sk => {
         if (!player.grantedSkills.includes(sk) && player.buffs && (player.buffs[sk] || 0) > 0) player.buffs[sk] = 0;

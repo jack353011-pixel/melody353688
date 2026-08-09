@@ -428,8 +428,8 @@ const DB = {
         "acc_summoner_amulet": { n: "喚獸師項鍊", type: "acc", slot: "amulet", ac: 0, wis: -1, cha: 2, req: "mage", safe: 0, p: 100000, gachaWeight: 1 },
         "acc_law_king_chain": { n: "法令軍王之鍊", legend: true, type: "acc", slot: "amulet", ac: 0, mmp: 15, mpR: 5, req: "mage,elf", safe: 0, p: 100000, gachaWeight: 1 },
         "acc_laia_ring":     { n: "蕾雅戒指", legend: true, type: "acc", slot: "ring", ac: 5, req: "all", safe: 0, p: 250000, gachaWeight: 1, stunResist: 5, d: "冰之女王蕾雅指間的戒指，冷冽之氣令神智不致動搖。" },
-        "acc_orin_amulet": { n: "歐林的項鍊", legend: true, type: "acc", slot: "amulet", ac: 0, req: "all", safe: 0, p: 100000, gachaWeight: 1, set: "orin", d: "歐林珍藏的項鍊，與西瑪戒指本是一對，分離已久。" },
-        "acc_sima_ring":   { n: "西瑪戒指", legend: true, type: "acc", slot: "ring", ac: 0, req: "all", safe: 0, p: 100000, gachaWeight: 1, set: "orin", d: "刻著西瑪之名的古老戒指，與歐林的項鍊遙相呼應。" },
+        "acc_orin_amulet": { n: "歐林的項鍊", legend: true, type: "acc", slot: "amulet", ac: 0, req: "all", safe: 0, p: 100000, gachaWeight: 1, set: "orin", d: "歐林珍藏的項鍊，與西瑪戒指本是一對，分離已久。同時裝備兩件後可使用「遙契回聲」：消耗 MP 18，治療一名隊伍成員，冷卻 8 秒。" },
+        "acc_sima_ring":   { n: "西瑪戒指", legend: true, type: "acc", slot: "ring", ac: 0, req: "all", safe: 0, p: 100000, gachaWeight: 1, set: "orin", d: "刻著西瑪之名的古老戒指，與歐林的項鍊遙相呼應。同時裝備兩件後可使用「遙契回聲」：消耗 MP 18，治療一名隊伍成員，冷卻 8 秒。" },
         "hlm_icequeen_charm": { n: "冰之女王魅力頭飾", legend: true, type: "arm", slot: "helm",  ac: 3, req: "royal", reqAvatar: "公主", safe: 4, p: 126000, gachaWeight: 1, set: "icequeen_charm", d: "冰之女王魅力套裝之一（公主限定），頭飾上的冰晶折射出懾人的高貴。" },
         "amr_icequeen_charm": { n: "冰之女王魅力禮服", legend: true, type: "arm", slot: "armor", ac: 7, req: "royal", reqAvatar: "公主", safe: 4, p: 186000, gachaWeight: 1, set: "icequeen_charm", d: "冰之女王魅力套裝之一（公主限定），禮服如初雪般華美而凜然。" },
         "bot_icequeen_charm": { n: "冰之女王魅力涼鞋", legend: true, type: "arm", slot: "boots", ac: 3, req: "royal", reqAvatar: "公主", safe: 4, p: 115000, gachaWeight: 1, set: "icequeen_charm", d: "冰之女王魅力套裝之一（公主限定），踏之如行於薄冰，步步生寒。" },
@@ -2863,6 +2863,8 @@ const DB = {
 
         // 七階魔法 (Lv 28)
         "sk_regen": { n: "體力回復術", type: "heal", justiceHeal: true, tier: 7, reqM: 28, mp: 35, valDice: [1, 20], healDice: [1, 30], healBase: 30, classicHeal: { baseDice: 10, sides: 8, mult: 0.8 }, groupHeal: true, healCooldownTicks: 30, msg: "治癒之光立即籠罩全隊。" },
+        // 🔱 歐林的項鍊＋西瑪戒指專屬套裝技能：兩件重逢時才授予，拆散即消失。
+        "sk_vow_echo": { n: "遙契回聲", type: "heal", tier: 7, mp: 18, valDice: [2, 30], healDice: [2, 40], healBase: 80, classicHeal: { baseDice: 10, sides: 10 }, healCooldownTicks: 80, desc: "單體治療。僅同時裝備歐林的項鍊與西瑪戒指時可使用。", msg: "相隔多年的誓約穿過黑暗，回應了仍在呼喚的人。" },
         "sk_greater_haste": { n: "強力加速術", type: "buff", tier: 7, reqM: 28, mp: 60, dur: 2400, haste: true, msg: "你感到身體變得非常輕盈。" },
         "sk_ice_lance": { n: "冰矛圍籬", type: "atk", tier: 7, reqM: 28, mp: 30, dmgType: "magic", ele: "water", dmgDice: [10, 6], dmgBase: 45, freeze: 200 },
         "sk_tornado": { n: "龍捲風", type: "atk", tier: 7, reqM: 28, mp: 45, dmgType: "magic", ele: "wind", target: "all", multiDmg: [[2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10]] },
