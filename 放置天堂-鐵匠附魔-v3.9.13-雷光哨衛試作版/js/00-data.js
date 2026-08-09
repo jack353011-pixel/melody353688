@@ -388,7 +388,7 @@ const DB = {
         "wpn_steel_manawand_red": { n: "紅色鋼鐵瑪那魔杖", type: "wpn", dmgS: 15, dmgL: 15, hit: 6, dmgBonus: 3, str: 3, mdmg: 3, spd: 1.0, req: "mage,illusion", safe: 6, p: 75000, eff: "magicstrike", mpOnHit: true, mpOnHitBase: 2, gachaWeight: 10, d: "以鋼鐵重鑄的力量魔法杖，杖心的魔法寶石燃著赤紅烈焰。" },
         "wpn_crystalwand": { n: "水晶魔杖", type: "wpn", dmgS: 1, dmgL: 1, hit: 0, spd: 1.0, req: "mage", safe: 6, p: 10000, mpR: 10, mpROverSafe: 2, gachaWeight: 20 },
         "wpn_powerless_baless": { n: "失去魔力的巴列斯魔杖", type: "wpn", dmgS: 1, dmgL: 1, hit: 0, dmgBonus: 0, spd: 1.0, req: "all", safe: 0, p: 100000, gachaWeight: 0, noEnhance: true, d: "魔力早已枯竭的古老魔杖，杖芯卻仍隱隱悸動。攜帶它並使用『靈魂之球』，或許能喚回沉睡的力量……（封印狀態無法強化；傳統模式下解封印才附加隨機強化值。可販售，售價 100000）" },   // 🔧 巴列斯任務武器；🏛️ noEnhance＝封印恆 +0（傳統模式自帶強化值延後到靈魂之球解封印時附加）
-        "wpn_baless": { n: "巴列斯魔杖", type: "wpn", dmgS: 2, dmgL: 3, hit: 0, dmgBonus: 0, mdmg: 2, spd: 1.0, req: "mage", safe: 0, p: 250000, mpR: 10, mpROverSafe: 2, legend: true, gachaWeight: 1, d: "重獲魔力的傳說魔杖，杖身蘊含撼動萬物的共鳴之力。" },   // 🏅 傳說武器（共鳴：見 WAND_LIGHTARROW_IDS）；🔧 安定值0：+0 為 MP自然恢復10，每強化+1再+2（10/12/14…）
+        "wpn_baless": { n: "巴列斯魔杖", type: "wpn", dmgS: 2, dmgL: 3, hit: 0, dmgBonus: 0, mdmg: 2, spd: 1.0, req: "mage", safe: 0, p: 250000, mpR: 10, mpROverSafe: 2, legend: true, gachaWeight: 1, grantSkills: ["sk_forbidden_resonance"], grantSkillsEquipOnly: true, d: "杖芯留著象牙塔最高研究室的編號，也留著巴列斯不肯停止的禁忌術式。裝備後可使用「禁式共鳴」：32 秒內魔法傷害 +8、魔防 −15。" },   // 🏅 傳說武器（共鳴：見 WAND_LIGHTARROW_IDS）；🔧 安定值0：+0 為 MP自然恢復10，每強化+1再+2（10/12/14…）
         "wpn_39": { n: "潘的角", type: "wpn", dmgS: 3, dmgL: 4, hit: 0, spd: 1, req: "all", safe: 6, p: 10, gachaWeight: 100 },
         "wpn_40": { n: "覆上米索莉的角", type: "wpn", dmgS: 4, dmgL: 4, hit: 0, spd: 1, req: "all", safe: 6, p: 178, unBonus: true, gachaWeight: 100 },
         "wpn_41": { n: "覆上奧里哈魯根的角", type: "wpn", dmgS: 7, dmgL: 8, hit: 0, spd: 1, req: "all", safe: 6, p: 1430, unBonus: true, gachaWeight: 100 },
@@ -2890,6 +2890,8 @@ const DB = {
         "sk_holy_barrier": { n: "聖結界", type: "buff", tier: 9, reqM: 36, mp: 30, dur: 32, msg: "一道神聖的防禦屏障保護著你。" },
         // 🐉 屠龍劍專屬裝備技能：呼應世界觀調查「劍其實是四龍封印的校準工具」。
         "sk_four_seal_resonance": { n: "四印共振", type: "buff", tier: 9, mp: 24, dur: 32, noRefresh: true, d: { resFire: 15, resWater: 15, resEarth: 15, resWind: 15 }, dragonStrikeRateBonus: 8, desc: "龍的一擊發動率 +8%（12% → 20%）。僅裝備屠龍劍時可使用。", msg: "劍刃四槽依序亮起，四道龍印與你同步共振。" },
+        // 🕯️ 巴列斯魔杖專屬裝備技能：以降低自身魔防為代價，重新接通被象牙塔禁止的研究術式。
+        "sk_forbidden_resonance": { n: "禁式共鳴", type: "buff", tier: 9, mp: 28, dur: 32, noRefresh: true, d: { magicDmg: 8, mr: -15 }, desc: "僅裝備巴列斯魔杖時可使用。", msg: "被刪去的研究式重新連結，杖芯傳來不祥的回響。" },
         "sk_sleep_mist": { n: "沉睡之霧", type: "atk", tier: 9, reqM: 36, mp: 40, dmgType: "magic", target: "all", status: { kind: "sleep", pbase: 100, dur: 8 } },
         "sk_thunder_storm": { n: "雷霆風暴", type: "atk", tier: 9, reqM: 36, mp: 48, dmgType: "magic", ele: "wind", target: "all", multiDmg: [[2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10]] },
         "sk_fire_storm": { n: "火風暴", type: "atk", tier: 9, reqM: 36, mp: 48, dmgType: "magic", ele: "fire", target: "all", multiDmg: [[4, 10], [4, 10], [4, 10], [4, 10]] },
