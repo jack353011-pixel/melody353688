@@ -53,9 +53,10 @@ function recomputeStats() {
     }, 0);   // 💍 固定裝備 MP 上限％（如喬丹之石）；與隨機 D2R 詞綴分開計算
     if (typeof p.lv === 'number') p.lv = Math.max(1, Math.min(100, Math.floor(p.lv) || 1));   // 🛡️ 等級硬夾 [1,100]：即時中和「改 player.lv」的外掛，避免職業成長值被放大
 
-    // 先把「上一輪由裝備授予的技能」從技能欄移除（卸下裝備時生效）；sk_helm_* 玩家無法學習，不會誤刪已學技能
-    if (player.grantedSkills && player.grantedSkills.length) {
-        player.skills = player.skills.filter(s => !player.grantedSkills.includes(s));
+    // 先把「上一輪由裝備授予的技能」從技能欄移除，稍後依本輪裝備重新授予；裝備專屬技能不可自然學會，不會誤刪已學技能。
+    let _previousGrantedSkills = Array.isArray(player.grantedSkills) ? player.grantedSkills.slice() : [];
+    if (_previousGrantedSkills.length) {
+        player.skills = player.skills.filter(s => !_previousGrantedSkills.includes(s));
     }
     player.grantedSkills = [];
     // ===== Phase 0：基礎屬性 + 衍生欄位歸零（依基本設定，起始值0；AC起始10）=====
@@ -485,6 +486,10 @@ d.mr += (baseMr + bonusMr);
             }
         });
     }
+    // 裝備／背包來源消失時，裝備技能與已施放的增益一起失效，避免卸裝後仍殘留完整持續時間。
+    _previousGrantedSkills.forEach(sk => {
+        if (!player.grantedSkills.includes(sk) && player.buffs && (player.buffs[sk] || 0) > 0) player.buffs[sk] = 0;
+    });
     // ⚠️ 套裝效果唯一真相在此；DB.sets(js/00) 僅供 initSetTags 反向標記、不承載數值
     p._setPoly = null;   // 套裝變身僅在穿著時生效；每次重算先清除，卸下套裝即消失
     if(setCheck['leather'] >= 4) { d.ac -= 3; }   // 皮套裝（原作未實作，依 DB.sets 補上）

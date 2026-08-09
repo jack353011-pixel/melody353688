@@ -1889,7 +1889,8 @@ function allyWeaponProcs(ally, target, hitInfo, instOverride) {
     if (wpn.eff === 'moonburst' && Math.random() < 0.08) {
         let t = _allyProcTarget(target); if (t) allyProcMoonburst(ally, t);
     }
-    if (wpn.dragonStrike && Math.random() * 100 < wpn.dragonStrike) {   // 🔧 龍的一擊（傭兵版）：用傭兵力量
+    let _allyDragonStrikeRate = (wpn.dragonStrike || 0) + (((ally.buffs.sk_four_seal_resonance || 0) > 0) ? (DB.skills.sk_four_seal_resonance.dragonStrikeRateBonus || 0) : 0);
+    if (wpn.dragonStrike && Math.random() * 100 < _allyDragonStrikeRate) {   // 🔧 龍的一擊（傭兵版）：用傭兵力量；四印共振期間 +8%
         let _ts = mapState.mobs.filter(m => m && m.curHp > 0 && !m._dead);
         if (_ts.length) {
             logCombat(`<span class="font-bold" style="color:#fca5a5;text-shadow:0 0 6px #dc2626;">【協力·${ally._allyName}·龍的一擊】</span>劍中的龍魂咆哮！`, 'player-special');

@@ -323,7 +323,7 @@ const DB = {
         "wpn_1": { n: "斧", type: "wpn", dmgS: 3, dmgL: 5, hit: 0, spd: 1, req: "all", safe: 6, p: 28, gachaWeight: 100 },
         "wpn_2hsword": { n: "雙手劍", type: "wpn", w2h: true,dmgS: 14, dmgL: 16, hit: 0, spd: 1, req: "knight", safe: 6, p: 25200, eff: "cleave", gachaWeight: 10 },
         "wpn_official_2h": { n: "武官雙手劍", type: "wpn", w2h: true, dmgS: 19, dmgL: 23, hit: 1, dmgBonus: 2, spd: 1, req: "knight", safe: 6, p: 95940, eff: "cleave", gachaWeight: 10 },   // 🔧 非傳說：權重 10（同武官頭盔/護鎧），避免潘朵拉抽獎誤判為「傳說大獎(權重1)」
-        "wpn_dragonslayer": { n: "屠龍劍", type: "wpn", w2h: true, dmgS: 28, dmgL: 35, hit: 2, dmgBonus: 9, spd: 1, req: "royal,knight,dragon", safe: 6, p: 300000, eff: "cleave", dragonStrike: 12, legend: true, gachaWeight: 1, d: "傳說中為屠龍而鍛造的雙手巨劍，劍身中沉眠著龍魂，一旦甦醒便嗜血咆哮。" },   // 🔧 卡瑞 100% 掉落（🎮 經典模式亦 100%·v2.6.75）；潘朵拉抽不到
+        "wpn_dragonslayer": { n: "屠龍劍", type: "wpn", w2h: true, dmgS: 28, dmgL: 35, hit: 2, dmgBonus: 9, spd: 1, req: "royal,knight,dragon", safe: 6, p: 300000, eff: "cleave", dragonStrike: 12, legend: true, gachaWeight: 1, grantSkills: ["sk_four_seal_resonance"], grantSkillsEquipOnly: true, d: "傳說稱它為屠龍之劍，刃上的四個凹槽卻與地、水、火、風封印石完全吻合。裝備後可使用「四印共振」：32 秒內全屬性抗性 +15，龍的一擊發動率由 12% 提升至 20%。" },   // 🔧 卡瑞 100% 掉落（🎮 經典模式亦 100%·v2.6.75）；潘朵拉抽不到
         "wpn_vander_sword": { n: "騎士范德之劍", type: "wpn", w2h: true, dmgS: 22, dmgL: 34, hit: 5, dmgBonus: 6, spd: 1, req: "knight", safe: 6, p: 210000, eff: "cleave", str: 1, vanderStunHit: true, legend: true, gachaWeight: 1, d: "闇黑騎士范德生前佩持的雙手巨劍，劍上仍纏著未散的殺意。" },
         "wpn_2": { n: "釘錘", type: "wpn", dmgS: 6, dmgL: 8, hit: 0, spd: 1.1, req: "all", safe: 6, p: 133, gachaWeight: 100 },
         "wpn_3": { n: "弓", type: "wpn", isBow: true, ranged: true, rapidfire: 20, dmgS: 2, dmgL: 2, hit: 0, spd: 1.0, req: "all", safe: 6, p: 70, gachaWeight: 100 },
@@ -2886,6 +2886,8 @@ const DB = {
 
         // 九階魔法 (Lv 36)
         "sk_holy_barrier": { n: "聖結界", type: "buff", tier: 9, reqM: 36, mp: 30, dur: 32, msg: "一道神聖的防禦屏障保護著你。" },
+        // 🐉 屠龍劍專屬裝備技能：呼應世界觀調查「劍其實是四龍封印的校準工具」。
+        "sk_four_seal_resonance": { n: "四印共振", type: "buff", tier: 9, mp: 24, dur: 32, noRefresh: true, d: { resFire: 15, resWater: 15, resEarth: 15, resWind: 15 }, dragonStrikeRateBonus: 8, desc: "龍的一擊發動率 +8%（12% → 20%）。僅裝備屠龍劍時可使用。", msg: "劍刃四槽依序亮起，四道龍印與你同步共振。" },
         "sk_sleep_mist": { n: "沉睡之霧", type: "atk", tier: 9, reqM: 36, mp: 40, dmgType: "magic", target: "all", status: { kind: "sleep", pbase: 100, dur: 8 } },
         "sk_thunder_storm": { n: "雷霆風暴", type: "atk", tier: 9, reqM: 36, mp: 48, dmgType: "magic", ele: "wind", target: "all", multiDmg: [[2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10]] },
         "sk_fire_storm": { n: "火風暴", type: "atk", tier: 9, reqM: 36, mp: 48, dmgType: "magic", ele: "fire", target: "all", multiDmg: [[4, 10], [4, 10], [4, 10], [4, 10]] },

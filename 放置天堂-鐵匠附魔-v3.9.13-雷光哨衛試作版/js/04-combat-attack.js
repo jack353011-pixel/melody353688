@@ -335,7 +335,8 @@ function playerAttack() {
 function dragonStrikeProc() {
     let wpn = player.eq.wpn ? DB.items[player.eq.wpn.id] : null;
     if (!wpn || !wpn.dragonStrike) return;
-    if (Math.random() * 100 >= wpn.dragonStrike) return;
+    let _dragonStrikeRate = wpn.dragonStrike + ((player.buffs.sk_four_seal_resonance || 0) > 0 ? (DB.skills.sk_four_seal_resonance.dragonStrikeRateBonus || 0) : 0);
+    if (Math.random() * 100 >= _dragonStrikeRate) return;
     let targets = mapState.mobs.filter(m => m && m.curHp > 0 && !m._dead);
     if (!targets.length) return;
     logCombat(`<span class="font-bold" style="color:#fca5a5;text-shadow:0 0 6px #dc2626;">【龍的一擊】</span>劍中的龍魂咆哮，衝擊貫穿了所有敵人！`, 'player-special');
