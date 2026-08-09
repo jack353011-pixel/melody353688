@@ -1937,11 +1937,50 @@ function applyPledgeEnemyScaling(mob) {
 // 首領生成時依「實際在場戰力」一次性提高 HP；不提高攻擊力，單人完全不變。
 // 傭兵是完整角色快照，權重較高；多實體召喚術以整組計算，避免低階 6 隻被當成 6 名完整角色。
 // 倍率固定在該首領身上，隊員倒地後不回降；三段變身由 doMobTransform 繼承初始倍率。
+const BOSS_RESILIENCE_NORMAL = 0.08;
+const BOSS_RESILIENCE_RAID = 0.12;
+const BOSS_RESILIENCE_CAP = 0.15;
 const BOSS_ARMY_RAID_IDS = new Set([
     'antaras', 'fafurion', 'valakas', 'lindvior',
     'sanct_giltas', 'sanct_dantes',
     'ant_antharas_eroded', 'ant_antharas_fury', 'ant_antharas_mad'
 ]);
+// 🛡️ 首領韌性：一般頭目吸收 8% 傷害，大型／團隊頭目吸收 12%。
+// 以 curHp 存取器作為單一結算層，所有扣血路徑（玩家、傭兵、寵物、召喚物、DoT、固定／百分比傷害）都會生效；
+// 回血與生成／還原 HP 為增加值，不受影響。啟用時機固定在出怪的所有 HP 縮放與傷勢還原完成後，避免把初始化誤判成傷害。
+function assignBossResilience(mob, mobId, inherited) {
+    if (!mob || !mob.boss || mob.siegeEnemy || mob.race === '建築') return 0;
+    let inheritedPct = inherited && Number(inherited._bossResiliencePct);
+    let pct = Number.isFinite(inheritedPct) && inheritedPct > 0
+        ? inheritedPct
+        : (BOSS_ARMY_RAID_IDS.has(mobId) ? BOSS_RESILIENCE_RAID : BOSS_RESILIENCE_NORMAL);
+    mob._bossResiliencePct = Math.max(0, Math.min(BOSS_RESILIENCE_CAP, pct));
+    return mob._bossResiliencePct;
+}
+function activateBossResilience(mob) {
+    if (!mob || mob._bossResilienceActive || !(Number(mob._bossResiliencePct) > 0)) return;
+    let storedHp = Number(mob.curHp) || 0;
+    Object.defineProperty(mob, 'curHp', {
+        configurable: true,
+        enumerable: true,
+        get: function() { return storedHp; },
+        set: function(nextHp) {
+            let next = Number(nextHp);
+            if (!Number.isFinite(next)) return;
+            if (next < storedHp) {
+                let attempted = storedHp - next;
+                let pct = Math.max(0, Math.min(BOSS_RESILIENCE_CAP, Number(mob._bossResiliencePct) || 0));
+                let dealt = pct > 0 ? Math.max(1, Math.round(attempted * (1 - pct))) : attempted;
+                storedHp -= dealt;
+                mob._lastRawDamage = attempted;
+                mob._lastDamageTaken = dealt;
+                return;
+            }
+            storedHp = next;
+        }
+    });
+    mob._bossResilienceActive = true;
+}
 function _bossArmyAlive(list, hpKey) {
     return (Array.isArray(list) ? list : []).filter(x => x && !x._downed && ((x[hpKey] != null ? x[hpKey] : 1) > 0));
 }
@@ -1990,6 +2029,7 @@ function bossArmyHpMultiplier(mob, mobId, snapshot) {
 }
 function applyBossArmyScaling(mob, mobId, inherited) {
     if (!mob) return 1;
+    assignBossResilience(mob, mobId, inherited);
     if (mob._armyHpMult != null) return mob._armyHpMult;
     if (!mob.boss || mob.siegeEnemy || mob.race === '建築') return 1;   // 一般怪／城門不建立快照，避免每次補怪都掃描整支隊伍
     let snapshot = inherited && inherited._armySnapshot ? inherited._armySnapshot : bossArmySnapshot();
@@ -2041,6 +2081,7 @@ function spawnMob(idx) {
             applySherineBuff(idx);   // 🐉 v3.7.61 初始區域頭目也套用席琳世界，與後續變身階段一致
             applyBossArmyScaling(mapState.mobs[idx], _aid);
             if (_ab.hard) initHardSkin(mapState.mobs[idx]);
+            activateBossResilience(mapState.mobs[idx]);
             if (_ab.boss && typeof vfxBossEntrance === 'function') vfxBossEntrance(mapState.mobs[idx]);
             renderMobs(); return;
         }
@@ -2057,6 +2098,7 @@ function spawnMob(idx) {
         applySherineBuff(idx);   // 🔮 軍王之室／底比斯歐西里斯祭壇也吃「席琳的世界」強化＋_sherine（與一般出怪一致；不含恩賜 grace；須在 initHardSkin 之前）
         applyBossArmyScaling(mapState.mobs[idx], _id);
         if(mapState.mobs[idx].hard) initHardSkin(mapState.mobs[idx]);
+        activateBossResilience(mapState.mobs[idx]);
         if (_b.boss && typeof vfxBossEntrance === 'function') { try { vfxBossEntrance(mapState.mobs[idx]); } catch (e) {} }   // 🐉 v3.4.95 軍王之室／祭壇頭目也播出場特效
         return;
     }
@@ -2281,6 +2323,7 @@ function spawnMob(idx) {
     }
 
     applySherineGrace(idx);   // 🔮 席琳的恩賜：1% 機率場上一隻一般怪變恩賜怪（與時空裂痕共用 applySherineGrace）
+    activateBossResilience(mapState.mobs[idx]);   // 🛡️ 所有 HP 倍率／傷勢還原完成後才啟用，避免初始化被當成傷害
     if (base.boss && typeof vfxBossEntrance === 'function') { try { vfxBossEntrance(mapState.mobs[idx]); } catch (e) {} }   // 🐉 頭目出場特效＋螢幕震動（cosmetic·v3.4.95 起全頭目通用：名單有專屬配色/稱號·未註冊者依屬性配色·吃 __vfxOff/補跑）
     if (mapState.mobs[idx]._wcMassTauntBattle && typeof wcMassTauntGroupBattleFill === 'function') wcMassTauntGroupBattleFill();
     if (!state.ff && !mapState._wcMassTauntBattleFilling) renderMobs();

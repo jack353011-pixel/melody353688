@@ -312,6 +312,7 @@ function doMobTransform(idx) {
     if (typeof applySherineBuff === 'function') { try { applySherineBuff(idx); } catch (e) {} }   // 🔮 審查修：席琳的世界強化跨變身沿用（與 spawnMob/spawnRiftMob 同序·須在 initHardSkin 之前）
     if (typeof applyBossArmyScaling === 'function') applyBossArmyScaling(next, mob.transformTo, mob);   // 👑 變身鏈沿用第一階生成時的軍團倍率，隊員中途倒地不降低後續階段 HP
     if (base.hard) initHardSkin(next);
+    if (typeof activateBossResilience === 'function') activateBossResilience(next);   // 🛡️ 變身階段沿用第一階首領韌性
     logCombat(mob.transformLogText
         ? `<span class="${getMobColor(mob.lv)}">${mob.n}</span> ${mob.transformLogText}！`
         : `<span class="${getMobColor(mob.lv)}">${mob.n}</span> 的身軀迸發妖力——變身為 <span class="${getMobColor(next.lv)} font-bold">${next.n}</span>！`, 'enemy');   // 🐉 v3.7.59 transformLogText＝前一階自訂變身訊息（完整述句·不接次階名：安塔「受到黑龍之力更深的侵蝕而狂暴」／狂怒「陷入瘋狂，完全失去理智」）；未設者維持通用文
@@ -1345,6 +1346,7 @@ function spawnRiftMob(idx) {
     if (typeof applyBossArmyScaling === 'function') applyBossArmyScaling(mapState.mobs[idx], mobId);   // 👑 裂痕頭目同樣依在場軍團取得一次性 HP 倍率
     if (mapState.mobs[idx].hard) initHardSkin(mapState.mobs[idx]);
     applySherineGrace(idx);   // 🔮 席琳的恩賜（1% 機率）
+    if (typeof activateBossResilience === 'function') activateBossResilience(mapState.mobs[idx]);   // 🛡️ 裂痕頭目韌性於所有 HP 強化完成後啟用
     if (base.boss && typeof vfxBossEntrance === 'function') { try { vfxBossEntrance(mapState.mobs[idx]); } catch (e) {} }   // 🐉 v3.4.95 時空裂痕頭目也播出場特效（函式內部吃 _vfxMute → 補跑不播）
     if (!state.ff) renderMobs();
 }
