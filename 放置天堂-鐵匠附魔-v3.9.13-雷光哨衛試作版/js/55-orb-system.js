@@ -25,6 +25,7 @@ const ORB_DEFS = {
 };
 
 function orbClampInt(v,min,max){return Math.max(min,Math.min(max,Math.floor(Number(v)||0)));}
+function orbValidEquippedId(o,slot,id){return id&&ORB_DEFS[id]&&ORB_DEFS[id].slot===slot&&o.owned[id]?id:'';}
 function orbEnsure(owner){
     if(!owner||typeof owner!=='object')return null;
     let o=owner.orbs;
@@ -39,9 +40,16 @@ function orbEnsure(owner){
     if(!o.equipped||typeof o.equipped!=='object')o.equipped={};
     Object.keys(ORB_SLOT_NAME).forEach(slot=>{
         let id=String(o.equipped[slot]||'');
-        o.equipped[slot]=(id&&ORB_DEFS[id]&&ORB_DEFS[id].slot===slot&&o.owned[id])?id:'';
+        o.equipped[slot]=orbValidEquippedId(o,slot,id);
     });
+    if(!Array.isArray(o.presets))o.presets=[];
+    o.presets.length=3;
+    for(let i=0;i<3;i++){
+        let p=o.presets[i]&&typeof o.presets[i]==='object'?o.presets[i]:(o.presets[i]={});
+        p.saved=!!p.saved;p.core=orbValidEquippedId(o,'core',String(p.core||''));p.resonance=orbValidEquippedId(o,'resonance',String(p.resonance||''));p.guard=orbValidEquippedId(o,'guard',String(p.guard||''));
+    }
     o.introDrops=orbClampInt(o.introDrops,0,3);
+    o.duplicateStreak=orbClampInt(o.duplicateStreak,0,4);
     o.trialClaimed=!!o.trialClaimed;
     return o;
 }
@@ -160,18 +168,26 @@ function orbDropPoolForMob(mob,slot){
     if(!ids.length)ids=Object.keys(ORB_DEFS);
     return [...new Set(ids)];
 }
-function orbRandomId(slot,mob){
+function orbRandomId(slot,mob,owner){
     let ids=orbDropPoolForMob(mob,slot);
+    let o=owner?orbEnsure(owner):null;
+    if(o&&o.duplicateStreak>=4){
+        let fresh=ids.filter(id=>!o.owned[id]);
+        if(!fresh.length)fresh=Object.keys(ORB_DEFS).filter(id=>(!slot||ORB_DEFS[id].slot===slot)&&!o.owned[id]);
+        if(fresh.length)ids=fresh;
+    }
     return ids[Math.floor(Math.random()*ids.length)]||'';
 }
 function orbGrant(owner,id,source){
     let o=orbEnsure(owner),def=ORB_DEFS[id];if(!o||!def)return false;
+    let trial=source==='試作';
     if(o.owned[id]){
-        let dust=15;o.dust+=dust;
-        if(typeof logSys==='function')logSys(`<span class="text-fuchsia-300 font-bold">🔮 ${def.n} 化為 ${dust} 寶珠粉塵。</span>`);
+        let dust=15;o.dust+=dust;if(!trial)o.duplicateStreak=Math.min(4,o.duplicateStreak+1);
+        let pity=!trial&&o.duplicateStreak>=4&&Object.keys(ORB_DEFS).some(x=>!o.owned[x]);
+        if(typeof logSys==='function')logSys(`<span class="text-fuchsia-300 font-bold">🔮 ${def.n} 化為 ${dust} 寶珠粉塵。${pity?'下次寶珠將優先出現未收集種類。':(!trial?`（未收集保底 ${o.duplicateStreak}/4）`:'')}</span>`);
         return false;
     }
-    o.owned[id]={level:1};
+    o.owned[id]={level:1};if(!trial)o.duplicateStreak=0;
     if(!o.equipped[def.slot])o.equipped[def.slot]=id;
     if(typeof logSys==='function')logSys(`<span class="font-bold" style="color:${def.color}">🔮 獲得${source?' '+source:''}「${def.n}」；已收入${ORB_SLOT_NAME[def.slot]}欄位。</span>`);
     return true;
@@ -181,11 +197,11 @@ function orbOnKill(mob){
     let o=orbEnsure(player);if(!o)return;
     let id='';
     if(mob.boss&&o.introDrops<3){
-        let slot=['core','resonance','guard'][o.introDrops++];id=orbRandomId(slot,mob);
+        let slot=['core','resonance','guard'][o.introDrops++];id=orbRandomId(slot,mob,player);
     }else{
         let rate=mob.boss?0.12:(mob.hard?0.002:0.0002);
         if(Math.random()>=rate)return;
-        id=orbRandomId('',mob);
+        id=orbRandomId('',mob,player);
     }
     if(id)orbGrant(player,id,mob.boss?'頭目寶珠':'寶珠');
 }
@@ -213,11 +229,28 @@ function orbRenderPanel(){
         let x=orbEquipped(player,slot,o);
         return `<div class="gc-orb-slot"><small>${ORB_SLOT_NAME[slot]}寶珠</small>${x?`<b style="color:${x.def.color}">${x.def.icon} ${x.def.n}</b><span>${ORB_RANK_NAME[x.level]}・Lv.${x.level}</span><button onclick="growthUnequipOrb('${slot}')">卸下</button>`:`<b class="text-slate-400">尚未裝備</b><span>只能裝備${ORB_SLOT_NAME[slot]}類寶珠</span>`}</div>`;
     }).join('');
+    let presetRows=o.presets.map((p,i)=>{
+        let equipped=Object.keys(ORB_SLOT_NAME).map(slot=>{let id=p[slot],d=id&&ORB_DEFS[id];return d?`<span style="color:${d.color}">${d.icon} ${d.n}</span>`:'<span class="text-slate-500">空</span>';}).join('');
+        return `<div class="gc-orb-preset"><b>配置 ${i+1}</b><div>${p.saved?equipped:'<span class="text-slate-500">尚未儲存</span>'}</div><span><button onclick="growthSaveOrbPreset(${i})">覆寫目前配置</button><button ${p.saved?'':'disabled'} onclick="growthLoadOrbPreset(${i})">套用</button></span></div>`;
+    }).join('');
     let cards=Object.keys(ORB_DEFS).map(id=>{
         let d=ORB_DEFS[id],row=o.owned[id],lv=row?row.level:1,equipped=o.equipped[d.slot]===id,cost=row&&lv<ORB_MAX_LEVEL?ORB_UPGRADE_COST[lv]:0;
         return `<article class="gc-orb-card ${row?'owned':'locked'}"><header><b style="color:${d.color}">${d.icon} ${d.n}</b><small>${ORB_SLOT_NAME[d.slot]}・${row?ORB_RANK_NAME[lv]+' Lv.'+lv:'尚未取得'}</small></header><p>${orbPowerText(id,lv)}</p><details><summary>殘響敘述</summary><p>${d.story}</p></details><div>${row?`<button ${equipped?'disabled':''} onclick="growthEquipOrb('${id}')">${equipped?'裝備中':'裝備'}</button><button ${lv>=ORB_MAX_LEVEL||o.dust<cost?'disabled':''} onclick="growthUpgradeOrb('${id}')">${lv>=ORB_MAX_LEVEL?'已滿級':`升級 ${cost} 粉塵`}</button>`:'<span class="text-slate-500">擊敗頭目或強敵取得</span>'}</div></article>`;
     }).join('');
-    return `<div class="gc-orbs"><div class="gc-orb-summary"><b>寶珠粉塵：${o.dust.toLocaleString()}</b><span>已收集 ${ownedCount}/${Object.keys(ORB_DEFS).length}・固定三欄；核心最高 10%，共鳴平均／常駐最高 4%。</span>${o.trialClaimed?'':'<button onclick="growthClaimTrialOrbs()">領取試作寶珠</button>'}</div><div class="gc-orb-slots">${slotRows}</div><h3>寶珠收藏</h3><div class="gc-orb-grid">${cards}</div><p class="text-slate-400">前三次擊敗頭目會依序保底核心、共鳴、守護寶珠；之後頭目 12%、強敵 0.2%、一般敵人 0.02%。種類依怪物元素、種族與防禦特性決定；重複寶珠轉為 15 粉塵。寶珠傷害不會遞迴觸發寶珠。</p></div>`;
+    return `<div class="gc-orbs"><div class="gc-orb-summary"><b>寶珠粉塵：${o.dust.toLocaleString()}</b><span>已收集 ${ownedCount}/${Object.keys(ORB_DEFS).length}・固定三欄；核心最高 10%，共鳴平均／常駐最高 4%。</span>${o.trialClaimed?'':'<button onclick="growthClaimTrialOrbs()">領取試作寶珠</button>'}</div><div class="gc-orb-slots">${slotRows}</div><h3>寶珠配置</h3><div class="gc-orb-presets">${presetRows}</div><h3>寶珠收藏</h3><div class="gc-orb-grid">${cards}</div><p class="text-slate-400">前三次擊敗頭目會依序保底核心、共鳴、守護寶珠；之後頭目 12%、強敵 0.2%、一般敵人 0.02%。種類依怪物元素、種族與防禦特性決定；重複寶珠轉為 15 粉塵；連續 4 顆重複後，下一顆優先補未收集種類。寶珠傷害不會遞迴觸發寶珠。</p></div>`;
+}
+function orbResetRuntime(owner){
+    if(!owner)return;owner._orbCycleEle='';owner._orbRhythmCount=0;owner._orbMomentumUid='';owner._orbMomentumStacks=0;owner._orbMomentumUntil=0;
+}
+function growthSaveOrbPreset(index){
+    index=Number(index);let o=orbEnsure(player);if(!o||!Number.isInteger(index)||index<0||index>=o.presets.length)return;
+    o.presets[index]={saved:true,core:o.equipped.core||'',resonance:o.equipped.resonance||'',guard:o.equipped.guard||''};
+    if(typeof saveGame==='function')saveGame();if(typeof renderGrowthCenter==='function')renderGrowthCenter();
+}
+function growthLoadOrbPreset(index){
+    index=Number(index);let o=orbEnsure(player);if(!o||!Number.isInteger(index)||index<0||index>=o.presets.length||!o.presets[index].saved)return;
+    let p=o.presets[index];Object.keys(ORB_SLOT_NAME).forEach(slot=>o.equipped[slot]=orbValidEquippedId(o,slot,p[slot]));orbResetRuntime(player);
+    if(typeof saveGame==='function')saveGame();if(typeof renderGrowthCenter==='function')renderGrowthCenter();
 }
 function growthClaimTrialOrbs(){
     let o=orbEnsure(player);if(!o||o.trialClaimed)return;o.trialClaimed=true;
@@ -226,14 +259,12 @@ function growthClaimTrialOrbs(){
 }
 function growthEquipOrb(id){
     let o=orbEnsure(player),d=ORB_DEFS[id];if(!o||!d||!o.owned[id])return;o.equipped[d.slot]=id;
-    if(d.slot==='core')player._orbCycleEle='';
-    if(d.slot==='resonance'){player._orbRhythmCount=0;player._orbMomentumUid='';player._orbMomentumStacks=0;player._orbMomentumUntil=0;}
+    orbResetRuntime(player);
     if(typeof saveGame==='function')saveGame();if(typeof renderGrowthCenter==='function')renderGrowthCenter();
 }
 function growthUnequipOrb(slot){
     let o=orbEnsure(player);if(!o||!ORB_SLOT_NAME[slot])return;o.equipped[slot]='';
-    if(slot==='core')player._orbCycleEle='';
-    if(slot==='resonance'){player._orbRhythmCount=0;player._orbMomentumUid='';player._orbMomentumStacks=0;player._orbMomentumUntil=0;}
+    orbResetRuntime(player);
     if(typeof saveGame==='function')saveGame();if(typeof renderGrowthCenter==='function')renderGrowthCenter();
 }
 function growthUpgradeOrb(id){
