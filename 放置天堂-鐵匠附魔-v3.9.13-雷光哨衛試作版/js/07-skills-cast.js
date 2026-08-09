@@ -831,6 +831,7 @@ function castSkillInner(skId) {
 
                 let dmgArray = sk.multiDmg || (sk.dmgDice ? [[sk.dmgDice[0], sk.dmgDice[1]]] : []);
                 let totalDmg = 0;
+                let dealtDmg = 0;
                 let hitsLog = [];
                 let isCrit = Math.random() * 100 < player.d.magicCrit;
     
@@ -867,12 +868,13 @@ function castSkillInner(skId) {
                     totalDmg = Math.max(1, Math.floor(totalDmg * equipSkillDmgMult(sk, skId) * (_autoCastNow ? (_equipWpnField('autoCastDmgMult') || 1) : 1)));   // 🏺 遺物 特定技能傷害倍率（冰錐/光箭/究極光裂術 ×1.5）；🐍 枯竭魔杖：auto 施放傷害 ×autoCastDmgMult(1.5)
                     if (typeof d2rHuntDamage === 'function') totalDmg = d2rHuntDamage(player, t, totalDmg, sk.ele || 'none');   // 八色：一般/頭目增傷＋屬性穿透＋異常增傷
                     t.curHp -= totalDmg;
-                    if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(player, t, totalDmg);
-                    _burstDmg += totalDmg;   // 🔧 魔爆累計
+                    dealtDmg = bossResilienceDamageTaken(t, totalDmg);
+                    if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(player, t, dealtDmg);
+                    _burstDmg += dealtDmg;   // 🔧 魔爆累計
                     t.justHit = (sk.ele && sk.ele !== 'none') ? sk.ele : 'magic';
                     t._spellHurt = true;   // 🎬 v3.0.14 法術傷害→hurt 動畫(含頭目·renderMobs 頭目閘放行)
-                    if (typeof reflectWallOnDamage === 'function') reflectWallOnDamage(t, totalDmg, 'magic', null);   // 🌑 v3.4.14 血壁空間：傷害魔法技能（單體/全體）＝魔法反射（玩家傭兵一致）
-                    let multiText = hitsLog.length > 1 ? `[${hitsLog.join(", ")}] (總和: ${totalDmg})` : `${totalDmg}`;
+                    if (typeof reflectWallOnDamage === 'function') reflectWallOnDamage(t, dealtDmg, 'magic', null, true);   // 🌑 v3.4.14 血壁空間：傷害魔法技能（單體/全體）＝魔法反射（玩家傭兵一致）
+                    let multiText = hitsLog.length > 1 ? `[${hitsLog.join(", ")}] (實扣總和: ${dealtDmg})` : `${dealtDmg}`;
                     if (isCrit) multiText += " (爆擊!)";
                     totalDmgText.push(`對 <span class="${getMobColor(t.lv)}">${t.n}</span> 造成 <span class="${isCrit?'text-yellow-500 font-bold':'text-cyan-300'}">${multiText} 點傷害</span>`);
                     if (player.dead) return;   // ☠️ v3.5.87 反射反殺：跳過本目標其餘附帶效果（forEach 內·外層另有總守衛）
@@ -885,7 +887,7 @@ function castSkillInner(skId) {
                 mobWake(t);
                 if(typeof playSpellFx === 'function') { try { playSpellFx(sk.n, t); } catch(e){} }   // ⚡ v2.7.15 法術特效：技能有註冊 SPELL_FX 者於目標身上疊播天堂原版特效(純視覺·只有註冊者會播)
                 if(t.st && t.st.mrhalf > 0) t.st.mrhalf = 0; // 受一次魔法傷害後解除魔抗減半
-                if(sk.lifesteal) { let h = Math.min(totalDmg, player.mhp - player.hp); if(h > 0){ player.hp += h; logCombat(`你吸取了 ${h} 點生命。`, 'heal'); } }
+                if(sk.lifesteal) { let h = Math.min(dealtDmg, player.mhp - player.hp); if(h > 0){ player.hp += h; logCombat(`你吸取了 ${h} 點生命。`, 'heal'); } }
                 if(sk.freeze) applyMobStatus(t, { kind:'freeze', pbase:sk.freeze, dur:6 }, sk.n);
                 if(sk.status) applyMobStatus(t, sk.status, sk.n, spCoef);
                 // 🏺 v3.5.27 水靈的魔力珠：原本不具冰凍效果的水屬性傷害魔法 → pct% 機率附加冰凍 dur 秒（頭目免疫冰凍照舊·經典模式停用特效）

@@ -1945,6 +1945,10 @@ const BOSS_ARMY_RAID_IDS = new Set([
     'sanct_giltas', 'sanct_dantes',
     'ant_antharas_eroded', 'ant_antharas_fury', 'ant_antharas_mad'
 ]);
+const BOSS_RESILIENCE_RAID_IDS = new Set([
+    ...BOSS_ARMY_RAID_IDS,
+    'sr_ushioni', 'sr_gashadokuro'
+]);
 // 🛡️ 首領韌性：一般頭目吸收 8% 傷害，大型／團隊頭目吸收 12%。
 // 以 curHp 存取器作為單一結算層，所有扣血路徑（玩家、傭兵、寵物、召喚物、DoT、固定／百分比傷害）都會生效；
 // 回血與生成／還原 HP 為增加值，不受影響。啟用時機固定在出怪的所有 HP 縮放與傷勢還原完成後，避免把初始化誤判成傷害。
@@ -1953,7 +1957,7 @@ function assignBossResilience(mob, mobId, inherited) {
     let inheritedPct = inherited && Number(inherited._bossResiliencePct);
     let pct = Number.isFinite(inheritedPct) && inheritedPct > 0
         ? inheritedPct
-        : (BOSS_ARMY_RAID_IDS.has(mobId) ? BOSS_RESILIENCE_RAID : BOSS_RESILIENCE_NORMAL);
+        : (BOSS_RESILIENCE_RAID_IDS.has(mobId) ? BOSS_RESILIENCE_RAID : BOSS_RESILIENCE_NORMAL);
     mob._bossResiliencePct = Math.max(0, Math.min(BOSS_RESILIENCE_CAP, pct));
     return mob._bossResiliencePct;
 }
@@ -1980,6 +1984,15 @@ function activateBossResilience(mob) {
         }
     });
     mob._bossResilienceActive = true;
+}
+// 取得最近一次扣血經首領韌性結算後的實際傷害；必須緊接該次 curHp 扣除後呼叫。
+function bossResilienceDamageTaken(mob, attempted) {
+    let raw = Math.max(0, Number(attempted) || 0);
+    if (!mob || !mob._bossResilienceActive) return raw;
+    let lastRaw = Number(mob._lastRawDamage);
+    let lastTaken = Number(mob._lastDamageTaken);
+    if (!Number.isFinite(lastRaw) || !Number.isFinite(lastTaken) || Math.abs(lastRaw - raw) > 1e-9) return raw;
+    return Math.max(0, lastTaken);
 }
 function _bossArmyAlive(list, hpKey) {
     return (Array.isArray(list) ? list : []).filter(x => x && !x._downed && ((x[hpKey] != null ? x[hpKey] : 1) > 0));

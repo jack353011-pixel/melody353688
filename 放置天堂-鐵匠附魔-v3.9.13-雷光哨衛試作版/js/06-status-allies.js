@@ -193,8 +193,8 @@ function processMobStatusTick(m, i) {
         s.poison--;
         if(state.ticks % (s.poisonTick || 30) === 0) {
             let _pdc = _teamDotCrit(s.poisonDmg);   // 🏺 v3.1.80 永不終止的夢魘：中毒 DoT 可爆擊
-            m.curHp -= _pdc.dmg; m.justHit = 'magic'; mobWake(m); _dpsCreditDot(s.poisonSrc, _pdc.dmg);   // 🎯 DPS：中毒 DoT 依施加者歸因（玩家/傭兵/召喚·未標記→玩家）
-            logCombat(`<span class="${getMobColor(m.lv)}">${m.n}</span> 受到中毒傷害 ${_pdc.dmg} 點。${_pdc.crit ? ' <span class="text-yellow-500 font-bold">(爆擊!)</span>' : ''}`, 'dot');   // 🟢 中毒 DoT→綠色持續傷害分類
+            m.curHp -= _pdc.dmg; let _pdt = bossResilienceDamageTaken(m, _pdc.dmg); m.justHit = 'magic'; mobWake(m); _dpsCreditDot(s.poisonSrc, _pdt);   // 🎯 DPS：中毒 DoT 依施加者歸因（玩家/傭兵/召喚·未標記→玩家）
+            logCombat(`<span class="${getMobColor(m.lv)}">${m.n}</span> 受到中毒傷害 ${_pdt} 點。${_pdc.crit ? ' <span class="text-yellow-500 font-bold">(爆擊!)</span>' : ''}`, 'dot');   // 🟢 中毒 DoT→綠色持續傷害分類
             if(m.curHp <= 0) { killMob(i); return true; }
         }
         if(s.poison <= 0) { s.poisonStacks = 0; s.poisonUnit = 0; s.poisonDmg = 0; s.poisonSrc = undefined; }   // 中毒結束：清空層數與 DPS 歸因來源（不清會跨中毒週期污染下一位施加者的統計）
@@ -212,8 +212,8 @@ function processMobStatusTick(m, i) {
             // 🔧 出血精通：每秒出血總傷害 ×(1 + 0.1×層數)（每層 +10%、10 層 = +100%）
             if(m._bleedMastery) bleedTotal = Math.floor(bleedTotal * (1 + 0.10 * m.bleeds.length));
             let _bdc = _teamDotCrit(bleedTotal);   // 🏺 v3.1.80 永不終止的夢魘：出血 DoT 可爆擊
-            m.curHp -= _bdc.dmg; m.justHit = 'magic'; mobWake(m); _dpsCreditDot(m._bleedSrc, _bdc.dmg);   // 🎯 DPS：出血 DoT 依施加者歸因（玩家/傭兵/寵物·未標記→玩家）
-            logCombat(`<span class="${getMobColor(m.lv)}">${m.n}</span> 受到出血傷害 ${_bdc.dmg} 點（${m.bleeds.length} 層）。${_bdc.crit ? ' <span class="text-yellow-500 font-bold">(爆擊!)</span>' : ''}`, 'dot');   // 🟢 出血 DoT→綠色持續傷害分類(原 'player' 藍色一般攻擊)
+            m.curHp -= _bdc.dmg; let _bdt = bossResilienceDamageTaken(m, _bdc.dmg); m.justHit = 'magic'; mobWake(m); _dpsCreditDot(m._bleedSrc, _bdt);   // 🎯 DPS：出血 DoT 依施加者歸因（玩家/傭兵/寵物·未標記→玩家）
+            logCombat(`<span class="${getMobColor(m.lv)}">${m.n}</span> 受到出血傷害 ${_bdt} 點（${m.bleeds.length} 層）。${_bdc.crit ? ' <span class="text-yellow-500 font-bold">(爆擊!)</span>' : ''}`, 'dot');   // 🟢 出血 DoT→綠色持續傷害分類(原 'player' 藍色一般攻擊)
             if(m.curHp <= 0) { killMob(i); return true; }
             if(!state.ff) renderMobs();
         }
@@ -224,8 +224,8 @@ function processMobStatusTick(m, i) {
         m._burstPoison.left--;
         if(m._burstPoison.left % 10 === 0) {
             let _udc = _teamDotCrit(m._burstPoison.dmg);   // 🏺 v3.1.80 永不終止的夢魘：猛爆劇毒 DoT 可爆擊
-            m.curHp -= _udc.dmg; m.justHit = 'magic'; mobWake(m); _dpsCreditDot(m._burstPoison.src, _udc.dmg);   // 🎯 DPS：猛爆劇毒 DoT 依施加者歸因（未標記→玩家）
-            logCombat(`<span class="${getMobColor(m.lv)}">${m.n}</span> 受到猛爆劇毒傷害 ${_udc.dmg} 點。${_udc.crit ? ' <span class="text-yellow-500 font-bold">(爆擊!)</span>' : ''}`, 'dot');   // 🟢 猛爆劇毒 DoT→綠色持續傷害分類(原 'player' 藍色一般攻擊)
+            m.curHp -= _udc.dmg; let _udt = bossResilienceDamageTaken(m, _udc.dmg); m.justHit = 'magic'; mobWake(m); _dpsCreditDot(m._burstPoison.src, _udt);   // 🎯 DPS：猛爆劇毒 DoT 依施加者歸因（未標記→玩家）
+            logCombat(`<span class="${getMobColor(m.lv)}">${m.n}</span> 受到猛爆劇毒傷害 ${_udt} 點。${_udc.crit ? ' <span class="text-yellow-500 font-bold">(爆擊!)</span>' : ''}`, 'dot');   // 🟢 猛爆劇毒 DoT→綠色持續傷害分類(原 'player' 藍色一般攻擊)
             if(m.curHp <= 0) { m._burstPoison = null; killMob(i); return true; }
             if(!state.ff) renderMobs();
         }
@@ -236,8 +236,8 @@ function processMobStatusTick(m, i) {
         m._burnDot.left--;
         if(m._burnDot.left % (m._burnDot.tick || 10) === 0) {
             let _fdc = _teamDotCrit(m._burnDot.dmg);   // 🏺 灼燒 DoT 可爆擊（與中毒/出血一致）
-            m.curHp -= _fdc.dmg; m.justHit = 'fire'; mobWake(m); _dpsCreditDot(m._burnDot.src, _fdc.dmg);   // 🎯 DPS：灼燒 DoT 依施加者歸因（未標記→玩家）
-            logCombat(`<span class="${getMobColor(m.lv)}">${m.n}</span> 受到灼燒傷害 ${_fdc.dmg} 點。${_fdc.crit ? ' <span class="text-yellow-500 font-bold">(爆擊!)</span>' : ''}`, 'dot');   // 🟢 灼燒 DoT→綠色持續傷害分類
+            m.curHp -= _fdc.dmg; let _fdt = bossResilienceDamageTaken(m, _fdc.dmg); m.justHit = 'fire'; mobWake(m); _dpsCreditDot(m._burnDot.src, _fdt);   // 🎯 DPS：灼燒 DoT 依施加者歸因（未標記→玩家）
+            logCombat(`<span class="${getMobColor(m.lv)}">${m.n}</span> 受到灼燒傷害 ${_fdt} 點。${_fdc.crit ? ' <span class="text-yellow-500 font-bold">(爆擊!)</span>' : ''}`, 'dot');   // 🟢 灼燒 DoT→綠色持續傷害分類
             if(m.curHp <= 0) { m._burnDot = null; killMob(i); return true; }
             if(!state.ff) renderMobs();
         }
@@ -1023,31 +1023,31 @@ function allyAttackOnce(ally, _arrowDelay) {   // 🏹 v3.2.14 _arrowDelay(選�
         if(typeof d2rGameplayMainDamage==='function')dmg=d2rGameplayMainDamage(ally,dmg);
         if(typeof d2rPerfectStrike==='function'){let _psa=d2rPerfectStrike(ally,dmg);dmg=_psa.dmg;if(_psa.proc)logCombat(`<span class="text-yellow-200 font-bold">【協力·${ally._allyName}·完美一擊】</span>造成額外傷害！`,'player-heavy','mercenary');}
         markBossPhysicalHit(t);
-        t.curHp -= dmg; t.justHit = getWpnEle(ally.eq ? ally.eq.wpn : null, wpn, ally); if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(ally, t, dmg); mobWake(t);
-        if(typeof d2rGameplaySplash==='function')d2rGameplaySplash(ally,t,dmg,isRanged);
+        t.curHp -= dmg; let _mainTakenA = bossResilienceDamageTaken(t, dmg); t.justHit = getWpnEle(ally.eq ? ally.eq.wpn : null, wpn, ally); if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(ally, t, _mainTakenA); mobWake(t);
+        if(typeof d2rGameplaySplash==='function')d2rGameplaySplash(ally,t,_mainTakenA,isRanged);
         if (wpn && wpn.bonespike && (t._bonespike || 0) > 0 && t.curHp > 0) { let _bs = t._bonespike * 20; t._bonespike = 0; t.curHp -= _bs; t._spellHurt = true; mobWake(t); logCombat(`<span class="font-bold" style="color:#e5e7eb;text-shadow:0 0 6px #6b7280;">【協力·${ally._allyName}·骨刺爆裂】</span>引爆目標身上的骨刺，額外造成 ${_bs} 點固定傷害。`, 'player-special'); }   // 🏺 骸骨意志之弓（傭兵）：一般攻擊引爆所有骨刺（每層 20 固定傷害）
-        if (typeof reflectWallOnDamage === 'function') reflectWallOnDamage(t, dmg, isRanged ? 'ranged' : 'melee', ally);   // 🌑 v3.4.14 血壁空間：傭兵物理普攻主擊反射（鏡像玩家 js/04:132）
+        if (typeof reflectWallOnDamage === 'function') reflectWallOnDamage(t, _mainTakenA, isRanged ? 'ranged' : 'melee', ally, true);   // 🌑 v3.4.14 血壁空間：傭兵物理普攻主擊反射（鏡像玩家 js/04:132）
         // ☠️ v3.5.90 反彈可能當場把傭兵打成倒地（reflectWallOnDamage 內設 _downed＋_reviveCd）：不早退的話會繼續跑所有命中特效，
         //    其中龍血2/5 吸血會把已倒地傭兵的 curHp 從 0 拉回正值 → 面板顯示有血、卻仍被 !a._downed 的治癒/受害者池判定為倒地（要等返生/回村才解）。
         //    ⚠️ 不能裸 return：仍須走完下方 killMob 收尾，否則被這一擊打死的怪會留在場上。鏡像玩家 js/04 playerAttack 的 player.dead 早退。
         if (ally._downed) { let _dri = mapState.mobs.findIndex(m => m && m.uid === t.uid); if (t.curHp <= 0) { if (_dri !== -1) killMob(_dri); } else renderMobs(); return; }
-        if (t.curHp > 0 && wpn && wpn.hitEchoMagic && Math.random() * 100 < (wpn.hitEchoMagic.rate || 0)) { t.curHp -= dmg; if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(t, dmg, 'magic'); t.justHit = wpn.hitEchoMagic.ele || 'magic'; t._spellHurt = true; mobWake(t); logCombat(`<span class="font-bold" style="color:#fb923c;text-shadow:0 0 6px #dc2626;">【協力·${ally._allyName}·爆破】</span>烈焰爆開，額外造成 ${dmg} 點火屬性魔法傷害。`, 'player-special'); }   // 🏺 火精靈王的爆焰（傭兵）：命中 10% 追加等同本擊的火魔傷；🌅 巨大骷髏視為魔法
+        if (t.curHp > 0 && wpn && wpn.hitEchoMagic && Math.random() * 100 < (wpn.hitEchoMagic.rate || 0)) { t.curHp -= dmg; let _echoTakenA = bossResilienceDamageTaken(t, dmg); if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(t, _echoTakenA, 'magic', true); t.justHit = wpn.hitEchoMagic.ele || 'magic'; t._spellHurt = true; mobWake(t); logCombat(`<span class="font-bold" style="color:#fb923c;text-shadow:0 0 6px #dc2626;">【協力·${ally._allyName}·爆破】</span>烈焰爆開，額外造成 ${_echoTakenA} 點火屬性魔法傷害。`, 'player-special'); }   // 🏺 火精靈王的爆焰（傭兵）：命中 10% 追加等同本擊的火魔傷；🌅 巨大骷髏視為魔法
         if (t.curHp > 0) consumeStrawCurse(t);   // 🐍 詛咒稻草人：傭兵主攻擊亦消耗並額外扣 80 水魔傷（鏡像玩家）
         if (wpn && wpn.strawCurse && t.curHp > 0 && Math.random() * 100 < wpn.strawCurse.rate) { if (!t.st) t.st = newMobStatus(); t.st.strawCurse = Math.max(t.st.strawCurse || 0, wpn.strawCurse.stacks || 3); }   // 🐍 傭兵種下詛咒稻草人（鏡像玩家）
         if (wpn && wpn.onHitEleVuln === 'fire' && t.curHp > 0) t._fireVulnUntil = state.ticks + 30;   // 🏺 v3.1.76 灼熱蜥蜴長舌（傭兵施加端）：命中使目標獲得火屬性弱點 3 秒（鏡像玩家 js/04:147·玩家與傭兵共用 _fireVulnUntil 標記）
         if (wpn && wpn.onHitWet && t.curHp > 0) t._wetUntil = state.ticks + 100;   // 🏺 海洋水晶球（傭兵施加端）：命中使目標潮濕 10 秒（鏡像玩家 js/04:158·共用 _wetUntil 標記）
         if (wpn && wpn.procBurn && t.curHp > 0 && (wpn.procBurn.magicHit ? allyAbnormalMagicHit(ally, t) : (!wpn.procBurn.rate || Math.random() * 100 < wpn.procBurn.rate))) t._burnDot = { left: (wpn.procBurn.dur || 6) * 10, dmg: wpn.procBurn.dmg || 10, tick: (wpn.procBurn.tick || 1) * 10, src: _dpsAllySrc(ally) };   // 🏺 熔岩灼燒的雙拳（傭兵鏡像玩家）：命中附加灼燒 DoT；🎯 DPS 歸該傭兵；🔥 v3.7.54 magicHit 改用該傭兵的等級／魔法命中
-        if (wpn && wpn.procPoisonPct && t.curHp > 0 && dmg > 0) { if (!t.st) t.st = newMobStatus(); let _ppd = Math.max(1, Math.floor(dmg * (wpn.procPoisonPct.pct || 50) / 100)); t.st.poison = (wpn.procPoisonPct.dur || 6) * 10; t.st.poisonTick = 10; t.st.poisonStacks = 1; t.st.poisonUnit = _ppd; t.st.poisonDmg = _ppd; t.st.poisonSrc = _dpsAllySrc(ally); }   // 🌅 遺物 毒鵺的黑尾（傭兵鏡像玩家）：命中附加「每秒該次傷害 pct%」中毒（最多 1 層·刷新覆蓋）
+        if (wpn && wpn.procPoisonPct && t.curHp > 0 && _mainTakenA > 0) { if (!t.st) t.st = newMobStatus(); let _ppd = Math.max(1, Math.floor(_mainTakenA * (wpn.procPoisonPct.pct || 50) / 100)); t.st.poison = (wpn.procPoisonPct.dur || 6) * 10; t.st.poisonTick = 10; t.st.poisonStacks = 1; t.st.poisonUnit = _ppd; t.st.poisonDmg = _ppd; t.st.poisonSrc = _dpsAllySrc(ally); }   // 🌅 遺物 毒鵺的黑尾（傭兵鏡像玩家）：命中附加「每秒該次實際傷害 pct%」中毒（最多 1 層·刷新覆蓋）
         if (wpn && wpn.windbladeProc && t.curHp > 0 && Math.random() * 100 < wpn.windbladeProc) { t.bleeds = t.bleeds || []; t._bleedCap = Math.max(t._bleedCap || 0, 5); while (t.bleeds.length >= t._bleedCap) t.bleeds.shift(); t.bleeds.push({ dmg: 10, ticksLeft: 60 }); t._bleedSrc = _dpsAllySrc(ally); }   // 🏺 v3.6.44 疾風拳刃（傭兵鏡像）：3% 風刃出血（每秒 10 點·6 秒）
         if (wpn && wpn.hardskinFireProc && t.curHp > 0 && _hsT > 0) { let _hf = Math.max(1, Math.floor(Math.max(1, t.curHp * 0.01) * elementCounterMult('fire', t.e))); t.curHp -= _hf; if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(t, _hf, 'magic'); t.justHit = 'fire'; t._spellHurt = true; }   // 🏺 v3.6.44 業火鍛造鎚（傭兵鏡像）：命中有硬皮敵人→額外剩餘 HP 1% 火魔傷
         if (wpn && wpn.hpOnHit && dmg > 0 && !ally._downed) ally.curHp = Math.min(ally.mhp || 1, (ally.curHp || 0) + wpn.hpOnHit);   // 🏺 v3.6.44 嗜血騎士的雙刀（傭兵鏡像）：命中恢復 HP
         if (wpn && wpn.hasteStrike && ally.buffs && ally.buffs.haste > 0) { ally.buffs.haste = 0; try { _allyLevelRecompute(ally); } catch (e) {} }   // 🏺 v3.1.76 殺人蜂的尾刺（傭兵）：一般攻擊命中時失去加速狀態（鏡像玩家 js/04:148）
-        if (ally._setDragonblood2 && dmg > 0) ally.curHp = Math.min(ally.mhp || 1, (ally.curHp || 0) + Math.max(1, Math.floor(dmg * ((ally.curHp < (ally.mhp || 1) * 0.5) ? 0.05 : 0.01))));   // 🐉 v2.6.9 #1b 龍血2/5（傭兵）：造成物理傷害吸血1%（自身HP<50%→5%）·回復戰鬥HP(curHp)
+        if (ally._setDragonblood2 && _mainTakenA > 0) ally.curHp = Math.min(ally.mhp || 1, (ally.curHp || 0) + Math.max(1, Math.floor(_mainTakenA * ((ally.curHp < (ally.mhp || 1) * 0.5) ? 0.05 : 0.01))));   // 🐉 v2.6.9 #1b 龍血2/5（傭兵）：依實際物理傷害吸血1%（自身HP<50%→5%）·回復戰鬥HP(curHp)
         // 🔧 黑暗妖精傭兵：預設攻擊自動維持附加劇毒（學過 sk_dark_poison 即視為常駐增益）；命中 50%／劇毒精通 100% 使目標中毒（與玩家同規則）
         if (ally.cls === 'dark' && ally.skills && ally.skills.includes('sk_dark_poison') && t.curHp > 0 && Math.random() < (allyHasMastery(ally, 'd_poison') ? 1 : 0.5)) {
             if (!t.st) t.st = newMobStatus();
             let _pPct = allyHasMastery(ally, 'd_poison') ? 2.0 : 0.6;   // 🔧 劇毒精通：每秒 200%；否則 60%
-            let _pUnit = Math.max(1, Math.floor(dmg * _pPct * ((wpn && wpn.poisonMult) || 1)));   // 🏺 暗黑蠍的雙鉗：poisonMult 放大附加劇毒（傭兵鏡像玩家）
+            let _pUnit = Math.max(1, Math.floor(_mainTakenA * _pPct * ((wpn && wpn.poisonMult) || 1)));   // 🏺 暗黑蠍的雙鉗：poisonMult 放大附加劇毒（傭兵鏡像玩家）
             // 🔧 新規則（與玩家一致）：未中毒、或新傷害高於現有時才上毒（取代並刷新5秒）；否則不更新，須等舊毒跑完
             if ((t.st.poison || 0) <= 0 || _pUnit > (t.st.poisonUnit || 0)) {
                 t.st.poison = 50; t.st.poisonTick = 10;                      // 持續 5 秒、1 層
@@ -1059,18 +1059,18 @@ function allyAttackOnce(ally, _arrowDelay) {   // 🏹 v3.2.14 _arrowDelay(選�
         }
         let mark = (heavy && isCrit) ? '會心一擊' : (isCrit ? '爆擊' : (heavy ? '重擊' : (_grazeA ? '擦傷' : '')));
         if (_dualX2A) mark += (mark ? '·' : '') + '雙刃×2';   // ⚔️ 雙刀內建特性標記
-        logCombat(`${kp}<span class="text-sky-300 font-bold">【協力·${ally._allyName}】</span>攻擊 <span class="${getMobColor(t.lv)}">${t.n}</span>，造成 ${dmg} 點傷害${mark?'（'+mark+'!）':''}。`, 'player');
+        logCombat(`${kp}<span class="text-sky-300 font-bold">【協力·${ally._allyName}】</span>攻擊 <span class="${getMobColor(t.lv)}">${t.n}</span>，造成 ${_mainTakenA} 點傷害${mark?'（'+mark+'!）':''}。`, 'player');
         // 🔧 硬皮消磨：傭兵一般攻擊命中固定再磨 1（basic，與玩家同規則）；單手鈍器鈍擊另由 allyOnHitEffects 觸發
         if (t.curHp > 0) wearHardSkin(t, ally.eq && ally.eq.wpn ? ally.eq.wpn.id : null, heavy, false, true, ally.classicMode);
-        allyOnHitEffects(ally, t, { dmg: dmg, heavy: heavy, hardSkin: _hsT });        // 🔧 命中後特效：穿透/即死/出血/鈍擊/切割（hardSkin 供穿透精通無視判定）
-        if (wpn && wpn.vampPct && dmg > 0) ally.curHp = Math.min(ally.mhp || 1, (ally.curHp || 0) + Math.floor(dmg * wpn.vampPct));   // 🐉 嗜血者鎖鏈劍（傭兵）·v2.6.9 修：回復戰鬥HP(curHp) 非快照 hp
+        allyOnHitEffects(ally, t, { dmg: _mainTakenA, heavy: heavy, hardSkin: _hsT });        // 🔧 命中後特效：穿透/即死/出血/鈍擊/切割（hardSkin 供穿透精通無視判定）
+        if (wpn && wpn.vampPct && _mainTakenA > 0) ally.curHp = Math.min(ally.mhp || 1, (ally.curHp || 0) + Math.floor(_mainTakenA * wpn.vampPct));   // 🐉 嗜血者鎖鏈劍（傭兵）·v2.6.9 修：回復戰鬥HP(curHp) 非快照 hp
         if (wpn && wpn.procHealFlat && dmg > 0 && Math.random() * 100 < wpn.procHealFlat.rate) { ally.curHp = Math.min(ally.mhp || 1, (ally.curHp || 0) + wpn.procHealFlat.hp); logCombat(`<span class="text-emerald-300 font-bold">【協力·${ally._allyName}·${wpn.n}】</span>恢復了 ${wpn.procHealFlat.hp} 點 HP。`, 'heal', 'mercenary'); }   // 🏺 v3.1.80 處刑人的護身斧（傭兵）：一般攻擊命中 3% 恢復 10 HP（鏡像玩家 js/04）
         if (t.curHp > 0 && !isRanged && wpn && (wpn.weakExpose || allyHasMastery(ally, 'k_weakness'))) {   // 🐉 弱點曝光（傭兵）：鎖鏈劍/弱點精通
             let _always = allyHasMastery(ally, 'k_chainblade') || allyHasMastery(ally, 'k_weakness');
             if (_always || Math.random() < 0.12) { let _max = allyHasMastery(ally, 'k_chainblade') ? 5 : 3; t.weakExpose = Math.min(_max, (t.weakExpose || 0) + 1); }
         }
         if (t.curHp > 0 && ally._setIron5 && typeof ironGuardTaunt === 'function' && ironGuardTaunt(t, ally)) logCombat(`<span class="font-bold" style="color:#93c5fd;text-shadow:0 0 6px #3b82f6;">【協力·${ally._allyName}·鐵衛 5/5】</span>嘲諷 <span class="${getMobColor(t.lv)}">${t.n}</span>！（3 秒）`, 'player-special');
-        allyWeaponProcs(ally, t, { hit: true, dmg: dmg });            // 🔧 普攻判定特效：瑪那回魔/共鳴/魔擊/月光爆裂
+        allyWeaponProcs(ally, t, { hit: true, dmg: _mainTakenA });            // 🔧 普攻判定特效：瑪那回魔/共鳴/魔擊/月光爆裂
         if (wpn && Math.random() * 100 < (ally._forceComboRate != null ? ally._forceComboRate : comboTriggerChance(ally, wpn, ally.eq && ally.eq.wpn))) allyComboAttack(ally, t, true);     // 雙擊：命中後依武器／套裝機率追加一次完整一般攻擊
         if (isCrit && allyHasMastery(ally, 'd_crit')) allyComboAttack(ally, t);   // 🔧 黑暗妖精爆擊精通：傭兵爆擊時追加一次連擊
         // ⚔️ v3.5.100 迅猛雙斧（傭兵）：副手已改為 alliesTick 內的獨立計時器 _offAtkCd，不再是「主手第二攻擊來源」
@@ -1229,17 +1229,18 @@ function allyCastMagic(ally, sk) {
         if (sk.hpCost && ally._setDragonblood5) totalDmg = Math.max(1, Math.floor(totalDmg * 1.2));   // 🐉 v3.1.78 龍血5/5（傭兵）：HP消耗技傷害+20%（傷害魔法·鏡像玩家 js/07:642·傭兵確有付HP見 allyDragonAct）
         if (typeof d2rHuntDamage === 'function') totalDmg = d2rHuntDamage(ally, t, totalDmg, sk.ele || 'none');
         t.curHp -= totalDmg;
-        if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(ally, t, totalDmg);
-        _burstDmg += totalDmg;   // 🔧 魔爆累計
+        let dealtDmg = bossResilienceDamageTaken(t, totalDmg);
+        if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(ally, t, dealtDmg);
+        _burstDmg += dealtDmg;   // 🔧 魔爆累計
         t.justHit = (sk.ele && sk.ele !== 'none') ? sk.ele : 'magic';
         t._spellHurt = true;   // 🎬 v3.0.14 傭兵法術傷害→hurt(含頭目)
         if (t.st && t.st.mrhalf > 0) t.st.mrhalf = 0;
         mobWake(t);
         if (typeof playSpellFx === 'function') { try { playSpellFx(sk.n, t, ally); } catch (e) {} }   // 🎬 傭兵傷害法術：以傭兵 sprite 作為特效施法者
-        if (typeof reflectWallOnDamage === 'function') reflectWallOnDamage(t, totalDmg, 'magic', ally);   // 🌑 v3.4.14 血壁空間：傭兵傷害魔法技能（單體/全體）＝魔法反射（鏡像玩家 js/07 傷害魔法分支）
-        if (sk.lifesteal && totalDmg > 0) { let h = Math.min(totalDmg, (ally.mhp || 0) - (ally.curHp || 0)); if (h > 0) { ally.curHp = Math.min(ally.mhp || 1, (ally.curHp || 0) + h); logCombat(`<span class="text-emerald-300 font-bold">【協力·${ally._allyName}】</span>吸取了 ${h} 點生命。`, 'heal', 'mercenary'); } }   // 🩸 v2.6.18 #中：吸血魔法（寒冷戰慄/吸血鬼之吻 lifesteal）回復戰鬥HP(curHp)，比照玩家 castSkill 624；上限本次傷害或缺血較小者
+        if (typeof reflectWallOnDamage === 'function') reflectWallOnDamage(t, dealtDmg, 'magic', ally, true);   // 🌑 v3.4.14 血壁空間：傭兵傷害魔法技能（單體/全體）＝魔法反射（鏡像玩家 js/07 傷害魔法分支）
+        if (sk.lifesteal && dealtDmg > 0) { let h = Math.min(dealtDmg, (ally.mhp || 0) - (ally.curHp || 0)); if (h > 0) { ally.curHp = Math.min(ally.mhp || 1, (ally.curHp || 0) + h); logCombat(`<span class="text-emerald-300 font-bold">【協力·${ally._allyName}】</span>吸取了 ${h} 點生命。`, 'heal', 'mercenary'); } }   // 🩸 v2.6.18 #中：吸血魔法（寒冷戰慄/吸血鬼之吻 lifesteal）回復戰鬥HP(curHp)，比照玩家 castSkill 624；上限本次傷害或缺血較小者
         // 🔮 白鳥 5/5：傭兵「施放傷害魔法技能」不觸發脆弱（2026-06 用戶要求：只有一般攻擊/基礎普攻才觸發）；基礎普攻(法師光箭/幻術士奇古獸/物理 on-hit)仍於各自路徑套用脆弱
-        texts.push(`<span class="${getMobColor(t.lv)}">${t.n}</span> ${totalDmg}${isCrit?'(爆)':''}`);
+        texts.push(`<span class="${getMobColor(t.lv)}">${t.n}</span> ${dealtDmg}${isCrit?'(爆)':''}`);
     });
     // 傷害魔法附帶狀態（幻想=沉睡／混亂／冰矛圍籬=凍結／奪命之雷=暈眩）；毒咒等 DoT 同步吃本技能係數
     // ⚠️ 係數須逐目標重算：原本直接引用 spCoef，但它宣告在上方 dmgArray.forEach 回呼內（作用域外）→ ReferenceError，傭兵一施放就整個 tick 拋例外
@@ -1468,13 +1469,14 @@ function _allyDamageMob(ally, t, dmg, ele, terrorKind) {
     dmg = Math.max(1, Math.floor(dmg * royalAllyMult()));   // 👑 王族魅力加成：傭兵造成傷害 ×(1+魅力/200)（非王族＝×1·涵蓋所有走本函式的傭兵輸出：連擊/雙持/各 proc/魔擊/穿透/龍擊/反擊/居合等）
     let _dpsBf = t.curHp;   // 🎯 DPS：扣血前 HP（量測實際輸出·溢殺以剩餘 HP 計）
     t.curHp -= dmg;
-    let _terrorBlocked = !!(terrorKind && typeof terrorVisageOnDamage === 'function' && terrorVisageOnDamage(t, dmg, terrorKind));   // 🌅 只補巨大骷髏免疫；不擴張血壁反射
+    let _dealt = bossResilienceDamageTaken(t, dmg);
+    let _terrorBlocked = !!(terrorKind && typeof terrorVisageOnDamage === 'function' && terrorVisageOnDamage(t, _dealt, terrorKind, true));   // 🌅 只補巨大骷髏免疫；不擴張血壁反射
     t.justHit = ele;
     mobWake(t);
     // 🌑 v3.4.14 血壁空間：中央匯流點「不再」反射——走本函式的皆為 proc/雙擊/副手/魔擊/擴散/穿透波及/反擊/居合/受擊荊棘等衍生輸出，
     //    玩家側對應路徑一律不反射（js/03/04 各 proc 無掛點）→傭兵比照，達成玩家/傭兵完全一致。
     //    直擊反射改掛「普攻主擊＋技能直擊」各路徑（allyAttackOnce/allyQiguAttack/allyCastMagic/allyCastPhysicalSkill/咆哮/粉碎/屠宰/心破/會心）。
-    if (!_dpsAllyTurn) { let _amt = _terrorBlocked ? 0 : Math.max(0, Math.min(dmg, _dpsBf)); _dpsAddAlly(ally, _amt); _dpsReactAllyAccum += _amt; }   // 🎯 回合外傭兵輸出（反擊/居合/反射/荊棘）直接歸該傭兵；巨大骷髏免疫不灌入DPS
+    if (!_dpsAllyTurn) { let _amt = _terrorBlocked ? 0 : Math.max(0, Math.min(_dealt, _dpsBf)); _dpsAddAlly(ally, _amt); _dpsReactAllyAccum += _amt; }   // 🎯 回合外傭兵輸出（反擊/居合/反射/荊棘）直接歸該傭兵；巨大骷髏免疫不灌入DPS
     let ri = mapState.mobs.findIndex(m => m && m.uid === t.uid);
     if (t.curHp <= 0) { if (ri !== -1) killMob(ri); } else renderMobs();
 }

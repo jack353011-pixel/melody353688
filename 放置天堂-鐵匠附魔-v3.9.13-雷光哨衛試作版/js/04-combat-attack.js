@@ -148,23 +148,24 @@ function playerAttack() {
         if(typeof d2rPerfectStrike==='function'){let _ps=d2rPerfectStrike(player,result.dmg);result.dmg=_ps.dmg;if(_ps.proc)logCombat('<span class="text-yellow-200 font-bold">【完美一擊】</span>攻擊造成額外傷害！','player-heavy');}
         result.dmg=runeOutgoingDamage(player,target,result.dmg);
         target.curHp -= result.dmg;
-        d2rOnHit(player, target, result.dmg);
-        if(typeof d2rGameplaySplash==='function')d2rGameplaySplash(player,target,result.dmg,result.ranged);
+        let _mainTaken = bossResilienceDamageTaken(target, result.dmg);
+        d2rOnHit(player, target, _mainTaken);
+        if(typeof d2rGameplaySplash==='function')d2rGameplaySplash(player,target,_mainTaken,result.ranged);
         if (wpn && wpn.bonespike && (target._bonespike || 0) > 0 && target.curHp > 0) { let _bs = target._bonespike * 20; target._bonespike = 0; target.curHp -= _bs; target._spellHurt = true; mobWake(target); logCombat(`<span class="font-bold" style="color:#e5e7eb;text-shadow:0 0 6px #6b7280;">【骨刺爆裂】</span>引爆目標身上的骨刺，額外造成 ${_bs} 點固定傷害。`, 'player-special'); }   // 🏺 骸骨意志之弓：一般攻擊引爆所有骨刺（每層 20 固定傷害）
-        reflectWallOnDamage(target, result.dmg, result.ranged ? 'ranged' : 'melee', null);   // 🌑 血壁空間（吉爾塔斯）：反彈同等傷害給攻擊方
+        reflectWallOnDamage(target, _mainTaken, result.ranged ? 'ranged' : 'melee', null, true);   // 🌑 血壁空間（吉爾塔斯）：反彈實際傷害給攻擊方
         if (player.dead) { player._flameSlashFire = false; return; }   // ⚡ v3.5.89 早退前先消耗一次性旗標：燃燒擊砍在扣血前就設起，若直接 return 會殘留到復活後的下一擊（憑空再噴一次火屬性）
         if (target.curHp > 0 && player._setIron5 && typeof ironGuardTaunt === 'function' && ironGuardTaunt(target, player)) logCombat(`<span class="font-bold" style="color:#93c5fd;text-shadow:0 0 6px #3b82f6;">【鐵衛 5/5】</span>嘲諷 <span class="${getMobColor(target.lv)}">${target.n}</span>！（3 秒）`, 'player-special');
                                    // ⚠️ 反彈可能當場打死玩家（killPlayer）：不早退的話會繼續跑吸血/回血與整段揮擊收尾，
                                    //    造成 dead===true 但 hp>0 的矛盾狀態，且死後照樣結算擊殺經驗/金幣/掉落（經典模式已扣 5% 又補領）。
                                    //    比照本檔連擊段「攻擊者被反殺即中止」的既有慣例。
-        if (target.curHp > 0 && wpn && wpn.hitEchoMagic && Math.random() * 100 < (wpn.hitEchoMagic.rate || 0)) { let _he = wpn.hitEchoMagic; target.curHp -= result.dmg; if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(target, result.dmg, 'magic'); target.justHit = _he.ele || 'magic'; target._spellHurt = true; mobWake(target); logCombat(`<span class="font-bold" style="color:#fb923c;text-shadow:0 0 6px #dc2626;">【爆破】</span>烈焰爆開，額外造成 ${result.dmg} 點火屬性魔法傷害。`, 'player-special'); }   // 🏺 火精靈王的爆焰：命中 10% 追加等同本擊的火魔傷；🌅 巨大骷髏視為魔法
+        if (target.curHp > 0 && wpn && wpn.hitEchoMagic && Math.random() * 100 < (wpn.hitEchoMagic.rate || 0)) { let _he = wpn.hitEchoMagic; target.curHp -= result.dmg; let _echoTaken = bossResilienceDamageTaken(target, result.dmg); if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(target, _echoTaken, 'magic', true); target.justHit = _he.ele || 'magic'; target._spellHurt = true; mobWake(target); logCombat(`<span class="font-bold" style="color:#fb923c;text-shadow:0 0 6px #dc2626;">【爆破】</span>烈焰爆開，額外造成 ${_echoTaken} 點火屬性魔法傷害。`, 'player-special'); }   // 🏺 火精靈王的爆焰：命中 10% 追加等同本擊的火魔傷；🌅 巨大骷髏視為魔法
         if (target.curHp > 0) consumeStrawCurse(target);   // 🐍 詛咒稻草人：受到攻擊時額外扣 80 水魔傷（每次消耗 1 層·最多 3 層）
         if (result.dmg > 0) { try { playMobHurt(target); } catch(e){} }   // 🔊 音效：怪物受傷（依怪名對應；全域節流）
-        if (player._setDragonblood2 && result.dmg > 0) player.hp = Math.min(player.mhp, player.hp + Math.max(1, Math.floor(result.dmg * (player.hp < player.mhp * 0.5 ? 0.05 : 0.01))));   // 🐉 龍血2/5：造成物理傷害吸血1%（自身HP<50%→5%）
-        if (wpn && wpn.vampPct && result.dmg > 0) player.hp = Math.min(player.mhp, player.hp + Math.floor(result.dmg * wpn.vampPct));   // 🐉 嗜血者鎖鏈劍：吸取一般攻擊傷害的 % 為 HP
+        if (player._setDragonblood2 && _mainTaken > 0) player.hp = Math.min(player.mhp, player.hp + Math.max(1, Math.floor(_mainTaken * (player.hp < player.mhp * 0.5 ? 0.05 : 0.01))));   // 🐉 龍血2/5：依實際物理傷害吸血1%（自身HP<50%→5%）
+        if (wpn && wpn.vampPct && _mainTaken > 0) player.hp = Math.min(player.mhp, player.hp + Math.floor(_mainTaken * wpn.vampPct));   // 🐉 嗜血者鎖鏈劍：吸取一般攻擊實際傷害的 % 為 HP
         if (wpn && wpn.procHealFlat && result.dmg > 0 && Math.random() * 100 < wpn.procHealFlat.rate) { player.hp = Math.min(player.mhp, player.hp + wpn.procHealFlat.hp); logCombat(`<span class="text-emerald-300 font-bold">【${wpn.n}】</span>恢復了 ${wpn.procHealFlat.hp} 點 HP。`, 'heal'); }   // 🏺 v3.1.80 處刑人的護身斧：一般攻擊命中 3% 機率恢復 10 HP
         if (wpn && wpn.procBurn && target.curHp > 0 && (wpn.procBurn.magicHit ? abnormalMagicHit(target) : (!wpn.procBurn.rate || Math.random() * 100 < wpn.procBurn.rate))) target._burnDot = { left: (wpn.procBurn.dur || 6) * 10, dmg: wpn.procBurn.dmg || 10, tick: (wpn.procBurn.tick || 1) * 10 };   // 🏺 熔岩灼燒的雙拳：命中附加灼燒 DoT（每秒 dmg 火傷、持續 dur 秒·刷新）；🔥 v3.7.52 magicHit:true（烈焰死騎劍）＝改走魔法命中公式判定
-        if (wpn && wpn.procPoisonPct && target.curHp > 0 && result.dmg > 0) { if (!target.st) target.st = newMobStatus(); let _ppd = Math.max(1, Math.floor(result.dmg * (wpn.procPoisonPct.pct || 50) / 100)); target.st.poison = (wpn.procPoisonPct.dur || 6) * 10; target.st.poisonTick = 10; target.st.poisonStacks = 1; target.st.poisonUnit = _ppd; target.st.poisonDmg = _ppd; target.st.poisonSrc = 'player'; }   // 🌅 遺物 毒鵺的黑尾：命中附加「每秒該次傷害 pct%」中毒（最多 1 層·dur 秒·刷新覆蓋）
+        if (wpn && wpn.procPoisonPct && target.curHp > 0 && _mainTaken > 0) { if (!target.st) target.st = newMobStatus(); let _ppd = Math.max(1, Math.floor(_mainTaken * (wpn.procPoisonPct.pct || 50) / 100)); target.st.poison = (wpn.procPoisonPct.dur || 6) * 10; target.st.poisonTick = 10; target.st.poisonStacks = 1; target.st.poisonUnit = _ppd; target.st.poisonDmg = _ppd; target.st.poisonSrc = 'player'; }   // 🌅 遺物 毒鵺的黑尾：命中附加「每秒該次實際傷害 pct%」中毒（最多 1 層·dur 秒·刷新覆蓋）
         if (wpn && wpn.windbladeProc && target.curHp > 0 && Math.random() * 100 < wpn.windbladeProc) { target.bleeds = target.bleeds || []; target._bleedCap = Math.max(target._bleedCap || 0, 5); while (target.bleeds.length >= target._bleedCap) target.bleeds.shift(); target.bleeds.push({ dmg: 10, ticksLeft: 60 }); target._bleedSrc = 'player'; logCombat(`<span class="font-bold text-emerald-300">【風刃】</span>疾風割裂目標，陷入出血（每秒 10 點·6 秒）。`, 'player-special'); }   // 🏺 v3.6.44 疾風拳刃：3% 觸發風刃出血
         if (wpn && wpn.hardskinFireProc && target.curHp > 0 && _mainHardSkin > 0) { let _hf = Math.max(1, Math.floor(Math.max(1, target.curHp * 0.01) * elementCounterMult('fire', target.e))); target.curHp -= _hf; if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(target, _hf, 'magic'); target.justHit = 'fire'; target._spellHurt = true; logCombat(`<span class="font-bold" style="color:#fb923c;text-shadow:0 0 6px #dc2626;">【業火】</span>業火灼穿硬皮，額外造成 ${_hf} 點火屬性魔法傷害。`, 'player-special'); if (target.curHp <= 0) { let _hfIdx = mapState.mobs.findIndex(x => x && x.uid === target.uid); if (_hfIdx !== -1) killMob(_hfIdx); } }   // 🏺 v3.6.44 業火鍛造鎚：命中有硬皮的敵人→額外目標剩餘 HP 1% 火魔傷
         if (wpn && wpn.hpOnHit && result.dmg > 0) player.hp = Math.min(player.mhp, player.hp + wpn.hpOnHit);   // 🏺 v3.6.44 嗜血騎士的雙刀：一般攻擊命中恢復 HP
@@ -172,7 +173,7 @@ function playerAttack() {
         if (player.buffs && player.buffs.sk_dark_poison > 0 && target.curHp > 0 && Math.random() < (hasMastery('d_poison') ? 1 : 0.5)) {
             if (!target.st) target.st = newMobStatus();
             let _pPct = hasMastery('d_poison') ? 2.0 : 0.6;   // 🔧 劇毒精通：每秒 200%；否則 60%
-            let _pUnit = Math.max(1, Math.floor(result.dmg * _pPct * ((wpn && wpn.poisonMult) || 1)));   // 🏺 暗黑蠍的雙鉗：poisonMult 放大觸發的附加劇毒傷害（×1.2）
+            let _pUnit = Math.max(1, Math.floor(_mainTaken * _pPct * ((wpn && wpn.poisonMult) || 1)));   // 🏺 暗黑蠍的雙鉗：poisonMult 放大觸發的附加劇毒傷害（×1.2）
             // 🔧 新規則：未中毒、或新傷害「高於」現有時才上毒（取代傷害並刷新5秒）；新傷害未更高則完全不更新，須等舊毒5秒跑完、敵人脫離中毒後才能再上毒
             if ((target.st.poison || 0) <= 0 || _pUnit > (target.st.poisonUnit || 0)) {
                 target.st.poison = 50; target.st.poisonTick = 10;   // 持續 5 秒、每秒一次
@@ -184,7 +185,7 @@ function playerAttack() {
         target.justHit = getWpnEle(player.eq.wpn, wpn);
         if (player._flameSlashFire) { target.justHit = 'fire'; player._flameSlashFire = false; logCombat('<span class="font-bold" style="color:#fb923c;text-shadow:0 0 6px #ea580c;">【燃燒擊砍】</span>烈焰隨刃迸發！', 'player'); }   // 🐉 燃燒擊砍：本擊轉火屬性
         if (player._setWhiteBird5 && target.curHp > 0) { if (!target.st) target.st = newMobStatus(); target.st.fragile = 30; }   // 🔮 白鳥 5/5：脆弱 3 秒（重複觸發刷新）
-        if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(player, target, result.dmg);
+        if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(player, target, _mainTaken);
         if (wpn && wpn.onHitEleVuln === 'fire' && target.curHp > 0) target._fireVulnUntil = state.ticks + 30;   // 🏺 遺物 灼熱蜥蜴長舌：命中使目標獲得火屬性弱點 3 秒（受火屬性攻擊 +30%·getPhysicalDmg 讀取）
         if (wpn && wpn.onHitWet && target.curHp > 0) target._wetUntil = state.ticks + 100;   // 🏺 遺物 海洋水晶球：命中使目標潮濕 10 秒（受下一次風屬性傷害 ×2 並解除·consumeWetMult 讀取）
         if (wpn && wpn.hasteStrike && player.buffs && player.buffs.haste > 0) { player.buffs.haste = 0; if (typeof calcStats === 'function') calcStats(); }   // 🏺 遺物 殺人蜂的尾刺：一般攻擊命中時失去加速狀態
@@ -242,7 +243,7 @@ function playerAttack() {
         }
 
         // 簡化戰鬥資訊，不顯示遠/近距離[cite: 8]
-        logCombat(`${killPrefix}命中 <span class="${getMobColor(target.lv)}">${target.n}</span>，造成 ${result.dmg} 點傷害。${ext}`, tag);
+        logCombat(`${killPrefix}命中 <span class="${getMobColor(target.lv)}">${target.n}</span>，造成 ${_mainTaken} 點傷害。${ext}`, tag);
         if(_cleaveProc) logCombat('<span class="text-teal-300 font-bold">流暢的手感，讓你更快砍出下一刀</span>', 'player');
         
         // 匕首/矛出血（力量/60 機率）＋🔧 出血精通：雙刀也比照匕首觸發（力量/60）；匕首/矛/雙刀皆可疊 10 層、每秒總傷害 ×(1+0.1×層)
@@ -250,9 +251,9 @@ function playerAttack() {
         let _canBleed = weaponHasBleed(_bleedWpnId) || (hasMastery('d_bleed') && getWeaponTags(_bleedWpnId).includes('雙刀'));
         let _bleedChance = _canBleed ? ((player.d.str || 0) / 60) : 0;
         if (player.eq.wpn && target.curHp > 0 && !player.classicMode && Math.random() < _bleedChance) {   // 🎮 經典模式：停用出血
-            applyBleed(target, result.dmg, hasMastery('d_bleed') ? 10 : 5, hasMastery('d_bleed'));   // 🔧 出血精通：上限 10 層 + 每層 +10% 傷害
+            applyBleed(target, _mainTaken, hasMastery('d_bleed') ? 10 : 5, hasMastery('d_bleed'));   // 🔧 出血精通：上限 10 層 + 每層 +10% 傷害
         }
-        if (player.buffs.sk_warrior_throwaxe > 0 && !result.ranged && target.curHp > 0) { applyBleed(target, result.dmg, 5, hasMastery('k_dualaxe')); try { _vfxProjectile(_vfxSlotRect(target.uid), 'axe'); } catch(e){} }   // ✨ VFX：每次觸發射出旋轉金屬斧   // ⚔️ v3.1.74 戰斧投擲：持續(64秒)期間內每次近戰一般攻擊都附加出血，不消耗 buff；不輸出逐擊日誌（同匕首出血，避免洗版，出血傷害本身每秒有日誌）；🏅 雙斧精通：每層+10%
+        if (player.buffs.sk_warrior_throwaxe > 0 && !result.ranged && target.curHp > 0) { applyBleed(target, _mainTaken, 5, hasMastery('k_dualaxe')); try { _vfxProjectile(_vfxSlotRect(target.uid), 'axe'); } catch(e){} }   // ✨ VFX：每次觸發射出旋轉金屬斧   // ⚔️ v3.1.74 戰斧投擲：持續(64秒)期間內每次近戰一般攻擊都附加出血，不消耗 buff；不輸出逐擊日誌（同匕首出血，避免洗版，出血傷害本身每秒有日誌）；🏅 雙斧精通：每層+10%
         // 單手鈍器鈍擊：命中使目標攻擊延遲 1 秒；每個敵人攻擊週期僅延遲一次（攻擊後重置），故最多 +1 秒、不會無限延遲
         let _isBlunt1h = !player.classicMode && !!(player.eq.wpn && getWeaponTags(player.eq.wpn.id).includes('單手鈍器'));   // 🎮 經典模式：停用鈍擊（延遲＋硬皮-1）
         if (player.eq.wpn && target.curHp > 0 && _isBlunt1h) {
@@ -784,11 +785,11 @@ function procFreeMagicSkill(t, skId, en, areaHit, sourceItem, illusionRecoverMp)
     if (total > 0) total = illusionMagicDmg(total, true, illusionRecoverMp !== false);   // 🔮 全體免費施法只在第一個目標回MP；5件仍逐目標生效
     if (total > 0 && typeof d2rHuntDamage === 'function') total = d2rHuntDamage(player, t, total, sk.ele || 'none');
     if (total > 0) {
-        t.curHp -= total; if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(t, total, 'magic'); t.justHit = (sk.ele && sk.ele !== 'none') ? sk.ele : 'magic'; t._spellHurt = true; mobWake(t);   // 🎬 v3.0.14 法術傷害→hurt(含頭目)；🌅 巨大骷髏：免費觸發法術視為魔法
+        t.curHp -= total; let _freeTaken = bossResilienceDamageTaken(t, total); if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(t, _freeTaken, 'magic', true); t.justHit = (sk.ele && sk.ele !== 'none') ? sk.ele : 'magic'; t._spellHurt = true; mobWake(t);   // 🎬 v3.0.14 法術傷害→hurt(含頭目)；🌅 巨大骷髏：免費觸發法術視為魔法
         if(typeof playSpellFx === 'function') { try { playSpellFx(sk.n, t); } catch(e){} }   // ⚡ v2.7.16 娃娃/寵物免費施放(如娃娃克特/聖伯納→極道落雷)也疊法術特效
         if (t.st && t.st.mrhalf > 0) t.st.mrhalf = 0;
-        logCombat(`<span class="font-bold" style="color:#93c5fd;text-shadow:0 0 6px #2563eb;">【${sk.n}】</span>額外施放，對 <span class="${getMobColor(t.lv)}">${t.n}</span> 造成 <span class="${isCrit ? 'text-yellow-500 font-bold' : 'text-cyan-300'}">${total}</span> 點傷害${isCrit ? '（爆擊!）' : ''}。`, 'player-special');
-        if (sk.lifesteal) { let _h = Math.min(total, player.mhp - player.hp); if (_h > 0) { player.hp += _h; logCombat(`你吸取了 ${_h} 點生命。`, 'heal'); } }   // 🩸 v3.2.43 稽核修：吸血法術（冷徹寒顫等）proc 觸發也回血（比照 castSkill js/07:703·奪魂者雙刃劍 onHitCastSkill）
+        logCombat(`<span class="font-bold" style="color:#93c5fd;text-shadow:0 0 6px #2563eb;">【${sk.n}】</span>額外施放，對 <span class="${getMobColor(t.lv)}">${t.n}</span> 造成 <span class="${isCrit ? 'text-yellow-500 font-bold' : 'text-cyan-300'}">${_freeTaken}</span> 點傷害${isCrit ? '（爆擊!）' : ''}。`, 'player-special');
+        if (sk.lifesteal) { let _h = Math.min(_freeTaken, player.mhp - player.hp); if (_h > 0) { player.hp += _h; logCombat(`你吸取了 ${_h} 點生命。`, 'heal'); } }   // 🩸 v3.2.43 稽核修：吸血法術（冷徹寒顫等）proc 觸發也回血（比照 castSkill js/07:703·奪魂者雙刃劍 onHitCastSkill）
     }
     if (t.curHp > 0 && sk.freeze) applyMobStatus(t, { kind: 'freeze', pbase: sk.freeze, dur: 6 }, sk.n);
     if (t.curHp > 0 && sk.status) applyMobStatus(t, sk.status, sk.n, spCoef);
@@ -1817,7 +1818,8 @@ function trollCounterBarrierOnDamage(mob, dmg, ally) {
     if (ally) { if (typeof enemyAttackAlly === 'function') enemyAttackAlly(mob, ally); }
     else if (!player.dead) enemyPhysicalAttack(mob, mapState.mobs.indexOf(mob), 0);
 }
-function reflectWallOnDamage(mob, dmg, kind, ally) {
+function reflectWallOnDamage(mob, dmg, kind, ally, alreadyResolved) {
+    if (!alreadyResolved) dmg = bossResilienceDamageTaken(mob, dmg);
     trollCounterBarrierOnDamage(mob, dmg, ally);   // 🛡️ v3.6.20 反擊屏障：獨立於血壁判定（無 _reflectWall 也要跑）
     if (!mob || !mob._reflectWall || !(dmg > 0)) return;
     let rw = mob._reflectWall;
@@ -1850,10 +1852,10 @@ function reflectWallOnDamage(mob, dmg, kind, ally) {
 }
 // 🌅 恐怖的面貌專用補掛點：只處理巨大骷髏的 block，不改吉爾塔斯血壁的反射範圍。
 // 傷害必須已先從 curHp 扣除；回傳 true 代表本次傷害被對應免疫完整抵銷。
-function terrorVisageOnDamage(mob, dmg, kind) {
+function terrorVisageOnDamage(mob, dmg, kind, alreadyResolved) {
     if (!mob || !mob._reflectWall || !mob._reflectWall.block || !(dmg > 0)) return false;
     let before = mob.curHp;
-    reflectWallOnDamage(mob, dmg, kind, null);
+    reflectWallOnDamage(mob, dmg, kind, null, alreadyResolved);
     return mob.curHp > before;
 }
 // 🛡️ v3.3.33 反叛者的盾牌（黑暗妖精聖地.md）：受到傷害時 rate(+per×強化)% 機率該次傷害 -amt（玩家＋傭兵、物理＋魔法四路徑共用）
