@@ -1317,7 +1317,7 @@ function _enemyPhysicalAttackInner(mob, idx, stunChance = 0, atkDmg = null, atkD
             return;
         }
         totalDmg=runeIncomingDamage(player,totalDmg);
-        if(typeof d2rTriggerIncoming==='function')totalDmg=d2rTriggerIncoming(player,totalDmg,mob);
+        if(typeof d2rTriggerIncoming==='function')totalDmg=d2rTriggerIncoming(player,totalDmg,mob,'physical');
         player.hp -= totalDmg;
         runeOnDamaged(player,mob);
         if (isBasicAttack && totalDmg > 0) corrosiveJellySkinOnBasicHit(mob, player);
@@ -1627,7 +1627,7 @@ function _enemyAttackAllyInner(mob, ally, isBasicAttack = false) {
         if (mob.curHp <= 0) { let _mi = mapState.mobs.findIndex(m => m && m.uid === mob.uid); if (_mi !== -1) killMob(_mi); }
         return;
     }
-    if(typeof d2rTriggerIncoming==='function')totalDmg=d2rTriggerIncoming(ally,totalDmg,mob);
+    if(typeof d2rTriggerIncoming==='function')totalDmg=d2rTriggerIncoming(ally,totalDmg,mob,'physical');
     ally.curHp -= totalDmg;
     if (isBasicAttack && totalDmg > 0) corrosiveJellySkinOnBasicHit(mob, ally);
     // 🏺 v3.7.52 高崙的生命印記（傭兵）：受到重擊時 MR-100·3 秒（js/02 通用消費·js/03 到期重算）
@@ -2038,7 +2038,7 @@ function _applyMobMagicToAllyInner(mob, sk, ally) {
         dmg = Math.max(0, Math.floor(dmg * raceDrMult(ally, mob)));   // 🏺 v3.7.52 隨從的護身斗篷（傭兵·魔法）
         dmg = allyDollDamageReduced(ally, dmg);   // 🆕 v2.6.10 #3：魔法娃娃機率減免（受魔法傷害）
         dmg = shieldDmgReduceProc(ally, dmg);   // 🌑 v3.3.33 反叛者的盾牌（傭兵鏡像·魔法）
-        if(typeof d2rTriggerIncoming==='function')dmg=d2rTriggerIncoming(ally,dmg,mob);
+        if(typeof d2rTriggerIncoming==='function')dmg=d2rTriggerIncoming(ally,dmg,mob,'magic');
         ally.curHp -= dmg;
         if (dmg > 0 && !ally._stunCycle) { ally._atkCd = (ally._atkCd || 0) + ((ally.d && ally.d.hitstun) || 0); ally._stunCycle = true; }   // ⚔️ 天堂職業硬直（傭兵·魔法）：延遲下次攻擊·每週期一次
         logCombat(`<span class="${getMobColor(mob.lv)}">${mob.n}</span> 施放${sk.skn || '魔法'}，對 ${nm} 造成 ${dmg} 點魔法傷害。`, 'enemy');
@@ -2470,7 +2470,7 @@ function _applyMobMagicInner(mob, sk) {
         dmg = dollDamageReduced(dmg);   // 🪆 魔法娃娃：受傷機率傷害減免（史巴托/巫妖）
         dmg = shieldDmgReduceProc(player, dmg);   // 🌑 v3.3.33 反叛者的盾牌：受傷 proc（魔法亦適用）
         dmg=runeIncomingDamage(player,dmg);
-        if(typeof d2rTriggerIncoming==='function')dmg=d2rTriggerIncoming(player,dmg,mob);
+        if(typeof d2rTriggerIncoming==='function')dmg=d2rTriggerIncoming(player,dmg,mob,'magic');
         player.hp -= dmg;
         runeOnDamaged(player,mob);
         if (dmg > 0) _relicOnDamageHeal();   // 🏺 遺物 白螞蟻蛋殼：受魔法傷害時亦觸發受擊自癒（5 秒節流·physical/magic 共用冷卻）
