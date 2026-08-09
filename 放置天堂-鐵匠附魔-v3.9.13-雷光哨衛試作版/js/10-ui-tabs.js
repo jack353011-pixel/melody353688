@@ -961,8 +961,8 @@ function dedupeGeneratedTooltipEffects(effects, d, options) {
 
 const GENIE_WISH_LABEL = { hp60: 'HP +60', mp30: 'MP +30', md3: '近距離傷害 +3', rd3: '遠距離傷害 +3', mdmg2: '魔法傷害 +2', sp6: '額外魔法點數 +6', hpr10: 'HP 自然恢復量 +10', mpr5: 'MP 自然恢復量 +5', dr3: '傷害減免 +3', ac3: 'AC -3', mr6: 'MR +6', str1: '力量 +1', dex1: '敏捷 +1', int1: '智力 +1', wis1: '精神 +1', con1: '體質 +1', cha1: '魅力 +1' };   // 🏺 v3.6.44 巨靈的三個願望
 const D2R_SHORT_LABEL = { md:'近傷',rd:'遠傷',mg:'魔傷',mh:'近命',rh:'遠命',gh:'魔命',str:'力量',dex:'敏捷',con:'體質',int:'智力',wis:'精神',cha:'魅力',hp:'HP',mp:'MP',rf:'火抗',rw:'水抗',re:'地抗',ra:'風抗',rn:'無抗',hpr:'HP恢復',mpr:'MP恢復',wt:'負重',mf:'尋寶',as:'攻速',ff:'火焰',fw:'寒冰',fa:'大地',fe:'風雷',ph:'回HP',pm:'回MP',ac:'AC',mr:'MR',er:'ER',dr:'減傷',mc:'近爆',rc:'遠爆',gc:'魔爆',mcd:'近爆傷',rcd:'遠爆傷',gcd:'魔爆傷',hpp:'HP%',mpp:'MP%',pot:'藥效',abr:'異抗',gf:'金幣',xf:'經驗',nd:'普怪傷',bd:'頭目傷',kh:'殺回HP',km:'殺回MP',kx:'殺爆',ts:'受擊盾',pi:'完美擊',ks:'殺加速',sp:'近濺射',fh:'滿血傷',fpen:'火穿',wpen:'水穿',epen:'地穿',apen:'風穿',sdm:'異常傷',bdr:'頭目減傷',und:'不死傷',dem:'惡魔傷',dra:'龍族傷',hsk:'硬皮傷',opn:'先制傷',exe:'處決傷',pdr:'物理減傷',mdr:'魔法減傷',ldr:'瀕死減傷',adr:'異常減傷',udr:'不死減傷',ddr:'惡魔減傷',blk:'格擋',mgd:'魔力護體',rcv:'傷勢回流',sav:'致命守護',bar:'傷勢壁壘',rip:'反擊意志',ber:'浴血增傷',fmp:'滿魔增傷',shp:'護盾猛攻',ksh:'擊殺護盾',krc:'擊殺回春',kfu:'擊殺戰意',frz:'霜縛追擊',brn:'焚燒追擊',psn:'劇毒追擊',bld:'流血追擊',ctl:'控場追擊',deb:'破綻追擊',hy:'蛇傷',hd:'蛇時',st:'靜電',os:'冰片',cb:'雷鏈',mcx:'隕星',gd:'焦土',scd:'延伸CD',ww:'炫風傷',wd:'炫風時',wr:'怒氣',wc:'炫風CD',ld:'躍擊傷',ls:'躍擊暈',lc:'躍擊CD',lr:'躍擊耗怒',bh:'聖鎚傷',bn:'聖鎚數',bt:'聖鎚時',bc:'聖鎚CD',med:'心靈傷',men:'心靈目標',mes:'心靈衰減',mec:'心靈CD',rbd:'裂界傷',rbn:'裂界目標',rbf:'裂界暈眩',rbc:'裂界CD',ard:'箭雨傷',arn:'箭雨數',arc:'箭雨暴擊',acd:'箭雨CD',csd:'充能傷',csn:'充能電束',csp:'充能穿透',csc:'充能CD',mzd:'馬賽克傷',mzn:'馬賽克目標',mzt:'蓄能時間',mzc:'馬賽克CD',trd:'雷哨傷',trn:'雷哨電束',trt:'雷哨時間',trc:'雷哨CD' };
-Object.assign(D2R_SHORT_LABEL,{fbr:'烈焰催化',wfr:'霜潮共鳴',eps:'腐土共生',wbl:'風刃放血'});
-const D2R_ELEMENT_STATUS_PERCENT_CODES = new Set(['fbr','wfr','eps','wbl']);
+Object.assign(D2R_SHORT_LABEL,{fbr:'烈焰催化',wfr:'霜潮共鳴',eps:'腐土共生',wbl:'風刃放血',fsi:'熾焰刻印',wsi:'寒潮刻印',esi:'腐毒刻印',asi:'裂風刻印'});
+const D2R_ELEMENT_STATUS_PERCENT_CODES = new Set(['fbr','wfr','eps','wbl','fsi','wsi','esi','asi']);
 function buildItemDescHTML(item) {
     let d = DB.items[item.id];
     if(!d) return '';
@@ -2166,7 +2166,7 @@ function _asEquipType(d) {
 }
 // 會改變戰鬥流程或特定技能玩法的詞綴。一般傷害、屬性與資源數值不在此列。
 const AUTOSELL_D2R_SPECIAL_AFFIX_CODES = new Set([
-    'kx','ts','pi','ks','sp','fh','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ber','fmp','shp','ksh','krc','kfu','frz','brn','psn','bld','ctl','deb','fbr','wfr','eps','wbl',
+    'kx','ts','pi','ks','sp','fh','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ber','fmp','shp','ksh','krc','kfu','frz','brn','psn','bld','ctl','deb','fbr','wfr','eps','wbl','fsi','wsi','esi','asi',
     'hy','hd','st','os','cb','mcx','gd','scd',
     'ww','wd','wr','wc','ld','ls','lc','lr',
     'bh','bn','bt','bc','shd','shn','sht','shc',
