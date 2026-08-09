@@ -792,6 +792,7 @@ const D2R_AFFIX_LABEL = {
     und:'不死獵殺', dem:'惡魔獵殺', dra:'屠龍', hsk:'破硬皮', opn:'先制增傷', exe:'處決增傷',
     pdr:'物理減傷', mdr:'魔法減傷', ldr:'瀕死減傷', adr:'異常減傷', udr:'不死減傷', ddr:'惡魔減傷',
     blk:'堅守格擋', mgd:'魔力護體', rcv:'傷勢回流', sav:'致命守護', bar:'傷勢壁壘', rip:'反擊意志',
+    ber:'浴血增傷', fmp:'滿魔增傷', shp:'護盾猛攻', ksh:'擊殺護盾', krc:'擊殺回春', kfu:'擊殺戰意',
     hy:'九頭蛇傷害', hd:'九頭蛇持續時間', st:'靜電立場效果', os:'冰封球冰片數',
     cb:'連鎖雷光彈跳數', mcx:'隕星數量', gd:'燃燒地面持續時間', scd:'延伸技能冷卻縮短',
     ww:'炫風斬傷害', wd:'炫風斬持續時間', wr:'怒氣取得量', wc:'炫風斬冷卻縮短',
@@ -1090,6 +1091,9 @@ const D2R_AFFIX_RANGES = {
     ,blk:[[6,7],[5,5],[4,4],[3,3],[2,2]], mgd:[[9,10],[7,8],[5,6],[4,4],[3,3]]
     ,rcv:[[4,5],[3,4],[3,3],[2,2],[1,1]], sav:[[8,10],[6,7],[4,5],[3,3],[2,2]]
     ,bar:[[22,25],[18,21],[14,17],[10,13],[6,9]], rip:[[12,15],[9,11],[7,8],[5,6],[3,4]]
+    ,ber:[[12,15],[10,11],[7,9],[5,6],[3,4]], fmp:[[12,15],[10,11],[7,9],[5,6],[3,4]]
+    ,shp:[[10,12],[8,9],[6,7],[4,5],[2,3]], ksh:[[4,5],[3,4],[3,3],[2,2],[1,1]]
+    ,krc:[[2,2],[2,2],[1,1],[1,1],[1,1]], kfu:[[10,12],[8,9],[6,7],[4,5],[2,3]]
     ,hy:[[26,30],[21,25],[16,20],[11,15],[6,10]], hd:[[26,30],[21,25],[16,20],[11,15],[6,10]]
     ,st:[[26,30],[21,25],[16,20],[11,15],[6,10]], os:[[3,3],[2,2],[2,2],[1,1],[1,1]]
     ,cb:[[3,3],[2,2],[2,2],[1,1],[1,1]], mcx:[[3,3],[2,2],[2,2],[1,1],[1,1]]
@@ -1169,14 +1173,14 @@ function d2rEquipTotals(owner) {
     out.mf=(out.mf||0)+Math.min(30,gemMf);
     return out;
 }
-function d2rHuntTotals(owner) {
-    let t=d2rEquipTotals(owner), cap={gf:50,xf:25,nd:30,bd:20,kh:60,km:15}, out={};
+function d2rHuntTotals(owner,rawTotals) {
+    let t=rawTotals||d2rEquipTotals(owner), cap={gf:50,xf:25,nd:30,bd:20,kh:60,km:15}, out={};
     Object.keys(cap).forEach(k=>out[k]=Math.max(0,Math.min(cap[k],Number(t[k])||0)));
     return out;
 }
 // 卓越以上的流派詞綴：所有數值先套用強化／耐久實效，再依類別封頂。
-function d2rCombatAffixTotals(owner) {
-    let t=d2rEquipTotals(owner), cap={fpen:30,wpen:30,epen:30,apen:30,sdm:40,bdr:25,und:35,dem:35,dra:35,hsk:30,opn:30,exe:40,pdr:20,mdr:20,ldr:25,adr:25,udr:25,ddr:25,blk:18,mgd:30,rcv:12,sav:20,bar:50,rip:30}, out={};
+function d2rCombatAffixTotals(owner,rawTotals) {
+    let t=rawTotals||d2rEquipTotals(owner), cap={fpen:30,wpen:30,epen:30,apen:30,sdm:40,bdr:25,und:35,dem:35,dra:35,hsk:30,opn:30,exe:40,pdr:20,mdr:20,ldr:25,adr:25,udr:25,ddr:25,blk:18,mgd:30,rcv:12,sav:20,bar:50,rip:30,ber:35,fmp:30,shp:30,ksh:10,krc:6,kfu:30}, out={};
     Object.keys(cap).forEach(k=>out[k]=Math.max(0,Math.min(cap[k],Number(t[k])||0)));
     return out;
 }
@@ -1197,8 +1201,12 @@ function d2rOutgoingDamage(owner,target,dmg,ele,hadAbnormal) {
     if(target&&(target.hard||Number(target.hardSkinMax)>0))pct+=t.hsk;
     if(target&&hp/mhp>=.9)pct+=t.opn;
     if(target&&hp/mhp<=.3)pct+=t.exe;
-    let now=(typeof state==='object'&&state?state.ticks:0);
+    let ownerHp=owner.curHp!=null?owner.curHp:owner.hp,ownerMhp=Math.max(1,Number(owner.mhp)||1),ownerMmp=Math.max(0,Number(owner.mmp)||0),now=(typeof state==='object'&&state?state.ticks:0);
+    if(t.ber&&(Number(ownerHp)||0)/ownerMhp<=.35)pct+=t.ber;
+    if(t.fmp&&ownerMmp>0&&(Number(owner.mp)||0)/ownerMmp>=.9)pct+=t.fmp;
+    if(t.shp&&(Number(owner._d2rShield)||0)>0)pct+=t.shp;
     if(t.rip&&now<(owner._d2rRiposteUntil||0))pct+=Math.min(t.rip,Number(owner._d2rRipostePct)||0);
+    if(t.kfu&&now<(owner._d2rKillFuryUntil||0))pct+=Math.min(t.kfu,Number(owner._d2rKillFuryPct)||0);
     return Math.max(1,Math.floor(dmg*(1+pct/100)));
 }
 function d2rHuntDamage(owner,target,dmg,ele,hadAbnormal) {
@@ -1208,9 +1216,12 @@ function d2rHuntDamage(owner,target,dmg,ele,hadAbnormal) {
 }
 function d2rHuntOnKill(owner) {
     if(!owner)return;
-    let t=d2rHuntTotals(owner), hpKey=owner===player?'hp':'curHp';
+    let raw=d2rEquipTotals(owner),t=d2rHuntTotals(owner,raw),ct=d2rCombatAffixTotals(owner,raw),hpKey=owner===player?'hp':'curHp',mhp=Math.max(1,Number(owner.mhp)||1),now=(typeof state==='object'&&state?state.ticks:0);
     if(t.kh)owner[hpKey]=Math.min(owner.mhp||1,(owner[hpKey]||0)+Math.floor(t.kh));
     if(t.km)owner.mp=Math.min(owner.mmp||0,(owner.mp||0)+Math.floor(t.km));
+    if(ct.krc)owner[hpKey]=Math.min(mhp,(owner[hpKey]||0)+Math.max(1,Math.floor(mhp*ct.krc/100)));
+    if(ct.ksh)owner._d2rShield=Math.max(owner._d2rShield||0,Math.max(1,Math.floor(mhp*ct.ksh/100)));
+    if(ct.kfu){let fresh=now>=(owner._d2rKillFuryUntil||0);owner._d2rKillFuryPct=ct.kfu;owner._d2rKillFuryUntil=now+50;if(fresh)logCombat(`<span class="text-orange-300 font-bold">【擊殺戰意】</span>傷害 +${ct.kfu}%（5 秒）。`,'player-special',owner===player?'player':'mercenary');}
 }
 function d2rTriggerTotals(owner) {
     let out={kx:0,ts:0,pi:0,piRate:0,ks:0};
@@ -1442,6 +1453,13 @@ function d2rEligibleAffixCodes(def, qualityIndex) {
     if(qualityIndex>=2&&((def.type==='arm'&&(def.slot==='armor'||def.slot==='boots'))||def.type==='acc'))pool.push('rcv');
     if(qualityIndex>=2&&def.type==='arm'&&(def.slot==='armor'||def.slot==='shield'))pool.push('sav','bar');
     if(qualityIndex>=2&&((def.type==='arm'&&(def.slot==='helm'||def.slot==='gloves'))||def.type==='acc'))pool.push('rip');
+    // 第五批資源／擊殺節奏詞綴：武器偏條件輸出，防具與飾品負責護盾、回春及連殺戰意。
+    if(qualityIndex>=2&&(def.type==='wpn'||(def.type==='arm'&&def.slot==='gloves')))pool.push('ber');
+    if(qualityIndex>=2&&(def.type==='wpn'||(def.type==='arm'&&def.slot==='helm')||def.type==='acc'))pool.push('fmp');
+    if(qualityIndex>=2&&(def.type==='wpn'||(def.type==='arm'&&def.slot==='shield')))pool.push('shp');
+    if(qualityIndex>=2&&def.type==='arm'&&(def.slot==='armor'||def.slot==='shield'))pool.push('ksh');
+    if(qualityIndex>=2&&((def.type==='arm'&&def.slot==='boots')||def.type==='acc'))pool.push('krc');
+    if(qualityIndex>=2&&(def.type==='wpn'||(def.type==='arm'&&def.slot==='gloves')||def.type==='acc'))pool.push('kfu');
     return pool;
 }
 function d2rRerollSingleAffix(item,index,mode) {
@@ -1450,7 +1468,7 @@ function d2rRerollSingleAffix(item,index,mode) {
     let old=rows[index],tier=old[2],code=old[0];
     if(mode==='type'){
         const skill=new Set(['hy','hd','st','os','cb','mcx','gd','scd','ww','wd','wr','wc','ld','ls','lc','lr','bh','bn','bt','bc','shd','shn','sht','shc','vwd','vwn','vws','vwc','fdd','fdn','fdf','fdc','tjd','tjn','tjs','tjc','med','men','mes','mec','rbd','rbn','rbf','rbc','ard','arn','arc','acd','csd','csn','csp','csc','mzd','mzn','mzt','mzc','trd','trn','trt','trc']);
-        const special=new Set(['as','ff','fw','fa','fe','ph','pm','kx','ts','pi','ks','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','hy','hd','st','os','cb','mcx','gd','scd','ww','wd','wr','wc','ld','ls','lc','lr','bh','bn','bt','bc','shd','shn','sht','shc','vwd','vwn','vws','vwc','fdd','fdn','fdf','fdc','tjd','tjn','tjs','tjc','med','men','mes','mec','rbd','rbn','rbf','rbc','ard','arn','arc','acd','csd','csn','csp','csc','mzd','mzn','mzt','mzc','trd','trn','trt','trc']),gameplay=new Set(['sp','fh']);
+        const special=new Set(['as','ff','fw','fa','fe','ph','pm','kx','ts','pi','ks','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ber','fmp','shp','ksh','krc','kfu','hy','hd','st','os','cb','mcx','gd','scd','ww','wd','wr','wc','ld','ls','lc','lr','bh','bn','bt','bc','shd','shn','sht','shc','vwd','vwn','vws','vwc','fdd','fdn','fdf','fdc','tjd','tjn','tjs','tjc','med','men','mes','mec','rbd','rbn','rbf','rbc','ard','arn','arc','acd','csd','csn','csp','csc','mzd','mzn','mzt','mzc','trd','trn','trt','trc']),gameplay=new Set(['sp','fh']);
         let specialMax=[0,0,1,1,2,2,3,3][qi],other=rows.filter((r,i)=>i!==index),used=new Set(other.map(r=>r[0]));
         let specialCount=other.filter(r=>special.has(r[0])).length,gameplayCount=other.filter(r=>gameplay.has(r[0])).length;
         let skillCount=other.filter(r=>skill.has(r[0])).length;
@@ -1478,7 +1496,7 @@ function d2rRollAffixes(def, options) {
     qi = D2R_QUALITY_KEYS.indexOf(quality);
     let pool=d2rEligibleAffixCodes(def,qi);
     const skillCodes = new Set(['hy','hd','st','os','cb','mcx','gd','scd','ww','wd','wr','wc','ld','ls','lc','lr','bh','bn','bt','bc','shd','shn','sht','shc','vwd','vwn','vws','vwc','fdd','fdn','fdf','fdc','tjd','tjn','tjs','tjc','med','men','mes','mec','rbd','rbn','rbf','rbc','ard','arn','arc','acd','csd','csn','csp','csc','mzd','mzn','mzt','mzc','trd','trn','trt','trc']);
-    const specialCodes = new Set(['as','ff','fw','fa','fe','ph','pm','kx','ts','pi','ks','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','hy','hd','st','os','cb','mcx','gd','scd','ww','wd','wr','wc','ld','ls','lc','lr','bh','bn','bt','bc','shd','shn','sht','shc','vwd','vwn','vws','vwc','fdd','fdn','fdf','fdc','tjd','tjn','tjs','tjc','med','men','mes','mec','rbd','rbn','rbf','rbc','ard','arn','arc','acd','csd','csn','csp','csc','mzd','mzn','mzt','mzc','trd','trn','trt','trc']);
+    const specialCodes = new Set(['as','ff','fw','fa','fe','ph','pm','kx','ts','pi','ks','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ber','fmp','shp','ksh','krc','kfu','hy','hd','st','os','cb','mcx','gd','scd','ww','wd','wr','wc','ld','ls','lc','lr','bh','bn','bt','bc','shd','shn','sht','shc','vwd','vwn','vws','vwc','fdd','fdn','fdf','fdc','tjd','tjn','tjs','tjc','med','men','mes','mec','rbd','rbn','rbf','rbc','ard','arn','arc','acd','csd','csn','csp','csc','mzd','mzn','mzt','mzc','trd','trn','trt','trc']);
     const gameplayCodes = new Set(['sp','fh']);
     let specialMax = [0,0,1,1,2,2,3,3][qi], specialCount = 0;
     let qdef = d2rQualityDef(quality);
@@ -1532,6 +1550,12 @@ function d2rAffixText(row) {
     if(r[0]==='sav')return `致命守護：致命傷時保留 1 HP 並獲得最大 HP ${r[1]}% 護盾（60 秒冷卻）`;
     if(r[0]==='bar')return `傷勢壁壘：受傷後獲得該次傷害 ${r[1]}% 護盾（5 秒冷卻，最多最大 HP 15%）`;
     if(r[0]==='rip')return `反擊意志：受傷後傷害 +${r[1]}%，持續 5 秒`;
+    if(r[0]==='ber')return `浴血增傷：自身 HP 35% 以下時傷害 +${r[1]}%`;
+    if(r[0]==='fmp')return `滿魔增傷：自身 MP 90% 以上時傷害 +${r[1]}%`;
+    if(r[0]==='shp')return `護盾猛攻：擁有八色詞綴護盾時傷害 +${r[1]}%`;
+    if(r[0]==='ksh')return `擊殺護盾：全隊擊殺後獲得最大 HP ${r[1]}% 護盾`;
+    if(r[0]==='krc')return `擊殺回春：全隊擊殺後恢復最大 HP ${r[1]}%`;
+    if(r[0]==='kfu')return `擊殺戰意：全隊擊殺後傷害 +${r[1]}%，持續 5 秒`;
     if(r[0]==='hy')return `九頭蛇傷害 +${r[1]}%`;
     if(r[0]==='hd')return `九頭蛇持續時間 +${r[1]}%`;
     if(r[0]==='st')return `靜電立場削減效果 +${r[1]}%`;
@@ -1593,7 +1617,7 @@ function d2rAffixText(row) {
     if(r[0]==='trt')return `雷光哨衛持續時間 +${r[1]}%`;
     if(r[0]==='trc')return `雷光哨衛冷卻時間 -${r[1]}%`;
     if (r[0] === 'ac') return `AC -${r[1]}`;
-    if (['mc','rc','gc','mcd','rcd','gcd','hpp','mpp','pot','abr','gf','xf','nd','bd','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip'].includes(r[0])) return `${D2R_AFFIX_LABEL[r[0]]} +${r[1]}%`;
+    if (['mc','rc','gc','mcd','rcd','gcd','hpp','mpp','pot','abr','gf','xf','nd','bd','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ber','fmp','shp','ksh','krc','kfu'].includes(r[0])) return `${D2R_AFFIX_LABEL[r[0]]} +${r[1]}%`;
     return `${D2R_AFFIX_LABEL[r[0]]} +${r[1]}`;
 }
 const D2R_NAME_PREFIX = {
@@ -1609,6 +1633,7 @@ const D2R_NAME_PREFIX = {
     und:'驅邪的',dem:'獵魔的',dra:'屠龍的',hsk:'粉碎的',opn:'先鋒的',exe:'終結的',
     pdr:'堅壁的',mdr:'秘護的',ldr:'背水的',adr:'忍苦的',udr:'驅靈的',ddr:'退魔的',
     blk:'格擋的',mgd:'魔護的',rcv:'回流的',sav:'不滅的',bar:'築壘的',rip:'復仇的',
+    ber:'浴血的',fmp:'滿溢的',shp:'盾擊的',ksh:'護獵的',krc:'回春的',kfu:'連戰的',
     hy:'蛇焰的',hd:'長燃的',st:'靜電的',os:'碎冰的',cb:'雷鏈的',mcx:'星落的',gd:'焦土的',scd:'迅詠的',
     ww:'旋刃的',wd:'不息的',wr:'狂怒的',wc:'疾旋的',
     ld:'震地的',ls:'鎮壓的',lc:'飛躍的',lr:'輕躍的',
@@ -1637,6 +1662,7 @@ const D2R_NAME_SUFFIX = {
     und:'之淨化',dem:'之誅魔',dra:'之龍殤',hsk:'之破壁',opn:'之先制',exe:'之斷命',
     pdr:'之鐵壁',mdr:'之法障',ldr:'之絕境',adr:'之抗逆',udr:'之鎮魂',ddr:'之退魔',
     blk:'之格擋',mgd:'之魔護',rcv:'之回流',sav:'之不滅',bar:'之壁壘',rip:'之反擊',
+    ber:'之浴血',fmp:'之滿溢',shp:'之盾擊',ksh:'之護獵',krc:'之回春',kfu:'之連戰',
     hy:'之九頭蛇',hd:'之蛇群長駐',st:'之靜電',os:'之冰片',cb:'之雷鏈',mcx:'之星雨',gd:'之焦土',scd:'之迅詠',
     ww:'之炫風',wd:'之不息旋舞',wr:'之狂怒',wc:'之疾旋',
     ld:'之震地',ls:'之鎮壓',lc:'之飛躍',lr:'之輕躍',
@@ -1652,8 +1678,8 @@ const D2R_NAME_SUFFIX = {
     mzd:'之馬賽克',mzn:'之廣域終結',mzt:'之凝息',mzc:'之迅終',
     trd:'之雷光哨衛',trn:'之多重電束',trt:'之長鳴',trc:'之迅哨'
 };
-const D2R_PREFIX_PREFERRED = new Set(['as','ff','fw','fa','fe','ph','pm','md','rd','mg','mh','rh','gh','rf','rw','re','ra','rn','mf','fpen','wpen','epen','apen','sdm','und','dem','dra','hsk','opn','exe']);
-const D2R_SUFFIX_PREFERRED = new Set(['str','dex','con','int','wis','cha','hp','mp','hpr','mpr','wt','bdr','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip']);
+const D2R_PREFIX_PREFERRED = new Set(['as','ff','fw','fa','fe','ph','pm','md','rd','mg','mh','rh','gh','rf','rw','re','ra','rn','mf','fpen','wpen','epen','apen','sdm','und','dem','dra','hsk','opn','exe','ber','fmp','shp','kfu']);
+const D2R_SUFFIX_PREFERRED = new Set(['str','dex','con','int','wis','cha','hp','mp','hpr','mpr','wt','bdr','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ksh','krc']);
 function d2rNameAffixes(item) {
     let rows = d2rAffixRows(item).map((r,i) => ({r,i})).sort((a,b) => a.r[2]-b.r[2] || b.r[1]-a.r[1] || a.i-b.i);
     if (!rows.length) return { prefix:'', suffix:'' };
