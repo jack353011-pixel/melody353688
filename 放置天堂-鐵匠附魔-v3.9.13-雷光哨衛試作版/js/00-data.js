@@ -419,7 +419,7 @@ const DB = {
         // ===== 軍王之室：掉落裝備 =====
         "wpn_assassin_mark": { n: "暗殺軍王之痕", type: "wpn", w2h: true, dmgS: 13, dmgL: 13, hit: 0, dmgBonus: 2, spd: 0.7, req: "dark", safe: 6, p: 25000, eff: "combo", gachaWeight: 10 },   // 雙刀・連擊
         "wpn_priest_wand":   { n: "神官魔杖", type: "wpn", w2h: true, dmgS: 9, dmgL: 9, hit: 0, spd: 1.0, req: "mage", safe: 6, p: 13340, unBonus: true, eff: "magicburst", gachaWeight: 10, d: "神官祈禱經年的法杖，能將信仰化為爆裂的魔力。" },
-        "wpn_laia_wand":     { n: "蕾雅魔杖", type: "wpn", dmgS: 1, dmgL: 1, hit: -3, dmgBonus: 0, mdmg: -2, spd: 1.0, req: "mage", safe: 6, p: 23340, legend: true, gachaWeight: 1, meleeHitSpell: { skn: "冰裂術", dice: [6, 10], ele: "water", freezePbase: 200, shatter: 100 }, d: "冰之女王蕾雅愛用的魔杖，杖尖凝結著永不消融的寒霜。" },
+        "wpn_laia_wand":     { n: "蕾雅魔杖", type: "wpn", dmgS: 1, dmgL: 1, hit: -3, dmgBonus: 0, mdmg: -2, spd: 1.0, req: "mage", safe: 6, p: 23340, legend: true, gachaWeight: 1, meleeHitSpell: { skn: "冰裂術", dice: [6, 10], ele: "water", freezePbase: 200, shatter: 100 }, d: "杖柄嵌著亞丁王室舊勳章，受勳者姓名卻已從名冊消失。與蕾雅戒指同時裝備後可使用「失名寒勳」：32 秒內水屬性抗性 +15、冰裂術碎冰追加傷害再 +100。" },
         "shd_priest_book":   { n: "神官魔法書", type: "arm", slot: "shield", ac: 3, mmp: 50, mpR: 3, req: "mage", safe: 6, p: 93000, gachaWeight: 5 },
         "amr_laia_robe":     { n: "蕾雅長袍", type: "arm", slot: "armor", ac: 2, mmp: 100, req: "mage", safe: 4, p: 58000, gachaWeight: 1 },
         "acc_necro_king_ring": { n: "冥法軍王之戒", legend: true, type: "acc", slot: "amulet", ac: 0, cha: 3, req: "mage,elf", safe: 0, p: 193000, gachaWeight: 1 },
@@ -427,7 +427,7 @@ const DB = {
         "acc_darkmage_amulet": { n: "黑法師項鍊", type: "acc", slot: "amulet", ac: 0, con: -1, int: 2, req: "mage", safe: 0, p: 100000, gachaWeight: 1 },
         "acc_summoner_amulet": { n: "喚獸師項鍊", type: "acc", slot: "amulet", ac: 0, wis: -1, cha: 2, req: "mage", safe: 0, p: 100000, gachaWeight: 1 },
         "acc_law_king_chain": { n: "法令軍王之鍊", legend: true, type: "acc", slot: "amulet", ac: 0, mmp: 15, mpR: 5, req: "mage,elf", safe: 0, p: 100000, gachaWeight: 1 },
-        "acc_laia_ring":     { n: "蕾雅戒指", legend: true, type: "acc", slot: "ring", ac: 5, req: "all", safe: 0, p: 250000, gachaWeight: 1, stunResist: 5, d: "冰之女王蕾雅指間的戒指，冷冽之氣令神智不致動搖。" },
+        "acc_laia_ring":     { n: "蕾雅戒指", legend: true, type: "acc", slot: "ring", ac: 5, req: "all", safe: 0, p: 250000, gachaWeight: 1, stunResist: 5, d: "冰之女王蕾雅指間的戒指，冷冽之氣令神智不致動搖。與蕾雅魔杖同時裝備後可使用「失名寒勳」：32 秒內水屬性抗性 +15、冰裂術碎冰追加傷害再 +100。" },
         "acc_orin_amulet": { n: "歐林的項鍊", legend: true, type: "acc", slot: "amulet", ac: 0, req: "all", safe: 0, p: 100000, gachaWeight: 1, set: "orin", d: "歐林珍藏的項鍊，與西瑪戒指本是一對，分離已久。同時裝備兩件後可使用「遙契回聲」：消耗 MP 18，治療一名隊伍成員，冷卻 8 秒。" },
         "acc_sima_ring":   { n: "西瑪戒指", legend: true, type: "acc", slot: "ring", ac: 0, req: "all", safe: 0, p: 100000, gachaWeight: 1, set: "orin", d: "刻著西瑪之名的古老戒指，與歐林的項鍊遙相呼應。同時裝備兩件後可使用「遙契回聲」：消耗 MP 18，治療一名隊伍成員，冷卻 8 秒。" },
         "hlm_icequeen_charm": { n: "冰之女王魅力頭飾", legend: true, type: "arm", slot: "helm",  ac: 3, req: "royal", reqAvatar: "公主", safe: 4, p: 126000, gachaWeight: 1, set: "icequeen_charm", d: "冰之女王魅力套裝之一（公主限定），頭飾上的冰晶折射出懾人的高貴。" },
@@ -2894,6 +2894,8 @@ const DB = {
         "sk_forbidden_resonance": { n: "禁式共鳴", type: "buff", tier: 9, mp: 28, dur: 32, noRefresh: true, d: { magicDmg: 8, mr: -15 }, desc: "僅裝備巴列斯魔杖時可使用。", msg: "被刪去的研究式重新連結，杖芯傳來不祥的回響。" },
         // 🔥 死亡騎士烈炎之劍專屬裝備技能：王名被抹去，殘火仍記得原來的主人。
         "sk_nameless_king_flame": { n: "無名王焰", type: "buff", tier: 9, mp: 24, dur: 32, noRefresh: true, d: { resFire: 15 }, spellProcRateBonus: 5, desc: "地獄火發動率額外 +5%。僅裝備死亡騎士的烈炎之劍時可使用。", msg: "被熔去姓名的王焰沿劍鍔重新燃起。" },
+        // ❄️ 蕾雅魔杖＋戒指組合技能：把王室名冊抹去的舊勳章重新喚醒。
+        "sk_lost_frost_medal": { n: "失名寒勳", type: "buff", tier: 9, mp: 24, dur: 32, noRefresh: true, d: { resWater: 15 }, laiaShatterBonus: 100, desc: "冰裂術對冰凍目標的碎冰追加傷害 +100。僅同時裝備蕾雅魔杖與蕾雅戒指時可使用。", msg: "被王室除名的寒勳在戒光中重新顯現。" },
         "sk_sleep_mist": { n: "沉睡之霧", type: "atk", tier: 9, reqM: 36, mp: 40, dmgType: "magic", target: "all", status: { kind: "sleep", pbase: 100, dur: 8 } },
         "sk_thunder_storm": { n: "雷霆風暴", type: "atk", tier: 9, reqM: 36, mp: 48, dmgType: "magic", ele: "wind", target: "all", multiDmg: [[2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10]] },
         "sk_fire_storm": { n: "火風暴", type: "atk", tier: 9, reqM: 36, mp: 48, dmgType: "magic", ele: "fire", target: "all", multiDmg: [[4, 10], [4, 10], [4, 10], [4, 10]] },

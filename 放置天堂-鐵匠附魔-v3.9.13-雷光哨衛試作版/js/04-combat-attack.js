@@ -956,7 +956,7 @@ function laiaWandHitProc(t) {
     let wasFrozen = !!(t.st && t.st.freeze > 0);
     let d = Math.floor(core * mrFactor);
     d = Math.max(1, d);   // 武器 proc 的 ×(1+階級/10) 已由 weaponMagicDamageCoef 統一套用。
-    if (wasFrozen) { d += (sp.shatter || 0); t.st.freeze = 0; }   // 冰凍目標：額外傷害並解除冰凍
+    if (wasFrozen) { d += (sp.shatter || 0) + (((player.buffs.sk_lost_frost_medal || 0) > 0) ? (DB.skills.sk_lost_frost_medal.laiaShatterBonus || 0) : 0); t.st.freeze = 0; }   // 冰凍目標：額外傷害並解除冰凍；失名寒勳再 +100
     d = Math.max(1, Math.floor(Math.max(1, d) * fragileMult(t) * elementCounterMult(sp.ele, t.e)));   // ⚔️ 屬性剋制 ×1.4(剋)/×0.6(被剋)（取代舊 +6）
     d = Math.max(1, Math.floor(d * enhanceWpnFinalMult(en, w)));   // 🔧 武器強化 +11~+20：最終傷害倍率（取代舊 (1+強化/10)）
     d = Math.max(1, Math.floor(d * rlFuryMult()));   // 🔮 紅獅5/5＋😡狂怒5/5 最終傷害

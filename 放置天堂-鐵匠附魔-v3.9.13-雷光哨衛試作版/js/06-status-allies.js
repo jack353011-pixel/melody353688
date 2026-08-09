@@ -1736,7 +1736,7 @@ function allyLaiaWandHitProc(ally, t) {
     let wasFrozen = !!(t.st && t.st.freeze > 0);
     let dd = Math.floor(core * mrFactor);
     dd = Math.max(1, dd);   // 武器 proc 的 ×(1+階級/10) 已由 weaponMagicDamageCoef 統一套用。
-    if (wasFrozen) { dd += (sp.shatter || 0); t.st.freeze = 0; }
+    if (wasFrozen) { dd += (sp.shatter || 0) + (((ally.buffs.sk_lost_frost_medal || 0) > 0) ? (DB.skills.sk_lost_frost_medal.laiaShatterBonus || 0) : 0); t.st.freeze = 0; }
     dd = Math.max(1, Math.floor(Math.max(1, dd) * fragileMult(t)));
     dd = Math.max(1, Math.floor(dd * enhanceWpnFinalMult(en, w)));   // 🔧 武器強化 +11~+20：最終傷害倍率（取代舊 (1+強化/10)）
     dd = Math.max(1, Math.floor(dd * elementCounterMult(sp.ele, t.e)));   // ⚔️ 屬性剋制倍率（取代舊 +6 固定加值）

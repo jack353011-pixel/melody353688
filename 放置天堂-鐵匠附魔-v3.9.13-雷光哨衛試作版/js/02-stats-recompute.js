@@ -502,6 +502,12 @@ d.mr += (baseMr + bonusMr);
         if (!player.grantedSkills.includes('sk_vow_echo')) player.grantedSkills.push('sk_vow_echo');
         if (!player.skills.includes('sk_vow_echo')) player.skills.push('sk_vow_echo');
     }
+    // ❄️ 蕾雅魔杖＋蕾雅戒指：王室寒勳只在兩件遺物重合時顯現。
+    let _laiaPair = p.eq.wpn && p.eq.wpn.id === 'wpn_laia_wand' && Object.values(p.eq).some(e => e && e.id === 'acc_laia_ring');
+    if (_laiaPair) {
+        if (!player.grantedSkills.includes('sk_lost_frost_medal')) player.grantedSkills.push('sk_lost_frost_medal');
+        if (!player.skills.includes('sk_lost_frost_medal')) player.skills.push('sk_lost_frost_medal');
+    }
     // 裝備／背包來源消失時，裝備技能與已施放的增益一起失效，避免卸裝後仍殘留完整持續時間。
     _previousGrantedSkills.forEach(sk => {
         if (!player.grantedSkills.includes(sk) && player.buffs && (player.buffs[sk] || 0) > 0) player.buffs[sk] = 0;
