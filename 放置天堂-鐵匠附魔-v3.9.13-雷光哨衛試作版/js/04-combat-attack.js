@@ -1001,6 +1001,7 @@ function allyBuffDmgReduceMult(ally) {
     let m = 1;
     if (ally && ally.buffs) {
         if (ally.buffs.sk_holy_barrier > 0) m *= 0.7;          // 聖結界：-30%
+        if (ally.buffs.sk_icequeen_veil > 0) m *= (DB.skills.sk_icequeen_veil.incomingDmgMult || 0.8);   // ❄️ 寒晶護幕：-20%
         if (ally.buffs.sk_set_dragonscion > 0) m *= 0.85;      // 🐉 龍血·龍裔：-15%
     }
     if (ally && ally._setFury5) m *= (1 - allyFuryRageRatio(ally));   // 😡 狂怒 5/5：依失血最多 -15%
@@ -1244,6 +1245,7 @@ function _enemyPhysicalAttackInner(mob, idx, stunChance = 0, atkDmg = null, atkD
         { let _drMult = 1.0;
           if (player._setIron3) _drMult *= 0.8;                          // 🔮 鐵衛 3/5：-20%
           if (player.buffs.sk_holy_barrier > 0) _drMult *= 0.7;          // 聖結界：-30%
+          if (player.buffs.sk_icequeen_veil > 0) _drMult *= (DB.skills.sk_icequeen_veil.incomingDmgMult || 0.8);   // ❄️ 寒晶護幕：-20%
           if (player.buffs.sk_set_dragonscion > 0) _drMult *= 0.85;      // 🐉 龍血·龍裔：-15%
           if (player._setFury5) _drMult *= (1 - furyRageRatio());        // 😡 狂怒 5/5：依失血最多 -15%
           _drMult *= avatarSelfDmgReduceMult(player);                    // 🔮 v3.4.45 化身（單體）：自身持有→受傷 -3%
@@ -2443,6 +2445,7 @@ function _applyMobMagicInner(mob, sk) {
         // 🔧 百分比受傷「減免」統一乘算（多層疊加採乘算：例 鐵衛20%×聖結界30%＝1−0.8×0.7＝44%，非相加 50%）
         { let _drMult = 1.0;
           if (player.buffs.sk_holy_barrier > 0) _drMult *= 0.7;                                                  // 聖結界：-30%
+          if (player.buffs.sk_icequeen_veil > 0) _drMult *= (DB.skills.sk_icequeen_veil.incomingDmgMult || 0.8);   // ❄️ 寒晶護幕：-20%
           if (player._setIron3) _drMult *= 0.8;                                                                  // 🔮 鐵衛 3/5：-20%
           if (player.buffs.sk_set_dragonscion > 0) _drMult *= 0.85;                                              // 🐉 龍血·龍裔：-15%
           if (player._setFury5) _drMult *= (1 - furyRageRatio());                                                // 😡 狂怒 5/5：依失血最多 -15%

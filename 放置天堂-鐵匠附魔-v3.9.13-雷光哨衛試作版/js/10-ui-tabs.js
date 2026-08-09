@@ -1330,7 +1330,7 @@ function buildItemDescHTML(item) {
     //    接線在 js/02 recomputeStats：①任何職業「裝備」→ 授予；②騎士／王族／戰士「背包持有」即授予（不需裝備）。
     if (d.grantSkills && d.grantSkills.length) {
         let _gsk = d.grantSkills.map(sk => (DB.skills[sk] && DB.skills[sk].n) || sk).join('、');
-        desc += `<br><span class="text-emerald-300 font-bold">可額外使用魔法：${_gsk}</span>`;
+        desc += `<br><span class="text-emerald-300 font-bold">可額外使用技能：${_gsk}</span>`;
         desc += `<br><span class="text-slate-400 text-xs">${d.grantSkillsEquipOnly ? '必須裝備才可使用。' : '騎士／王族／戰士放在背包即可使用；其他職業需裝備。'}</span>`;
     }
 
