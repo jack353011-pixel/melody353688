@@ -16,6 +16,7 @@ const ORB_DEFS = {
     orb_void:{slot:'core',icon:'⚫',n:'虛寂寶珠',color:'#c4b5fd',story:'無光的珠心沒有倒影。被束縛者凝視它時，會忘記究竟是誰先失去了名字。'},
     orb_storm:{slot:'core',icon:'🌩️',n:'風暴眼寶珠',color:'#67e8f9',story:'城牆外擠滿無名的影子時，守望者看見風暴中央反而出現了一條筆直的路。'},
     orb_challenger:{slot:'core',icon:'⚔️',n:'逆階寶珠',color:'#fca5a5',story:'敗者把斷劍埋在高塔下。多年後，劍身只剩一道向上的缺口，像仍在挑戰看不見的敵人。'},
+    orb_berserk:{slot:'core',icon:'🩸',n:'血怒寶珠',color:'#ef4444',story:'血液沿著劍柄流下時，戰士才發現握住自己的不是手，而是一個拒絕倒下的念頭。'},
     orb_echo:{slot:'resonance',icon:'〽️',n:'回響寶珠',color:'#e879f9',story:'被遺忘的咒語仍在空殿回返，直到有人再次聽見。'},
     orb_hunter:{slot:'resonance',icon:'🜲',n:'獵魂寶珠',color:'#facc15',story:'獵人不追逐足跡；他等待戰利品的靈魂先暴露方向。'},
     orb_rhythm:{slot:'resonance',icon:'🎵',n:'律動寶珠',color:'#67e8f9',story:'第五次鐘聲永遠比前四次更重，因為守夜人只敲給仍醒著的人聽。'},
@@ -25,6 +26,7 @@ const ORB_DEFS = {
     orb_ebb:{slot:'resonance',icon:'🌊',n:'枯潮寶珠',color:'#60a5fa',story:'潮水退盡後，礁石才露出真正的形狀。法師說，魔力也是如此。'},
     orb_feint:{slot:'resonance',icon:'↝',n:'游擊寶珠',color:'#a7f3d0',story:'箭痕從不在同一面盾上停留。第三名守軍倒下時，才有人發現射手一直站在原地。'},
     orb_vigor:{slot:'resonance',icon:'💚',n:'盈生寶珠',color:'#6ee7b7',story:'杯中之水滿而不溢。修士說，真正的力量不是受傷後復原，而是讓第一道傷口來得更晚。'},
+    orb_revenge:{slot:'resonance',icon:'↩️',n:'回刃寶珠',color:'#fb923c',story:'刀鋒敲在盾上的聲音沒有消失。它繞過戰場，藏進下一次揮擊裡。'},
     orb_iron:{slot:'guard',icon:'🛡️',n:'鐵壁寶珠',color:'#94a3b8',story:'城牆崩毀後，仍有一小塊石頭記得自己曾保護過誰。'},
     orb_devour:{slot:'guard',icon:'🩸',n:'噬魔寶珠',color:'#fda4af',story:'它吞食逸散的法力，卻用溫熱的血回報持有者。'},
     orb_recovery:{slot:'guard',icon:'🌿',n:'回生寶珠',color:'#6ee7b7',story:'被踩碎的嫩芽沒有復仇，只從足印中央重新生長。'},
@@ -33,7 +35,8 @@ const ORB_DEFS = {
     orb_shelter:{slot:'guard',icon:'🕯️',n:'庇護寶珠',color:'#fde68a',story:'最後一根蠟燭沒有照亮主人，只替伏在門邊等待的夥伴留住了一夜溫度。'},
     orb_laststand:{slot:'guard',icon:'❤️‍🩹',n:'殘命寶珠',color:'#fb7185',story:'甲冑已碎，旗幟已倒。那名士兵仍站著，因為身後還有一盞未熄的燈。'},
     orb_adapt:{slot:'guard',icon:'🐉',n:'蛻甲寶珠',color:'#86efac',story:'脫落的鱗片記住了殺死它的力量。下一片新生的鱗，便不再以同樣方式碎裂。'},
-    orb_lifeline:{slot:'guard',icon:'🪶',n:'續命寶珠',color:'#fef3c7',story:'羽毛落地以前，死者又聽見一次自己的心跳。那不是復活，只是一個尚未寫完的句點。'}
+    orb_lifeline:{slot:'guard',icon:'🪶',n:'續命寶珠',color:'#fef3c7',story:'羽毛落地以前，死者又聽見一次自己的心跳。那不是復活，只是一個尚未寫完的句點。'},
+    orb_resolve:{slot:'guard',icon:'🔔',n:'鎮魂寶珠',color:'#d8b4fe',story:'鐘聲沒有驅散詛咒，只提醒被困在黑暗裡的人：恐懼仍然有盡頭。'}
 };
 
 function orbClampInt(v,min,max){return Math.max(min,Math.min(max,Math.floor(Number(v)||0)));}
@@ -93,6 +96,9 @@ function orbAdaptPct(level){return 9+orbClampInt(level,1,5);}                  /
 function orbChallengerPct(level){return 5+orbClampInt(level,1,5);}             // 目標高至少 5 級時傷害 +6%～10%
 function orbVigorPct(level){return 1+.6*orbClampInt(level,1,5);}               // HP 90% 以上傷害 +1.6%～4%
 function orbLifelineCdSec(level){return 135-15*orbClampInt(level,1,5);}         // 致死保護冷卻 120～60 秒
+function orbBerserkPct(level){return 5+orbClampInt(level,1,5);}                // HP 35% 以下傷害 +6%～10%
+function orbRevengePct(level){return 1+.6*orbClampInt(level,1,5);}             // 受擊後下一次傷害 +1.6%～4%
+function orbResolvePct(level){return 9+orbClampInt(level,1,5);}                // 自身受控／弱化時直傷減免 10%～14%
 function orbLivingEnemyCount(){
     if(typeof mapState!=='object'||!mapState||!Array.isArray(mapState.mobs))return 0;
     return mapState.mobs.filter(m=>m&&(Number(m.curHp)||0)>0&&!m._dead).length;
@@ -108,6 +114,7 @@ function orbTargetCondition(target,kind){
     if(kind==='deb')return ['blind','weaken','disease','slow','mrhalf','magicseal','fragile','shatter','armorbreak','confuse','panic','guardbreak','terror','doom','strawCurse','muddywater'].some(k=>(Number(st[k])||0)>0);
     return false;
 }
+function orbControlOrDebuff(target){return orbTargetCondition(target,'frz')||orbTargetCondition(target,'ctl')||orbTargetCondition(target,'deb');}
 
 // 單一傷害結算只執行一次，不製造額外傷害事件，因此不會遞迴觸發寶珠。
 function orbOutgoingDamage(owner,target,dmg,ele){
@@ -126,11 +133,14 @@ function orbOutgoingDamage(owner,target,dmg,ele){
         let current=['fire','water','earth','wind'].includes(ele)?ele:'';
         if(current){if(owner._orbCycleEle&&owner._orbCycleEle!==current)pct+=orbCyclePct(core.level);owner._orbCycleEle=current;}
     }else if(core&&core.id==='orb_void'){
-        if((!ele||ele==='none'||ele==='magic')&&(orbTargetCondition(target,'ctl')||orbTargetCondition(target,'deb')))pct+=orbVoidPct(core.level);
+        if((!ele||ele==='none'||ele==='magic')&&orbControlOrDebuff(target))pct+=orbVoidPct(core.level);
     }else if(core&&core.id==='orb_storm'){
         if(orbLivingEnemyCount()>=3)pct+=orbStormPct(core.level);
     }else if(core&&core.id==='orb_challenger'){
         if((Number(target.lv)||0)>=(Number(owner.lv)||0)+5)pct+=orbChallengerPct(core.level);
+    }else if(core&&core.id==='orb_berserk'){
+        let hpKey=owner===player?'hp':'curHp',hp=Math.max(0,Number(owner[hpKey])||0),mhp=Math.max(1,Number(owner.mhp)||1);
+        if(hp>0&&hp/mhp<=.35)pct+=orbBerserkPct(core.level);
     }
     let resonance=orbEquipped(owner,'resonance',orbs);
     if(resonance&&resonance.id==='orb_echo'&&Math.random()*100<orbEchoRate(resonance.level)){
@@ -156,6 +166,10 @@ function orbOutgoingDamage(owner,target,dmg,ele){
     }else if(resonance&&resonance.id==='orb_vigor'){
         let hpKey=owner===player?'hp':'curHp',hp=Math.max(0,Number(owner[hpKey])||0),mhp=Math.max(1,Number(owner.mhp)||1);
         if(hp/mhp>=.9)pct+=orbVigorPct(resonance.level);
+    }else if(resonance&&resonance.id==='orb_revenge'){
+        let now=typeof state==='object'&&state?state.ticks:0;
+        if(owner._orbRevengeReady&&now<=(owner._orbRevengeUntil||0)){pct+=orbRevengePct(resonance.level);owner._orbRevengeReady=false;}
+        else if(now>(owner._orbRevengeUntil||0))owner._orbRevengeReady=false;
     }else if(resonance&&resonance.id==='orb_momentum'){
         let now=typeof state==='object'&&state?state.ticks:0,uid=String(target.uid||target.id||target.n||'');
         if(uid&&owner._orbMomentumUid===uid&&now<=(owner._orbMomentumUntil||0))owner._orbMomentumStacks=orbClampInt(owner._orbMomentumStacks,0,4)+1;
@@ -175,7 +189,12 @@ function orbOutgoingDamage(owner,target,dmg,ele){
 }
 function orbIncomingDamage(owner,dmg,source,kind){
     dmg=Math.max(0,Math.floor(Number(dmg)||0));let orbs=orbEnsure(owner),guard=orbEquipped(owner,'guard',orbs);
-    if(!dmg||!guard)return dmg;
+    if(!dmg)return dmg;
+    let resonance=orbEquipped(owner,'resonance',orbs);
+    if(resonance&&resonance.id==='orb_revenge'){
+        let now=typeof state==='object'&&state?state.ticks:0;owner._orbRevengeReady=true;owner._orbRevengeUntil=now+30;
+    }
+    if(!guard)return dmg;
     if(guard.id==='orb_iron')return Math.max(1,Math.floor(dmg*(1-orbIronPct(guard.level)/100)));
     if(guard.id==='orb_aegis'&&kind==='magic')return Math.max(1,Math.floor(dmg*(1-orbAegisPct(guard.level)/100)));
     if(guard.id==='orb_bastion'&&kind==='physical')return Math.max(1,Math.floor(dmg*(1-orbBastionPct(guard.level)/100)));
@@ -196,6 +215,8 @@ function orbIncomingDamage(owner,dmg,source,kind){
             return Math.max(0,hp-1);
         }
     }
+    if(guard.id==='orb_resolve'&&orbControlOrDebuff(owner))
+        return Math.max(1,Math.floor(dmg*(1-orbResolvePct(guard.level)/100)));
     return dmg;
 }
 function orbAfterIncoming(owner,dmg){
@@ -246,6 +267,7 @@ function orbDropPoolForMob(mob,slot){
         if(ele==='none'&&(mr>=30||mob&&mob.hard))ids.push('orb_void');
         if(mob&&mob.hard||race==='元素')ids.push('orb_storm');
         if(mob&&(mob.boss||mob.hard))ids.push('orb_challenger');
+        if(race==='惡魔'||mob&&mob.un||mob&&mob.boss)ids.push('orb_berserk');
     }
     if(!slot||slot==='resonance'){
         let special=false;
@@ -254,6 +276,7 @@ function orbDropPoolForMob(mob,slot){
         if(race==='動物'||race==='元素'){ids.push('orb_bond');special=true;}
         if(mob&&Number(mob.atkSpd)>0&&Number(mob.atkSpd)<=1.5){ids.push('orb_feint');special=true;}
         if(mob&&mob.hard){ids.push('orb_vigor');special=true;}
+        if(mob&&(mob.boss||mob.hard)){ids.push('orb_revenge');special=true;}
         if(!special)ids.push('orb_hunter');
     }
     if(!slot||slot==='guard'){
@@ -264,6 +287,7 @@ function orbDropPoolForMob(mob,slot){
         if(mob&&(mob.boss||mob.hard)||race==='惡魔'||mob&&mob.un)ids.push('orb_laststand');
         if(mob&&(mob.mag||mob.mag2||mob.mag3)||mob&&mob.hard)ids.push('orb_adapt');
         if(mob&&mob.boss||mob&&mob.un)ids.push('orb_lifeline');
+        if(mr>=30||mob&&(mob.mag||mob.mag2||mob.mag3))ids.push('orb_resolve');
     }
     if(slot&&!ids.length)ids=Object.keys(ORB_DEFS).filter(id=>ORB_DEFS[id].slot===slot);
     if(!ids.length)ids=Object.keys(ORB_DEFS);
@@ -316,6 +340,7 @@ function orbPowerText(id,level){
     if(id==='orb_void')return `無屬性傷害命中受控制或弱化的敵人時，傷害 +${orbVoidPct(lv)}%`;
     if(id==='orb_storm')return `場上至少有 3 個存活敵人時，傷害 +${orbStormPct(lv)}%`;
     if(id==='orb_challenger')return `目標等級比自己高至少 5 級時，傷害 +${orbChallengerPct(lv)}%`;
+    if(id==='orb_berserk')return `自身 HP 35% 以下時，傷害 +${orbBerserkPct(lv)}%`;
     if(d.slot==='core')return `${d.ele==='fire'?'火':d.ele==='water'?'水':d.ele==='earth'?'地':'風'}屬性命中${d.condition}敵人時，傷害 +${orbCoreBonus(lv)}%`;
     if(id==='orb_echo')return `${orbEchoRate(lv)}% 機率使本次傷害提高 50%（不會再次觸發）`;
     if(id==='orb_hunter')return `一般物品掉落率 +${orbHunterPct(lv)}%（不影響寶石、符文與寶珠）`;
@@ -326,6 +351,7 @@ function orbPowerText(id,level){
     if(id==='orb_ebb')return `MP 30% 以下時，傷害 +${orbEbbPct(lv).toFixed(1).replace(/\.0$/,'')}%`;
     if(id==='orb_feint')return `傷害目標與上一次不同時，傷害 +${orbFeintPct(lv).toFixed(1).replace(/\.0$/,'')}%（第一個目標不加成）`;
     if(id==='orb_vigor')return `自身 HP 90% 以上時，傷害 +${orbVigorPct(lv).toFixed(1).replace(/\.0$/,'')}%`;
+    if(id==='orb_revenge')return `受到直接傷害後 3 秒內，下一次傷害 +${orbRevengePct(lv).toFixed(1).replace(/\.0$/,'')}%（觸發後消耗）`;
     if(id==='orb_iron')return `受到的最終傷害 -${orbIronPct(lv)}%`;
     if(id==='orb_devour')return `造成元素傷害時，每 5 秒最多回復 ${orbDevourPct(lv).toFixed(2).replace(/0+$/,'').replace(/\.$/,'')}% 最大 HP`;
     if(id==='orb_recovery')return `受傷後回復該次傷害的 ${orbRecoveryPct(lv)}%（致死傷害無效）`;
@@ -335,6 +361,7 @@ function orbPowerText(id,level){
     if(id==='orb_laststand')return `受擊前 HP 35% 以下時，受到的最終傷害 -${orbLastStandPct(lv)}%`;
     if(id==='orb_adapt')return `5 秒內連續受到相同類型的直接傷害時，第二次起最終傷害 -${orbAdaptPct(lv)}%（物理／魔法分開）`;
     if(id==='orb_lifeline')return `致死的直接傷害改為保留 1 HP；冷卻 ${orbLifelineCdSec(lv)} 秒（切換配置不會重置）`;
+    if(id==='orb_resolve')return `自身受到控制或弱化時，受到的直接傷害 -${orbResolvePct(lv)}%`;
     return '';
 }
 function orbRenderPanel(){
@@ -353,7 +380,7 @@ function orbRenderPanel(){
     return `<div class="gc-orbs"><div class="gc-orb-summary"><b>寶珠粉塵：${o.dust.toLocaleString()}</b><span>已收集 ${ownedCount}/${Object.keys(ORB_DEFS).length}・固定三欄；核心負責傷害條件，共鳴調整戰鬥節奏，守護負責生存。</span>${o.trialClaimed?'':'<button onclick="growthClaimTrialOrbs()">領取試作寶珠</button>'}</div><div class="gc-orb-slots">${slotRows}</div><h3>寶珠配置</h3><div class="gc-orb-presets">${presetRows}</div><h3>寶珠收藏</h3><div class="gc-orb-grid">${cards}</div><p class="text-slate-400">前三次擊敗頭目會依序保底核心、共鳴、守護寶珠；之後頭目 12%、強敵 0.2%、一般敵人 0.02%。種類依怪物元素、種族與防禦特性決定；重複寶珠轉為 15 粉塵；連續 4 顆重複後，下一顆優先補未收集種類。寵物與召喚物只讀其召喚者的寶珠；寶珠傷害不會遞迴觸發寶珠。</p></div>`;
 }
 function orbResetRuntime(owner){
-    if(!owner)return;owner._orbCycleEle='';owner._orbRhythmCount=0;owner._orbMomentumUid='';owner._orbMomentumStacks=0;owner._orbMomentumUntil=0;owner._orbBondAt=0;owner._orbFeintUid='';owner._orbAdaptKind='';owner._orbAdaptUntil=0;
+    if(!owner)return;owner._orbCycleEle='';owner._orbRhythmCount=0;owner._orbMomentumUid='';owner._orbMomentumStacks=0;owner._orbMomentumUntil=0;owner._orbBondAt=0;owner._orbFeintUid='';owner._orbAdaptKind='';owner._orbAdaptUntil=0;owner._orbRevengeReady=false;owner._orbRevengeUntil=0;
 }
 function growthSaveOrbPreset(index){
     index=Number(index);let o=orbEnsure(player);if(!o||!Number.isInteger(index)||index<0||index>=o.presets.length)return;
