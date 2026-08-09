@@ -1261,6 +1261,7 @@ function d2rOutgoingDamage(owner,target,dmg,ele,hadAbnormal) {
     if(t.rip&&now<(owner._d2rRiposteUntil||0))pct+=Math.min(t.rip,Number(owner._d2rRipostePct)||0);
     if(t.kfu&&now<(owner._d2rKillFuryUntil||0))pct+=Math.min(t.kfu,Number(owner._d2rKillFuryPct)||0);
     let result=Math.max(1,Math.floor(dmg*(1+pct/100)));
+    if(typeof orbOutgoingDamage==='function')result=orbOutgoingDamage(owner,target,result,ele);
     d2rElementImprintTry(owner,target,result,ele,t);
     return result;
 }
@@ -1311,6 +1312,7 @@ function d2rTriggerIncoming(owner,dmg,source,kind) {
     let shield=Math.max(0,Math.floor(owner._d2rShield||0));
     if(shield){let used=Math.min(shield,dmg);owner._d2rShield=shield-used;dmg-=used;if(used)logCombat(`<span class="text-cyan-300 font-bold">【受擊護盾】</span>吸收 ${used} 點傷害。`,'player-special',owner===player?'player':'mercenary');}
     if(dmg>0&&ct.mgd&&(Number(owner.mp)||0)>0){let absorb=Math.min(Math.floor(Number(owner.mp)||0),Math.floor(dmg*ct.mgd/100));if(absorb>0){owner.mp-=absorb;dmg-=absorb;logCombat(`<span class="text-blue-300 font-bold">【魔力護體】</span>消耗 ${absorb} MP 吸收傷害。`,'player-special',owner===player?'player':'mercenary');}}
+    if(typeof orbIncomingDamage==='function')dmg=orbIncomingDamage(owner,dmg,source,kind);
     let t=d2rTriggerTotals(owner),now=(typeof state==='object'&&state?state.ticks:0);
     if(dmg>0&&t.ts&&now>=(owner._d2rShieldCd||0)&&Math.random()<.05){
         owner._d2rShield=Math.max(owner._d2rShield||0,Math.max(1,Math.floor((owner.mhp||1)*t.ts/100)));

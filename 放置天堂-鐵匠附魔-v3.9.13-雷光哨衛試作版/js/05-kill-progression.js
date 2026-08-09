@@ -260,7 +260,7 @@ function trialItemDropMult(id) { return 1; }
 function partyActiveMemberCount() { return Math.min(8, 1 + ((player.allies || []).filter(a => a && !a._downed).length)); }
 function partyExpShareCount() { return partyActiveMemberCount(); }   // 相容 native-preview／舊外部呼叫；不再作為除數
 function partyRewardMult() { return partyActiveMemberCount(); }
-function partyDropRate(rate) { return Math.min(1, Math.max(0, Number(rate) || 0) * partyRewardMult() * (typeof balanceMult === 'function' ? balanceMult('drop') : 1)); }
+function partyDropRate(rate) { return Math.min(1, Math.max(0, Number(rate) || 0) * partyRewardMult() * (typeof balanceMult === 'function' ? balanceMult('drop') : 1) * (typeof orbLootMultiplier === 'function' ? orbLootMultiplier(player) : 1)); }
 // 任務道具的主玩家與隊員分流：隊員保留個別試煉進度，但所有實體道具都立即交給隊長背包。
 function grantPartyTrialQuestDrop(itemId, cnt) {
     cnt = Math.max(1, Math.floor(Number(cnt) || 1));
@@ -529,6 +529,7 @@ function killMob(idx) {
     // 💎 寶石獨立掉落，不受物品發現率、隊伍掉落倍率或正式版掉落倍率影響，避免寶石自我循環。
     if (!_kbNoReward && typeof rollGemDropForMob === 'function') rollGemDropForMob(mob);
     if (!_kbNoReward && typeof rollRuneDropForMob === 'function') rollRuneDropForMob(mob);
+    if (!_kbNoReward && typeof orbOnKill === 'function') orbOnKill(mob);
 
     // === 🔧 萬能藥稀有掉落：等級 40 以上、非血盟。一般敵人 0.01%；頭目 1%（排除夢幻之島頭目），擊殺後隨機掉落 6 種萬能藥之一 ===
     if (!_kbNoReward && !mob.siegeV2 && (mob.lv || 0) >= 40 && mob.race !== '血盟') {   // 🗝️ 軍王之室小怪／城戰 V2 守軍不進萬能藥掉落
