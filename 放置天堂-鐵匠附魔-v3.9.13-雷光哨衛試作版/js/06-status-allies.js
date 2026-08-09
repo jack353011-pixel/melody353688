@@ -1226,6 +1226,7 @@ function allyCastMagic(ally, sk) {
           totalDmg = Math.max(1, Math.floor(totalDmg * equipSkillDmgMult(sk, _sidA, ally))); }   // 🏺 v3.1.76 遺物 特定技能傷害倍率（傭兵·掃 ally.eq·鏡像玩家 js/07:640）
         // 🔮 攻擊技能下拉選單可選的一般傷害法術，不觸發幻覺2/5與5/5（鏡像玩家 castSkill）
         if (sk.hpCost && ally._setDragonblood5) totalDmg = Math.max(1, Math.floor(totalDmg * 1.2));   // 🐉 v3.1.78 龍血5/5（傭兵）：HP消耗技傷害+20%（傷害魔法·鏡像玩家 js/07:642·傭兵確有付HP見 allyDragonAct）
+        if (typeof d2rHuntDamage === 'function') totalDmg = d2rHuntDamage(ally, t, totalDmg, sk.ele || 'none');
         t.curHp -= totalDmg;
         if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(ally, t, totalDmg);
         _burstDmg += totalDmg;   // 🔧 魔爆累計
@@ -1544,7 +1545,7 @@ function allyStrikeRoll(ally, t, opts) {
     if (heavy && wpn && wpn.heavyMult) dmg = Math.max(1, Math.floor(dmg * wpn.heavyMult));   // 🏺 v3.1.76 鎧甲守衛的笨重巨劍（傭兵·鏡像玩家 js/03:903）
     if (heavy && wpn && wpn.heavyBonusDmg) dmg += wpn.heavyBonusDmg;   // 🌅 牛鬼的斷角（傭兵·連擊/穿透/副手等·鏡像玩家 js/03）
     if (ally.statuses && ally.statuses.broken > 0) dmg = Math.max(1, Math.floor(dmg * 0.8));   // 🐍 v3.1.76 壞物術（傭兵·鏡像玩家 js/03:904）
-    if (typeof d2rHuntDamage === 'function') dmg = d2rHuntDamage(ally, t, dmg);
+    if (typeof d2rHuntDamage === 'function') dmg = d2rHuntDamage(ally, t, dmg, getWpnEle(wpnInst, wpn, ally));
     markBossPhysicalHit(t);
     return { hit: true, dmg: dmg, heavy: heavy, crit: isCrit };
 }
@@ -1638,6 +1639,7 @@ function _allyProcWeaponSpellHit(ally, t, sp, en, illusionRecoverMp) {
     dd = Math.max(1, Math.floor(dd * allyRlFuryMult(ally)));   // 🔴😡 v2.6.18 紅獅5×狂怒5造傷（死騎/克特武器附魔·原全無·鏡像玩家 _procWeaponSpellHit rlFuryMult）
     if (t.st && t.st.mrhalf > 0) t.st.mrhalf = 0;
     dd = _allyIllusionMagicDmg(ally, dd, illusionRecoverMp !== false);   // 🔮 全體 spellProc 只在第一個目標回MP
+    if (typeof d2rHuntDamage === 'function') dd = d2rHuntDamage(ally, t, dd, sp.ele || 'none');
     let glow = (sp.ele === 'fire') ? '#fca5a5;text-shadow:0 0 6px #dc2626'
              : (sp.ele === 'wind') ? '#67e8f9;text-shadow:0 0 6px #06b6d4'
              : (sp.ele === 'water') ? '#93c5fd;text-shadow:0 0 6px #2563eb'
@@ -1714,6 +1716,7 @@ function allyProcFreeMagicSkill(ally, t, skId, en, areaHit, sourceItem, illusion
         total = Math.max(1, Math.floor(total * consumeWetMult(t, sk.ele)));   // 🏺 海洋水晶球（傭兵免費施法）：潮濕目標受風屬性魔法傷害 ×2 並解除
         total = Math.max(1, Math.floor(total * equipSkillDmgMult(sk, skId, ally)));   // 🥕 v3.2.40 稽核修：傭兵武器免費施法也吃技能傷害倍率遺物（冰之女王魔杖冰錐×暴走兔胡蘿蔔1.5 等·鏡像玩家 js/04:500）
         total = _allyIllusionMagicDmg(ally, total, illusionRecoverMp !== false);   // 🔮 全體免費施法只在第一個目標回MP
+        if (typeof d2rHuntDamage === 'function') total = d2rHuntDamage(ally, t, total, sk.ele || 'none');
     }
     if (total > 0) {
         if (t.st && t.st.mrhalf > 0) t.st.mrhalf = 0;
@@ -1741,6 +1744,7 @@ function allyLaiaWandHitProc(ally, t) {
     dd = Math.max(1, Math.floor(dd * enhanceWpnFinalMult(en, w)));   // 🔧 武器強化 +11~+20：最終傷害倍率（取代舊 (1+強化/10)）
     dd = Math.max(1, Math.floor(dd * elementCounterMult(sp.ele, t.e)));   // ⚔️ 屬性剋制倍率（取代舊 +6 固定加值）
     if (t.st && t.st.mrhalf > 0) t.st.mrhalf = 0;
+    if (typeof d2rHuntDamage === 'function') dd = d2rHuntDamage(ally, t, dd, sp.ele || 'none', wasFrozen);
     if (typeof playSpellFx === 'function') { try { playSpellFx(sp.skn || '冰裂術', t, ally); } catch (e) {} }   // ❄️ 傭兵觸發以傭兵 sprite 作為特效施法者
     logCombat(`<span class="font-bold" style="color:#93c5fd;text-shadow:0 0 6px #2563eb;">【協力·${ally._allyName}·${sp.skn || '冰裂術'}】</span>對 <span class="${getMobColor(t.lv)}">${t.n}</span> 造成 ${dd} 點水屬性魔法傷害${wasFrozen ? '（冰碎!）' : ''}。`, 'player-special');
     _allyDamageMob(ally, t, dd, sp.ele, 'magic');
@@ -2439,6 +2443,7 @@ function allyStormTick(ally, sk, noMageBonus) {
         if (sk.n === '火牢' && ally.eq && ally.eq.armor && (DB.items[ally.eq.armor.id] || {}).firePrisonMult) dmg = Math.max(1, Math.floor(dmg * DB.items[ally.eq.armor.id].firePrisonMult));   // 🏺 黝黑的烈火皮囊（傭兵）：火牢傷害加倍（鏡像玩家 js/04 stormBuffTick）
         dmg = Math.max(1, Math.floor(dmg * royalAllyMult()));   // 👑 王族魅力加成：傭兵造成傷害 ×(1+魅力/200)
         dmg = _allyIllusionMagicDmg(ally, dmg, _illusionIdx === 0);   // 🔮 每次持續法術跳傷只回一次MP，5件仍逐目標生效
+        if (typeof d2rHuntDamage === 'function') dmg = d2rHuntDamage(ally, t, dmg, sk.ele || 'none');
         t.curHp -= dmg; if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(ally, t, dmg); t.justHit = (sk.ele && sk.ele !== 'none') ? sk.ele : 'magic'; mobWake(t);
         dmgLog.push(`<span class="${getMobColor(t.lv)}">${t.n}</span> ${dmg}${isCrit ? '(爆)' : ''}`);
         if (t.curHp <= 0) {

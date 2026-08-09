@@ -443,6 +443,7 @@
     function d2rOverviewPanel() {
         let raw = typeof d2rEquipTotals === 'function' ? d2rEquipTotals(player) : {};
         let hunt = typeof d2rHuntTotals === 'function' ? d2rHuntTotals(player) : {};
+        let combat = typeof d2rCombatAffixTotals === 'function' ? d2rCombatAffixTotals(player) : {};
         let defs = [
             ['gf','金幣取得量',50,'%'],['xf','經驗值取得量',25,'%'],
             ['nd','對一般怪物傷害',30,'%'],['bd','對頭目傷害',20,'%'],
@@ -454,14 +455,16 @@
             return `<div class="gc-d2r-card ${capped?'gc-d2r-capped':''}"><div><b>${name}</b>${capped?'<small>已封頂</small>':''}</div>
                 <span>${show}${unit} / ${cap}${unit}</span><div class="gc-d2r-bar"><i style="width:${pct}%"></i></div></div>`;
         }).join('');
+        let combatDefs=[['fpen','火焰穿透',30],['wpen','寒冰穿透',30],['epen','大地穿透',30],['apen','風雷穿透',30],['sdm','異常增傷',40],['bdr','頭目減傷',25]];
+        cards += combatDefs.map(([code,name,cap])=>{let before=Math.max(0,Number(raw[code])||0),value=Math.max(0,Number(combat[code])||0),capped=before>=cap,pct=Math.max(0,Math.min(100,value/cap*100)),show=Number.isInteger(value)?value:value.toFixed(1);return `<div class="gc-d2r-card ${capped?'gc-d2r-capped':''}"><div><b>${name}</b>${capped?'<small>已封頂</small>':''}</div><span>${show}% / ${cap}%</span><div class="gc-d2r-bar"><i style="width:${pct}%"></i></div></div>`;}).join('');
         let all = typeof d2rEquipTotals === 'function' ? d2rEquipTotals(player) : {}, groups=[
-            ['攻擊','md,rd,mg,mh,rh,gh,as,mc,rc,gc,mcd,rcd,gcd'],
-            ['防禦','hp,mp,hpp,mpp,ac,mr,er,dr,rf,rw,re,ra,rn,abr'],
+            ['攻擊','md,rd,mg,mh,rh,gh,as,mc,rc,gc,mcd,rcd,gcd,fpen,wpen,epen,apen,sdm'],
+            ['防禦','hp,mp,hpp,mpp,ac,mr,er,dr,rf,rw,re,ra,rn,abr,bdr'],
             ['資源／狩獵','mf,wt,hpr,mpr,pot,gf,xf,nd,bd,kh,km'],
             ['命中／觸發特效','ff,fw,fa,fe,ph,pm,kx,ts,pi,ks'],
             ['玩法改變','sp,fh']
         ];
-        let summary=groups.map(([name,codes])=>{let rows=codes.split(',').filter(k=>(Number(all[k])||0)>0).map(k=>`${(typeof D2R_SHORT_LABEL!=='undefined'&&D2R_SHORT_LABEL[k])||(D2R_AFFIX_LABEL&&D2R_AFFIX_LABEL[k])||k} ${k==='ac'?'-':'+'}${Number(all[k]).toFixed(Number(all[k])%1?1:0)}${['as','mc','rc','gc','mcd','rcd','gcd','hpp','mpp','pot','abr','gf','xf','nd','bd','kx','ts','pi','ks','sp','fh'].includes(k)?'%':''}`);return `<div class="gc-d2r-group"><b>${name}</b><span>${rows.length?rows.join('｜'):'目前沒有'}</span></div>`;}).join('');
+        let summary=groups.map(([name,codes])=>{let rows=codes.split(',').filter(k=>(Number(all[k])||0)>0).map(k=>`${(typeof D2R_SHORT_LABEL!=='undefined'&&D2R_SHORT_LABEL[k])||(D2R_AFFIX_LABEL&&D2R_AFFIX_LABEL[k])||k} ${k==='ac'?'-':'+'}${Number(all[k]).toFixed(Number(all[k])%1?1:0)}${['as','mc','rc','gc','mcd','rcd','gcd','hpp','mpp','pot','abr','gf','xf','nd','bd','kx','ts','pi','ks','sp','fh','fpen','wpen','epen','apen','sdm','bdr'].includes(k)?'%':''}`);return `<div class="gc-d2r-group"><b>${name}</b><span>${rows.length?rows.join('｜'):'目前沒有'}</span></div>`;}).join('');
         return `<div class="gc-d2r"><p class="text-slate-300 mb-3">以下為強化與耐久計算後的實際生效值；達到全身上限時顯示「已封頂」。寶石、符文與符文之語不列入八色詞綴增幅。</p>
             <div class="gc-d2r-grid">${cards}</div><h3 class="text-amber-300 font-bold mt-5 mb-2">全身八色詞綴分類</h3>${summary}</div>`;
     }

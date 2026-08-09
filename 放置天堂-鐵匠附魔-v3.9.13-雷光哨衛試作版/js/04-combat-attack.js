@@ -425,7 +425,7 @@ function stormBuffTick(sk, noMageBonus) {
         if (sk.n === '火牢' && player.eq && player.eq.armor && (DB.items[player.eq.armor.id] || {}).firePrisonMult) d = d * DB.items[player.eq.armor.id].firePrisonMult;   // 🏺 v3.5.27 黝黑的烈火皮囊：火牢傷害加倍
         d = Math.max(1, Math.floor(d * rlFuryMult()));   // 🔮 紅獅5/5＋😡狂怒5/5 最終傷害
         d = Math.max(1, Math.floor(d * fragileMult(t) * wpnEnFinalMult(player.eq && player.eq.wpn)));    // 🔮 脆弱（白鳥5）；🔧 武器強化 +11~+20 最終倍率（魔法 DoT，與玩家傷害魔法 castSkill 一致）
-        d = illusionMagicDmg(d, true, _illusionIdx === 0); t.curHp -= d; t.justHit = (sk.ele && sk.ele !== 'none') ? sk.ele : 'magic'; if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(player, t, d); mobWake(t);   // 🔮 幻覺2件每次法術僅回一次MP；5件仍逐目標二次傷害
+        d = illusionMagicDmg(d, true, _illusionIdx === 0); if (typeof d2rHuntDamage === 'function') d = d2rHuntDamage(player, t, d, sk.ele || 'none'); t.curHp -= d; t.justHit = (sk.ele && sk.ele !== 'none') ? sk.ele : 'magic'; if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(player, t, d); mobWake(t);   // 🔮 幻覺2件每次法術僅回一次MP；5件仍逐目標二次傷害；八色流派詞綴統一結算
         dmgLog.push(`<span class="${getMobColor(t.lv)}">${t.n}</span> ${d}${isCrit ? '(爆)' : ''}`);
         if (t.curHp <= 0) {
             let ri = mapState.mobs.findIndex(x => x && x.uid === t.uid); if (ri !== -1) killMob(ri);
@@ -782,6 +782,7 @@ function procFreeMagicSkill(t, skId, en, areaHit, sourceItem, illusionRecoverMp)
     total = Math.floor(total * enhanceWpnFinalMult(en, (sourceItem && sourceItem.type === 'wpn') ? sourceItem : (player.eq.wpn && DB.items[player.eq.wpn.id])));   // 🔧 武器強化 +11~+20：使用實際觸發武器（含副手／屬性附加魔法）
     if (total > 0) total = Math.max(1, Math.floor(total * equipSkillDmgMult(sk, skId)));   // 🏺 遺物 特定技能傷害倍率（觸發路徑：冰之女王魔杖觸發的冰錐等亦吃暴走兔胡蘿蔔 ×1.5）
     if (total > 0) total = illusionMagicDmg(total, true, illusionRecoverMp !== false);   // 🔮 全體免費施法只在第一個目標回MP；5件仍逐目標生效
+    if (total > 0 && typeof d2rHuntDamage === 'function') total = d2rHuntDamage(player, t, total, sk.ele || 'none');
     if (total > 0) {
         t.curHp -= total; if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(t, total, 'magic'); t.justHit = (sk.ele && sk.ele !== 'none') ? sk.ele : 'magic'; t._spellHurt = true; mobWake(t);   // 🎬 v3.0.14 法術傷害→hurt(含頭目)；🌅 巨大骷髏：免費觸發法術視為魔法
         if(typeof playSpellFx === 'function') { try { playSpellFx(sk.n, t); } catch(e){} }   // ⚡ v2.7.16 娃娃/寵物免費施放(如娃娃克特/聖伯納→極道落雷)也疊法術特效
@@ -911,6 +912,7 @@ function _procWeaponSpellHit(t, sp, en, illusionRecoverMp) {
     d = Math.max(1, Math.floor(d * rlFuryMult()));   // 🔮 紅獅5/5＋😡狂怒5/5 最終傷害
     if (t.st && t.st.mrhalf > 0) t.st.mrhalf = 0;
     d = illusionMagicDmg(d, true, illusionRecoverMp !== false);   // 🔮 全體 spellProc 只在第一個目標回MP；5件仍逐目標生效
+    if (typeof d2rHuntDamage === 'function') d = d2rHuntDamage(player, t, d, sp.ele || 'none');
     t.curHp -= d;
     if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(t, d, 'magic');   // 🌅 巨大骷髏：spellProc 視為魔法
     t.justHit = (sp.ele && sp.ele !== 'none') ? sp.ele : 'magic';
@@ -965,6 +967,7 @@ function laiaWandHitProc(t) {
     d = Math.max(1, Math.floor(d * enhanceWpnFinalMult(en, w)));   // 🔧 武器強化 +11~+20：最終傷害倍率（取代舊 (1+強化/10)）
     d = Math.max(1, Math.floor(d * rlFuryMult()));   // 🔮 紅獅5/5＋😡狂怒5/5 最終傷害
     if (t.st && t.st.mrhalf > 0) t.st.mrhalf = 0;
+    if (typeof d2rHuntDamage === 'function') d = d2rHuntDamage(player, t, d, sp.ele || 'none', wasFrozen);
     t.curHp -= d; if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(t, d, 'magic'); t.justHit = sp.ele; t._spellHurt = true; mobWake(t);   // 🎬 v3.0.14 法術傷害→hurt(含頭目)；🌅 巨大骷髏：冰裂術視為魔法
     if(typeof playSpellFx === 'function') { try { playSpellFx(sp.skn || '冰裂術', t); } catch(e){} }   // ⚡ v2.7.16 蕾雅魔杖命中觸發也疊法術特效（未註冊者自動略過）
     logCombat(`<span class="font-bold" style="color:#93c5fd;text-shadow:0 0 6px #2563eb;">【${sp.skn || '冰裂術'}】</span>對 <span class="${getMobColor(t.lv)}">${t.n}</span> 造成 ${d} 點水屬性魔法傷害${wasFrozen ? '（冰碎!）' : ''}。`, 'player-special');
@@ -1314,7 +1317,7 @@ function _enemyPhysicalAttackInner(mob, idx, stunChance = 0, atkDmg = null, atkD
             return;
         }
         totalDmg=runeIncomingDamage(player,totalDmg);
-        if(typeof d2rTriggerIncoming==='function')totalDmg=d2rTriggerIncoming(player,totalDmg);
+        if(typeof d2rTriggerIncoming==='function')totalDmg=d2rTriggerIncoming(player,totalDmg,mob);
         player.hp -= totalDmg;
         runeOnDamaged(player,mob);
         if (isBasicAttack && totalDmg > 0) corrosiveJellySkinOnBasicHit(mob, player);
@@ -1624,7 +1627,7 @@ function _enemyAttackAllyInner(mob, ally, isBasicAttack = false) {
         if (mob.curHp <= 0) { let _mi = mapState.mobs.findIndex(m => m && m.uid === mob.uid); if (_mi !== -1) killMob(_mi); }
         return;
     }
-    if(typeof d2rTriggerIncoming==='function')totalDmg=d2rTriggerIncoming(ally,totalDmg);
+    if(typeof d2rTriggerIncoming==='function')totalDmg=d2rTriggerIncoming(ally,totalDmg,mob);
     ally.curHp -= totalDmg;
     if (isBasicAttack && totalDmg > 0) corrosiveJellySkinOnBasicHit(mob, ally);
     // 🏺 v3.7.52 高崙的生命印記（傭兵）：受到重擊時 MR-100·3 秒（js/02 通用消費·js/03 到期重算）
@@ -2035,7 +2038,7 @@ function _applyMobMagicToAllyInner(mob, sk, ally) {
         dmg = Math.max(0, Math.floor(dmg * raceDrMult(ally, mob)));   // 🏺 v3.7.52 隨從的護身斗篷（傭兵·魔法）
         dmg = allyDollDamageReduced(ally, dmg);   // 🆕 v2.6.10 #3：魔法娃娃機率減免（受魔法傷害）
         dmg = shieldDmgReduceProc(ally, dmg);   // 🌑 v3.3.33 反叛者的盾牌（傭兵鏡像·魔法）
-        if(typeof d2rTriggerIncoming==='function')dmg=d2rTriggerIncoming(ally,dmg);
+        if(typeof d2rTriggerIncoming==='function')dmg=d2rTriggerIncoming(ally,dmg,mob);
         ally.curHp -= dmg;
         if (dmg > 0 && !ally._stunCycle) { ally._atkCd = (ally._atkCd || 0) + ((ally.d && ally.d.hitstun) || 0); ally._stunCycle = true; }   // ⚔️ 天堂職業硬直（傭兵·魔法）：延遲下次攻擊·每週期一次
         logCombat(`<span class="${getMobColor(mob.lv)}">${mob.n}</span> 施放${sk.skn || '魔法'}，對 ${nm} 造成 ${dmg} 點魔法傷害。`, 'enemy');
@@ -2467,7 +2470,7 @@ function _applyMobMagicInner(mob, sk) {
         dmg = dollDamageReduced(dmg);   // 🪆 魔法娃娃：受傷機率傷害減免（史巴托/巫妖）
         dmg = shieldDmgReduceProc(player, dmg);   // 🌑 v3.3.33 反叛者的盾牌：受傷 proc（魔法亦適用）
         dmg=runeIncomingDamage(player,dmg);
-        if(typeof d2rTriggerIncoming==='function')dmg=d2rTriggerIncoming(player,dmg);
+        if(typeof d2rTriggerIncoming==='function')dmg=d2rTriggerIncoming(player,dmg,mob);
         player.hp -= dmg;
         runeOnDamaged(player,mob);
         if (dmg > 0) _relicOnDamageHeal();   // 🏺 遺物 白螞蟻蛋殼：受魔法傷害時亦觸發受擊自癒（5 秒節流·physical/magic 共用冷卻）
