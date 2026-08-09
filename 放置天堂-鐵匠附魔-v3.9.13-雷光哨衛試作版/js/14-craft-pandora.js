@@ -1830,6 +1830,7 @@ window.onload = () => {
         if(sk.mEff) eff.push(SK_MEFF[sk.mEff]||'特殊效果');
         if(sk.incomingDmgMult && sk.incomingDmgMult < 1) eff.push('受到的所有傷害 −'+Math.round((1-sk.incomingDmgMult)*100)+'%');
         if(sk.dragonStrikeRateBonus) eff.push('龍的一擊發動率 ＋'+sk.dragonStrikeRateBonus+'%');
+        if(sk.spellProcRateBonus) eff.push('武器內建魔法發動率 ＋'+sk.spellProcRateBonus+'%');
         if(sk.darkPoison) eff.push('一般攻擊命中 50% 機率使目標中毒：每秒該次攻擊 60% 傷害、持續 5 秒、最多 1 層（取較高傷害並刷新；劇毒精通→100%、每秒 200%）');
         if(sk.moveSpeedMult){
             let moveSpeedText = '移動速度+'+Math.round((sk.moveSpeedMult - 1) * 100)+'%（速度×'+sk.moveSpeedMult;

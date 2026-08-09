@@ -408,7 +408,7 @@ const DB = {
         "wpn_baranka_claw":      { n: "魔獸軍王之爪", type: "wpn", w2h: true, dmgS: 12, dmgL: 12, hit: 0, dmgBonus: 2, spd: 0.8, req: "dark", safe: 6, p: 25000,  eff: "combo", gachaWeight: 10 },
         "wpn_baranka_steelclaw": { n: "巴蘭卡鋼爪",   type: "wpn", w2h: true, dmgS: 18, dmgL: 18, hit: 0, dmgBonus: 8, spd: 0.7, req: "dark", safe: 6, p: 125000, eff: "combo", legend: true, gachaWeight: 1 },
         // ===== 傳說單手劍：附帶魔法施放特效（spellProc，不需學會技能、必中、受魔法傷害影響） =====
-        "wpn_dk_flameblade": { n: "死亡騎士的烈炎之劍", type: "wpn", dmgS: 16, dmgL: 10, hit: 5, dmgBonus: 2, spd: 0.8, req: "knight", safe: 6, p: 152000, legend: true, gachaWeight: 1, spellProc: { skn: "地獄火", dice: [16, 5], flat: 40, ele: "fire", aoe: true }, procRateBase: 3, procRatePerEn: 1, d: "死亡騎士緊握至死的劍，劍刃終年燃著不滅的地獄業火。" },
+        "wpn_dk_flameblade": { n: "死亡騎士的烈炎之劍", type: "wpn", dmgS: 16, dmgL: 10, hit: 5, dmgBonus: 2, spd: 0.8, req: "knight", safe: 6, p: 152000, legend: true, gachaWeight: 1, spellProc: { skn: "地獄火", dice: [16, 5], flat: 40, ele: "fire", aoe: true }, procRateBase: 3, procRatePerEn: 1, grantSkills: ["sk_nameless_king_flame"], grantSkillsEquipOnly: true, d: "焦黑劍鍔仍殘留古亞丁王冠的固定孔，真正的王名卻已熔毀。裝備後可使用「無名王焰」：32 秒內火屬性抗性 +15，地獄火發動率額外 +5%。" },
         "wpn_kurt_sword":    { n: "克特之劍", type: "wpn", dmgS: 15, dmgL: 11, hit: 9, dmgBonus: 5, spd: 0.8, req: "knight,elf", safe: 6, p: 152000, legend: true, gachaWeight: 1, spellProc: { skn: "極道落雷", dice: [5, 8], flat: 40, ele: "wind" }, procRateBase: 15, procRatePerEn: 1, d: "克特之劍，劍鋒間遊走著被馴服的雷霆。" },
         // ===== ⚡ 元素施放傳說武器（spellProc·攻擊1%+每強化1%觸發·必中·受魔法傷害影響·不吃法師階級加成） =====
         "wpn_thor_hammer":   { n: "雷神之鎚", type: "wpn", dmgS: 7, dmgL: 12, hit: 3, dmgBonus: 0, spd: 0.9, req: "royal,knight,elf,mage,warrior", safe: 6, p: 46000, legend: true, gachaWeight: 1, ignHardSkin: true, spellProc: { skn: "電光衝擊", dice: [5, 5], flat: 5, ele: "wind", status: { kind: "stun", pct: 5, dur: 3 } }, procRateBase: 1, procRatePerEn: 1, d: "雷神遺落的戰鎚，鎚頭間纏繞著未平息的雷霆。" },
@@ -2892,6 +2892,8 @@ const DB = {
         "sk_four_seal_resonance": { n: "四印共振", type: "buff", tier: 9, mp: 24, dur: 32, noRefresh: true, d: { resFire: 15, resWater: 15, resEarth: 15, resWind: 15 }, dragonStrikeRateBonus: 8, desc: "龍的一擊發動率 +8%（12% → 20%）。僅裝備屠龍劍時可使用。", msg: "劍刃四槽依序亮起，四道龍印與你同步共振。" },
         // 🕯️ 巴列斯魔杖專屬裝備技能：以降低自身魔防為代價，重新接通被象牙塔禁止的研究術式。
         "sk_forbidden_resonance": { n: "禁式共鳴", type: "buff", tier: 9, mp: 28, dur: 32, noRefresh: true, d: { magicDmg: 8, mr: -15 }, desc: "僅裝備巴列斯魔杖時可使用。", msg: "被刪去的研究式重新連結，杖芯傳來不祥的回響。" },
+        // 🔥 死亡騎士烈炎之劍專屬裝備技能：王名被抹去，殘火仍記得原來的主人。
+        "sk_nameless_king_flame": { n: "無名王焰", type: "buff", tier: 9, mp: 24, dur: 32, noRefresh: true, d: { resFire: 15 }, spellProcRateBonus: 5, desc: "地獄火發動率額外 +5%。僅裝備死亡騎士的烈炎之劍時可使用。", msg: "被熔去姓名的王焰沿劍鍔重新燃起。" },
         "sk_sleep_mist": { n: "沉睡之霧", type: "atk", tier: 9, reqM: 36, mp: 40, dmgType: "magic", target: "all", status: { kind: "sleep", pbase: 100, dur: 8 } },
         "sk_thunder_storm": { n: "雷霆風暴", type: "atk", tier: 9, reqM: 36, mp: 48, dmgType: "magic", ele: "wind", target: "all", multiDmg: [[2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10], [2, 10]] },
         "sk_fire_storm": { n: "火風暴", type: "atk", tier: 9, reqM: 36, mp: 48, dmgType: "magic", ele: "fire", target: "all", multiDmg: [[4, 10], [4, 10], [4, 10], [4, 10]] },

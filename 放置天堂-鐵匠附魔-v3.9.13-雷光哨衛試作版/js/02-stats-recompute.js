@@ -353,6 +353,17 @@ function recomputeStats() {
         if (_oAtt) { d.extraDmg += _oAtt.dmg; d.extraMp += _oAtt.mp; }   // 🔥 副手屬性詞綴：額外傷害/魔法點數
     }
 
+    // 武器欄在下方防具／飾品迴圈中會被刻意跳過，因此武器授予技能必須在此獨立收集。
+    // 主武器與迅猛雙斧副手都採同一規則；卸裝清除仍由本函式後段的 _previousGrantedSkills 統一處理。
+    [p.eq.wpn, p.eq.offwpn].forEach(inst => {
+        let wd = inst && DB.items[inst.id];
+        if (!wd || !Array.isArray(wd.grantSkills)) return;
+        wd.grantSkills.forEach(sk => {
+            if (!player.grantedSkills.includes(sk)) player.grantedSkills.push(sk);
+            if (!player.skills.includes(sk)) player.skills.push(sk);
+        });
+    });
+
     let setCheck = {}, _setSeen = {};
     p._equipHaste = false;   // 裝備常駐加速（如伊娃之盾）：每次重算先清除，卸下即消失（同 _setPoly 模式）
     if (p.eq.wpn) { let _hw = DB.items[p.eq.wpn.id]; if (_hw && (_hw.eff === 'haste' || _hw.equipHaste)) p._equipHaste = true; }   // 🔧 武器常駐加速（惡魔之劍 eff:haste／惡魔雙刀·鋼爪·十字弓 equipHaste）

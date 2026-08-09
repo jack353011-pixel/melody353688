@@ -675,7 +675,9 @@ function weaponSpellProc(target, attackHit, instOverride) {
     }
     if (!wpn.spellProc && !wpn.procSkill) return;
     let en = capWpnEn(inst.en);
-    if (Math.random() * 100 >= ((wpn.procRateBase || 1) + (wpn.procRatePerEn != null ? wpn.procRatePerEn : 1) * en)) return;   // 預設 1% + 每強化 +1%；🔧 巴風特魔杖 procRateBase:2/procRatePerEn:2
+    let _spellProcRate = (wpn.procRateBase || 1) + (wpn.procRatePerEn != null ? wpn.procRatePerEn : 1) * en;
+    if ((player.buffs.sk_nameless_king_flame || 0) > 0) _spellProcRate += (DB.skills.sk_nameless_king_flame.spellProcRateBonus || 0);
+    if (Math.random() * 100 >= _spellProcRate) return;   // 預設 1% + 每強化 +1%；無名王焰期間，烈炎之劍額外 +5%
     let t = (target && target.curHp > 0) ? target : null;
     if (!t) {
         let alive = mapState.mobs.filter(m => m && m.curHp > 0);

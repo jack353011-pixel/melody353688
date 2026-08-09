@@ -1927,7 +1927,9 @@ function allyWeaponProcs(ally, target, hitInfo, instOverride) {
     // 🔧 武器附魔施放（spellProc/procSkill，與玩家一致）：一般武器命中與否皆判定；procOnHit 武器僅命中時判定
     if ((wpn.spellProc || wpn.procSkill) && (!wpn.procOnHit || (hitInfo && hitInfo.hit))) {
         let _en = capWpnEn(wpnInst.en);
-        if (Math.random() * 100 < ((wpn.procRateBase || 1) + (wpn.procRatePerEn != null ? wpn.procRatePerEn : 1) * _en)) {
+        let _allySpellProcRate = (wpn.procRateBase || 1) + (wpn.procRatePerEn != null ? wpn.procRatePerEn : 1) * _en;
+        if ((ally.buffs.sk_nameless_king_flame || 0) > 0) _allySpellProcRate += (DB.skills.sk_nameless_king_flame.spellProcRateBonus || 0);
+        if (Math.random() * 100 < _allySpellProcRate) {
             let st = _allyProcTarget(target);
             // ⚡ v3.7.52 克特之盾（judgmentThunder·傭兵鏡像玩家）：裝備指定武器時 spellProc 升級為審判落雷（同觸發骰＝機率不變）
             let _spA = wpn.spellProc;
