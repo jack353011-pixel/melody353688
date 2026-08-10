@@ -10,7 +10,8 @@
  *   一度寫成「只搬 lineage_idle_/fb5_/afk_/dograce_ 前綴」,已否決。任何形式的清單都要跟著
  *   上游走,作者哪天新增一個 key 我們不會知道,漏搬是**安靜失效**(玩家搬完、玩一陣子才發現
  *   東西不見,而且查不出來)。正確性論證很硬:B 變成 A 的完整複本,A 跑得動 B 就跑得動。
- *   → 匯出 localStorage 全部 key,還原時把現有的全部清掉再原樣寫回。新增功能自動涵蓋,零維護。
+ *   → 匯出 localStorage 全部 key；v3.9.26 起另帶 IndexedDB 自動備份桶。還原時把兩邊
+ *      原樣寫回，舊 schema 1 備份仍可讀；IndexedDB 不可用時自動降級回舊 localStorage 備份鍵。
  *
  * 還原的安全設計(每一條都是「弄壞玩家存檔」的防線):
  *   ① 備份只用**文字建議**(確認框裡提醒「先按上面的匯出」),刻意不做「強制自動下載一份」——
@@ -75,7 +76,7 @@
   }
 
   var FORMAT = 'idle-lineage-full';
-  var SCHEMA = 1;
+  var SCHEMA = 2;
 
   function lsKeys() {
     var out = [];
@@ -88,12 +89,26 @@
     return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
   }
 
-  // 檔案裡只有三個「我們自己寫的」欄位:format(認得是不是我們的檔)、exportedAt(給玩家確認)、
-  // keyCount(檔案有沒有被截斷)。keys 內容一律原封不動,不解析、不認識、不判斷。
+  // localStorage keys 內容一律原封不動；IndexedDB 只匯出已正式遷移的自動備份桶。
   function buildPack() {
     var keys = {}, n = 0;
     lsKeys().forEach(function (k) { var v = localStorage.getItem(k); if (v != null) { keys[k] = v; n++; } });
     return { format: FORMAT, schema: SCHEMA, exportedAt: new Date().toISOString(), keyCount: n, keys: keys };
+  }
+  function buildPackAsync() {
+    var idb = window.FB5_IDB_SHADOW;
+    var idbReady = false;
+    try { idbReady = !!(idb && typeof idb.getStatus === 'function' && idb.getStatus().state === 'ready'); } catch (e) {}
+    if (!idbReady || typeof idb.exportAutoBackups !== 'function') {
+      var pack = buildPack();
+      pack.indexedDB = { autoBackups: [], autoBackupCount: 0 };
+      return Promise.resolve(pack);
+    }
+    return idb.exportAutoBackups().then(function (rows) {
+      var pack = buildPack();   // 等待在途備份完成後再掃 localStorage，連失敗降級寫回的備份也不漏
+      pack.indexedDB = { autoBackups: rows || [], autoBackupCount: (rows || []).length };
+      return pack;
+    });
   }
 
   // 🔁 與核心 exportSave(js/13:558)同一套,不要自己另立一種:showSaveFilePicker 可用就用
@@ -131,13 +146,15 @@
 
   function doExport() {
     var fname = 'idle-lineage-backup-' + stamp() + '.json';
-    var text;
-    try { text = JSON.stringify(buildPack()); }
-    catch (e) { note('❌ 打包失敗：' + (e && e.message || e), true); return Promise.resolve(null); }
-    return download(text, fname).then(function (r) {
+    return buildPackAsync().then(function (pack) { return JSON.stringify(pack); }).then(function (text) {
+      return download(text, fname);
+    }).then(function (r) {
       if (r === 'cancel') return null;
       if (r !== 'saved') { note('❌ 存檔失敗（瀏覽器可能擋住了下載）。', true); return null; }
       return { fname: fname };
+    }).catch(function (e) {
+      note('❌ 打包失敗：' + (e && e.message || e), true);
+      return null;
     });
   }
 
@@ -160,14 +177,13 @@
   }
 
   function uploadPack() {
-    var text;
-    try { text = JSON.stringify(buildPack()); }
-    catch (e) { return Promise.reject(new Error('打包失敗：' + (e && e.message || e))); }
-    var fd = new FormData();
-    fd.append('reqtype', 'fileupload');
-    fd.append('time', LB_EXPIRY);
-    fd.append('fileToUpload', new Blob([text], { type: 'application/json' }), 'save.json');
-    return fetch(LB_UPLOAD, { method: 'POST', body: fd }).then(function (r) {
+    return buildPackAsync().then(function (pack) {
+      var text = JSON.stringify(pack), fd = new FormData();
+      fd.append('reqtype', 'fileupload');
+      fd.append('time', LB_EXPIRY);
+      fd.append('fileToUpload', new Blob([text], { type: 'application/json' }), 'save.json');
+      return fetch(LB_UPLOAD, { method: 'POST', body: fd });
+    }).then(function (r) {
       if (!r.ok) throw new Error('上傳失敗（' + r.status + '）');
       return r.text();
     }).then(function (url) {
@@ -200,20 +216,52 @@
     var names = Object.keys(keys);
     if (!names.length || (d.keyCount != null && d.keyCount !== names.length)) return { ok: false, err: '備份檔不完整，請重新匯出一份。' };
     for (var i = 0; i < names.length; i++) if (typeof keys[names[i]] !== 'string') return { ok: false, err: '備份檔不完整，請重新匯出一份。' };
+    if (Number(d.schema) >= 2 && d.indexedDB == null) return { ok: false, err: '備份檔的資料庫內容不完整，請重新匯出一份。' };
+    if (d.indexedDB != null) {
+      if (!d.indexedDB || !Array.isArray(d.indexedDB.autoBackups)) return { ok: false, err: '備份檔的資料庫內容不完整，請重新匯出一份。' };
+      if (d.indexedDB.autoBackupCount != null && Number(d.indexedDB.autoBackupCount) !== d.indexedDB.autoBackups.length) return { ok: false, err: '備份檔的資料庫內容不完整，請重新匯出一份。' };
+      for (var j = 0; j < d.indexedDB.autoBackups.length; j++) {
+        var rec = d.indexedDB.autoBackups[j];
+        if (!rec || typeof rec !== 'object' || typeof rec.raw !== 'string' || !rec.raw) return { ok: false, err: '備份檔的自動備份內容不完整，請重新匯出一份。' };
+      }
+    }
     return { ok: true, pack: d };
   }
 
   // 實際寫入:整個清空再原樣寫回。中途失敗立刻停手,回報寫到第幾個。
+  function restoreBackupsToLegacy(records) {
+    var grouped = {};
+    (records || []).forEach(function (rec) { var slot = Math.max(1, Math.floor(Number(rec.slot) || 1)); (grouped[slot] || (grouped[slot] = [])).push(rec); });
+    var ok = true;
+    Object.keys(grouped).forEach(function (slot) {
+      var rows = grouped[slot].sort(function (a, b) { return Number(b.at) - Number(a.at); }).slice(0, 3), meta = [];
+      rows.forEach(function (rec, i) {
+        if (_lzSetStoredRaw('lineage_idle_save_' + slot + '_auto_bak_' + (i + 1), rec.raw) === false) ok = false;
+        meta.push({ at: Number(rec.at) || Date.now(), lv: Number(rec.lv) || 1, name: String(rec.name || '') });
+      });
+      if (_lsSet('lineage_idle_save_' + slot + '_auto_bak_meta', JSON.stringify(meta)) === false) ok = false;
+    });
+    return ok;
+  }
   function applyPack(pack) {
     var names = Object.keys(pack.keys);
     try { localStorage.clear(); }
-    catch (e) { return { ok: false, done: 0, err: '清除舊資料時失敗：' + (e && e.message || e) }; }
+    catch (e) { return Promise.resolve({ ok: false, done: 0, err: '清除舊資料時失敗：' + (e && e.message || e) }); }
     for (var i = 0; i < names.length; i++) {
       var k = names[i], okw = false;
       try { okw = _lzSetStoredRaw(k, pack.keys[k]) !== false; } catch (e) { okw = false; }
-      if (!okw) return { ok: false, err: '儲存空間不足' };
+      if (!okw) return Promise.resolve({ ok: false, err: '儲存空間不足' });
     }
-    return { ok: true, done: names.length };
+    var records = pack.indexedDB && Array.isArray(pack.indexedDB.autoBackups) ? pack.indexedDB.autoBackups : [];
+    var idb = window.FB5_IDB_SHADOW;
+    var idbReady = false;
+    try { idbReady = !!(idb && typeof idb.getStatus === 'function' && idb.getStatus().state === 'ready'); } catch (e) {}
+    if (idbReady && typeof idb.importAutoBackups === 'function') {
+      return idb.importAutoBackups(records).then(function () { return { ok: true, done: names.length }; }).catch(function () {
+        return restoreBackupsToLegacy(records) ? { ok: true, done: names.length } : { ok: false, err: '自動備份還原失敗' };
+      });
+    }
+    return Promise.resolve(restoreBackupsToLegacy(records) ? { ok: true, done: names.length } : { ok: false, err: '自動備份還原失敗' });
   }
 
   function startRestore() {
@@ -248,13 +296,16 @@
 
   function runApply(pack) {
     note('還原中…請不要關掉頁面。');
-    var r = applyPack(pack);
-    if (!r.ok) {
-      note('❌ 還原沒有完成（' + r.err + '）。這台裝置的資料現在是不完整的，請重新匯入一次備份檔，或改用空間比較夠的裝置。', true);
-      return;
-    }
-    note('✅ 已還原，重新載入中…');
-    setTimeout(function () { try { location.reload(); } catch (e) {} }, 900);
+    applyPack(pack).then(function (r) {
+      if (!r.ok) {
+        note('❌ 還原沒有完成（' + r.err + '）。這台裝置的資料現在是不完整的，請重新匯入一次備份檔，或改用空間比較夠的裝置。', true);
+        return;
+      }
+      note('✅ 已還原，重新載入中…');
+      setTimeout(function () { try { location.reload(); } catch (e) {} }, 900);
+    }).catch(function (e) {
+      note('❌ 還原沒有完成（' + (e && e.message || e) + '）。請重新匯入一次備份檔。', true);
+    });
   }
 
   function ask(message, onOk) {

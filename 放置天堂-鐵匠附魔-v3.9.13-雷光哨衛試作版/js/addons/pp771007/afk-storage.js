@@ -90,12 +90,12 @@
     if (idb) {
       var idbClass = idb.state === 'ready' ? 'ok' : ((idb.state === 'failed' || idb.state === 'unsupported' || idb.state === 'degraded') ? 'bad' : 'wait');
       var idbText = idb.state === 'ready'
-        ? 'IndexedDB 影子備份啟動時已驗證（' + idb.keyCount + ' 筆）；目前仍由 localStorage 正式讀寫。'
+        ? '主存檔影子已驗證（' + idb.keyCount + ' 筆）；' + idb.backupCount + ' 份自動備份由 IndexedDB 保存，角色主檔仍由 localStorage 正式讀寫。'
         : (idb.state === 'file-store' ? '打包版使用檔案存檔，不需要 IndexedDB 影子備份。'
           : (idb.state === 'failed' || idb.state === 'unsupported' || idb.state === 'degraded'
             ? 'IndexedDB 影子備份未啟用；localStorage 正式存檔不受影響。'
             : 'IndexedDB 影子備份正在建立與驗證中；localStorage 正式存檔不受影響。'));
-      html += '<div class="m-stg-idb m-stg-idb-' + idbClass + '"><b>資料庫遷移・第一階段</b><br>' + esc(idbText) + '</div>';
+      html += '<div class="m-stg-idb m-stg-idb-' + idbClass + '"><b>資料庫遷移・第二階段</b><br>' + esc(idbText) + '</div>';
     }
 
     // ⚠️ 未壓縮存檔警示:正常所有存檔都應是「已壓縮(LZ1)」。若有一批停在「未壓縮(SIG1)」,

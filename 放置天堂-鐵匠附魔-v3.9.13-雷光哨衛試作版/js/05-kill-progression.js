@@ -194,7 +194,7 @@ function renderAuditTab() {
         </div>
         <div class="border-t border-slate-700 pt-2">
             <div class="text-emerald-300 font-bold mb-1">自動存檔備份</div>
-            <div class="text-slate-500 text-xs mb-2">每個角色最多保留 3 份，每 5 分鐘輪替一次；還原前會保留目前進度。</div>
+            <div class="text-slate-500 text-xs mb-2">每個角色最多保留 3 份，每 5 分鐘輪替一次；網頁版存於 IndexedDB，還原前會保留目前進度。</div>
             <div class="flex flex-col gap-1">${_backupRows || '<div class="text-slate-500 text-sm">下一次存檔後開始建立備份。</div>'}</div>
         </div>
     </div>`;

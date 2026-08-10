@@ -1,19 +1,23 @@
 /* ============================================================================
- * IndexedDB phase 1: verified shadow copy
+ * IndexedDB phase 2: verified shadow copy + primary automatic backups
  *
- * localStorage remains the only authoritative web save source in this phase.
+ * localStorage remains the authoritative source for the main game state.
  * Every core _lsSet/_lsRemove write is mirrored to IndexedDB after the
  * synchronous localStorage operation succeeds. On startup, one atomic
  * transaction replaces the shadow with a snapshot of localStorage, followed by
  * an exact read-back verification. Any IndexedDB error is isolated: the legacy
  * save path and its synchronous success/failure contract remain unchanged.
+ * Rotating automatic backups are the first data family promoted to IndexedDB;
+ * legacy localStorage backup generations are migrated only after a successful
+ * database transaction and remain covered by the full portable backup format.
  * ========================================================================== */
 (function () {
   'use strict';
 
   var api = {
-    phase: 'shadow', state: 'opening', authoritative: 'localStorage',
-    keyCount: 0, verifiedAt: 0, lastError: '', pending: 0, writes: 0
+    phase: 'hybrid-backups', state: 'opening', authoritative: 'localStorage',
+    keyCount: 0, verifiedAt: 0, lastError: '', pending: 0, writes: 0,
+    backupCount: 0, backupLastError: ''
   };
   window.FB5_IDB_SHADOW = api;
 
@@ -29,7 +33,8 @@
     return {
       phase: api.phase, state: api.state, authoritative: api.authoritative,
       keyCount: api.keyCount, verifiedAt: api.verifiedAt,
-      lastError: api.lastError, pending: api.pending, writes: api.writes
+      lastError: api.lastError, pending: api.pending, writes: api.writes,
+      backupCount: api.backupCount, backupLastError: api.backupLastError
     };
   };
 
@@ -49,9 +54,10 @@
   }
 
   var DB_NAME = 'idle_lineage_storage';
-  var DB_VERSION = 1;
+  var DB_VERSION = 2;
   var KV_STORE = 'kv';
   var META_STORE = 'meta';
+  var BACKUP_STORE = 'autoBackups';
   var db = null;
   var migrating = true;
   var queued = [];
@@ -59,6 +65,8 @@
   var flushChain = Promise.resolve();
   var nativeSet = window._lsSet;
   var nativeRemove = window._lsRemove;
+  var backupCache = Object.create(null);
+  var backupChain = Promise.resolve();
 
   function localSnapshot() {
     var rows = [];
@@ -94,6 +102,10 @@
         var upgradeDb = req.result;
         if (!upgradeDb.objectStoreNames.contains(KV_STORE)) upgradeDb.createObjectStore(KV_STORE);
         if (!upgradeDb.objectStoreNames.contains(META_STORE)) upgradeDb.createObjectStore(META_STORE);
+        if (!upgradeDb.objectStoreNames.contains(BACKUP_STORE)) {
+          var backups = upgradeDb.createObjectStore(BACKUP_STORE, { keyPath: 'id' });
+          backups.createIndex('slot', 'slot', { unique: false });
+        }
       };
       req.onsuccess = function () { resolve(req.result); };
       req.onerror = function () { reject(req.error || new Error('IndexedDB open failed')); };
@@ -162,7 +174,7 @@
     kv.clear();
     rows.forEach(function (row) { kv.put(row[1], row[0]); });
     tx.objectStore(META_STORE).put({
-      phase: 1, authoritative: 'localStorage', state: 'copied',
+      phase: 2, authoritative: 'localStorage+IndexedDB(autoBackups)', state: 'copied',
       keyCount: rows.length, copiedAt: Date.now()
     }, 'migration');
     return done;
@@ -190,7 +202,7 @@
     var tx = db.transaction(META_STORE, 'readwrite');
     var done = txDone(tx);
     tx.objectStore(META_STORE).put({
-      phase: 1, authoritative: 'localStorage', state: 'verified',
+      phase: 2, authoritative: 'localStorage+IndexedDB(autoBackups)', state: 'verified',
       keyCount: count, verifiedAt: now
     }, 'migration');
     return done.then(function () {
@@ -198,6 +210,187 @@
       api.verifiedAt = now;
     });
   }
+
+  // ── Phase 2: rotating automatic backups live primarily in IndexedDB. ──
+  function cleanBackupRecord(rec) {
+    if (!rec || typeof rec !== 'object' || typeof rec.raw !== 'string' || !rec.raw) return null;
+    var slot = Math.max(1, Math.floor(Number(rec.slot) || 1));
+    var at = Math.max(1, Math.floor(Number(rec.at) || Date.now()));
+    return {
+      id: String(rec.id || (slot + ':' + at + ':' + Math.random().toString(36).slice(2, 8))),
+      slot: slot, at: at, lv: Math.max(1, Math.floor(Number(rec.lv) || 1)),
+      name: String(rec.name || ''), raw: rec.raw
+    };
+  }
+  function backupMeta(rec, index) {
+    return { id: rec.id, index: index + 1, slot: rec.slot, at: rec.at, lv: rec.lv, name: rec.name };
+  }
+  function cacheRecords(records) {
+    backupCache = Object.create(null);
+    (records || []).forEach(function (rec) {
+      rec = cleanBackupRecord(rec);
+      if (!rec) return;
+      if (!backupCache[rec.slot]) backupCache[rec.slot] = [];
+      backupCache[rec.slot].push(backupMeta(rec, 0));
+    });
+    Object.keys(backupCache).forEach(function (slot) {
+      backupCache[slot].sort(function (a, b) { return b.at - a.at; });
+      backupCache[slot] = backupCache[slot].slice(0, 3).map(function (rec, i) { rec.index = i + 1; return rec; });
+    });
+    api.backupCount = Object.keys(backupCache).reduce(function (n, slot) { return n + backupCache[slot].length; }, 0);
+    notify();
+  }
+  function cacheSlotRecords(slot, records) {
+    slot = Math.max(1, Math.floor(Number(slot) || 1));
+    var clean = (records || []).map(cleanBackupRecord).filter(Boolean).sort(function (a, b) { return b.at - a.at; }).slice(0, 3);
+    if (clean.length) backupCache[slot] = clean.map(function (rec, i) { return backupMeta(rec, i); });
+    else delete backupCache[slot];
+    api.backupCount = Object.keys(backupCache).reduce(function (n, key) { return n + backupCache[key].length; }, 0);
+    notify();
+  }
+  function loadBackupCache() {
+    var tx = db.transaction(BACKUP_STORE, 'readonly');
+    var done = txDone(tx);
+    return requestDone(tx.objectStore(BACKUP_STORE).getAll()).then(function (records) {
+      return done.then(function () { cacheRecords(records); return records; });
+    });
+  }
+  function pruneBackups() {
+    return loadBackupCache().then(function (records) {
+      var remove = [], grouped = Object.create(null);
+      records.forEach(function (rec) {
+        if (!grouped[rec.slot]) grouped[rec.slot] = [];
+        grouped[rec.slot].push(rec);
+      });
+      Object.keys(grouped).forEach(function (slot) {
+        grouped[slot].sort(function (a, b) { return b.at - a.at; });
+        grouped[slot].slice(3).forEach(function (rec) { remove.push(rec.id); });
+      });
+      if (!remove.length) { cacheRecords(records); return; }
+      var tx = db.transaction(BACKUP_STORE, 'readwrite');
+      var done = txDone(tx), store = tx.objectStore(BACKUP_STORE);
+      remove.forEach(function (id) { store.delete(id); });
+      return done.then(loadBackupCache);
+    });
+  }
+  function pruneBackupSlot(slot) {
+    slot = Math.max(1, Math.floor(Number(slot) || 1));
+    var tx = db.transaction(BACKUP_STORE, 'readonly'), done = txDone(tx);
+    return requestDone(tx.objectStore(BACKUP_STORE).index('slot').getAll(slot)).then(function (records) {
+      return done.then(function () {
+        records.sort(function (a, b) { return b.at - a.at; });
+        var keep = records.slice(0, 3), remove = records.slice(3);
+        if (!remove.length) { cacheSlotRecords(slot, keep); return; }
+        var delTx = db.transaction(BACKUP_STORE, 'readwrite'), delDone = txDone(delTx), store = delTx.objectStore(BACKUP_STORE);
+        remove.forEach(function (rec) { store.delete(rec.id); });
+        return delDone.then(function () { cacheSlotRecords(slot, keep); });
+      });
+    });
+  }
+  function writeBackup(rec) {
+    rec = cleanBackupRecord(rec);
+    if (!rec) return Promise.reject(new Error('Invalid automatic backup'));
+    var tx = db.transaction(BACKUP_STORE, 'readwrite');
+    var done = txDone(tx);
+    tx.objectStore(BACKUP_STORE).put(rec);
+    return done.then(function () { return pruneBackupSlot(rec.slot); }).then(function () { api.backupLastError = ''; return rec; });
+  }
+  function fallbackBackupToLocal(rec) {
+    try {
+      var prefix = 'lineage_idle_save_' + rec.slot + '_auto_bak_', meta = [];
+      try { meta = JSON.parse(localStorage.getItem(prefix + 'meta') || '[]'); } catch (e) {}
+      for (var i = 2; i >= 1; i--) {
+        var older = localStorage.getItem(prefix + i);
+        if (older != null && !nativeSet(prefix + (i + 1), older)) return false;
+      }
+      if (!nativeSet(prefix + '1', rec.raw)) return false;
+      meta.unshift({ at: rec.at, lv: rec.lv, name: rec.name });
+      return nativeSet(prefix + 'meta', JSON.stringify(meta.slice(0, 3)));
+    } catch (e) { return false; }
+  }
+  function legacyBackupRows() {
+    var rows = [];
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i), match = /^lineage_idle_save_(\d+)_auto_bak_([1-3])$/.exec(key || '');
+        if (!match) continue;
+        var raw = localStorage.getItem(key); if (!raw) continue;
+        var slot = Number(match[1]), idx = Number(match[2]), meta = [];
+        try { meta = JSON.parse(localStorage.getItem('lineage_idle_save_' + slot + '_auto_bak_meta') || '[]'); } catch (e) {}
+        var info = meta[idx - 1] || {};
+        var at = Math.max(1, Math.floor(Number(info.at) || (Date.now() - idx)));
+        rows.push({ id: 'legacy:' + slot + ':' + at + ':' + idx, slot: slot, at: at, lv: info.lv, name: info.name, raw: raw, legacyKey: key });
+      }
+    } catch (e) {}
+    return rows;
+  }
+  function migrateLegacyBackups() {
+    var rows = legacyBackupRows();
+    if (!rows.length) return loadBackupCache();
+    var tx = db.transaction(BACKUP_STORE, 'readwrite');
+    var done = txDone(tx), store = tx.objectStore(BACKUP_STORE);
+    rows.forEach(function (rec) { var clean = cleanBackupRecord(rec); if (clean) store.put(clean); });
+    return done.then(pruneBackups).then(function () {
+      // IndexedDB commit + readback completed. Only now release the old quota.
+      var slots = Object.create(null);
+      rows.forEach(function (rec) { slots[rec.slot] = true; window._lsRemove(rec.legacyKey); });
+      Object.keys(slots).forEach(function (slot) { window._lsRemove('lineage_idle_save_' + slot + '_auto_bak_meta'); });
+    });
+  }
+  api.autoBackupList = function (slot) {
+    slot = Math.max(1, Math.floor(Number(slot) || 1));
+    return (backupCache[slot] || []).map(function (rec) {
+      return { id: rec.id, index: rec.index, at: rec.at, lv: rec.lv, name: rec.name };
+    });
+  };
+  api.queueAutoBackup = function (slot, raw, info, minIntervalMs) {
+    slot = Math.max(1, Math.floor(Number(slot) || 1));
+    var current = api.autoBackupList(slot), now = Math.max(1, Math.floor(Number(info && info.at) || Date.now()));
+    if (current[0] && now - current[0].at < Math.max(0, Number(minIntervalMs) || 0)) return false;
+    var rec = cleanBackupRecord({ slot: slot, at: now, lv: info && info.lv, name: info && info.name, raw: raw });
+    if (!rec) return false;
+    var optimistic = backupMeta(rec, 0);
+    backupCache[slot] = [optimistic].concat(backupCache[slot] || []).sort(function (a, b) { return b.at - a.at; }).slice(0, 3)
+      .map(function (x, i) { x.index = i + 1; return x; });
+    api.backupCount = Object.keys(backupCache).reduce(function (n, key) { return n + backupCache[key].length; }, 0);
+    backupChain = backupChain.catch(function () {}).then(function () { return api.ready; }).then(function () { return writeBackup(rec); }).catch(function (e) {
+      api.backupLastError = String(e && e.message || e);
+      fallbackBackupToLocal(rec);
+      setState('degraded', e);
+      return db ? loadBackupCache().catch(function () {}) : null;
+    });
+    return true;
+  };
+  api.saveAutoBackup = function (slot, raw, info) {
+    var rec = cleanBackupRecord({ slot: slot, at: info && info.at, lv: info && info.lv, name: info && info.name, raw: raw });
+    if (!rec) return Promise.reject(new Error('Invalid automatic backup'));
+    backupChain = backupChain.catch(function () {}).then(function () { return api.ready; }).then(function () { return writeBackup(rec); });
+    return backupChain;
+  };
+  api.getAutoBackup = function (slot, index) {
+    return api.ready.then(function () { return backupChain; }).then(function () {
+      var list = api.autoBackupList(slot), meta = list[Math.max(1, Math.floor(Number(index) || 1)) - 1];
+      if (!meta) return null;
+      var tx = db.transaction(BACKUP_STORE, 'readonly'), done = txDone(tx);
+      return requestDone(tx.objectStore(BACKUP_STORE).get(meta.id)).then(function (rec) { return done.then(function () { return rec || null; }); });
+    });
+  };
+  api.exportAutoBackups = function () {
+    return api.ready.then(function () { return backupChain; }).then(function () {
+      if (!db) return [];
+      var tx = db.transaction(BACKUP_STORE, 'readonly'), done = txDone(tx);
+      return requestDone(tx.objectStore(BACKUP_STORE).getAll()).then(function (rows) { return done.then(function () { return rows; }); });
+    });
+  };
+  api.importAutoBackups = function (records) {
+    records = Array.isArray(records) ? records.map(cleanBackupRecord).filter(Boolean) : [];
+    backupChain = backupChain.catch(function () {}).then(function () { return api.ready; }).then(function () {
+      var tx = db.transaction(BACKUP_STORE, 'readwrite'), done = txDone(tx), store = tx.objectStore(BACKUP_STORE);
+      store.clear(); records.forEach(function (rec) { store.put(rec); });
+      return done.then(pruneBackups).then(function () { return api.backupCount; });
+    });
+    return backupChain;
+  };
 
   api.audit = function () {
     if (!db) return Promise.resolve({ ok: false, state: api.state });
@@ -218,7 +411,10 @@
       if (!ok) throw new Error('IndexedDB shadow verification mismatch');
       return markVerified(rows.length);
     }).then(function () {
+      return migrateLegacyBackups();
+    }).then(function () {
       migrating = false;
+      api.authoritative = 'localStorage+IndexedDB(autoBackups)';
       setState('ready');
       return flushQueued();
     }).then(function () { return api.getStatus(); });

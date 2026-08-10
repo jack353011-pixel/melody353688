@@ -1664,11 +1664,16 @@ function _mercMonotonicExpGuard() {
 
 // ===== 自動輪替備份（每個角色保留最近 3 份）=====
 // 在覆寫主存檔前保存「上一份已驗證存檔」。同一角色 5 分鐘內不重複輪替，
-// 避免頻繁存檔把三份備份都洗成幾乎相同的狀態。
+// 避免頻繁存檔把三份備份都洗成幾乎相同的狀態。v3.9.26 起網頁版優先存入
+// IndexedDB；不支援／打包版仍沿用 localStorage／檔案儲存，舊備份可自動遷移。
 const AUTO_BACKUP_KEEP = 3;
 const AUTO_BACKUP_INTERVAL_MS = 5 * 60 * 1000;
 function _autoBackupPrefix(slot) { return 'lineage_idle_save_' + slot + '_auto_bak_'; }
 function _autoBackupMetaKey(slot) { return _autoBackupPrefix(slot) + 'meta'; }
+function _autoBackupIdbReady(idb) {
+    try { return !!(idb && typeof idb.getStatus === 'function' && idb.getStatus().state === 'ready'); }
+    catch(e) { return false; }
+}
 function _autoBackupReadMeta(slot) {
     try {
         let meta = JSON.parse(_lsGet(_autoBackupMetaKey(slot)) || '[]');
@@ -1685,6 +1690,12 @@ function _autoBackupCapture(slot) {
         if(!verified || !verified.payload || (verified.signed && !verified.ok)) return false;
         let parsed = JSON.parse(verified.payload);
         if(!parsed || !parsed.p || !parsed.p.cls) return false;
+        let idb = (typeof window !== 'undefined') ? window.FB5_IDB_SHADOW : null;
+        if(_autoBackupIdbReady(idb) && typeof idb.queueAutoBackup === 'function') {
+            return idb.queueAutoBackup(slot, raw, {
+                at: Date.now(), lv: Math.max(1, Math.floor(Number(parsed.p.lv) || 1)), name: String(parsed.p.name || '')
+            }, AUTO_BACKUP_INTERVAL_MS);
+        }
         let meta = _autoBackupReadMeta(slot);
         let now = Date.now();
         if(meta[0] && now - Number(meta[0].at) < AUTO_BACKUP_INTERVAL_MS) return false;
@@ -1704,18 +1715,36 @@ function _autoBackupCapture(slot) {
 }
 function autoBackupList(slot) {
     slot = Math.max(1, Math.floor(Number(slot || currentSlot) || 1));
+    let idb = (typeof window !== 'undefined') ? window.FB5_IDB_SHADOW : null;
+    if(_autoBackupIdbReady(idb) && typeof idb.autoBackupList === 'function') return idb.autoBackupList(slot);
     return _autoBackupReadMeta(slot).map((m, i) => ({ index: i + 1, at: Number(m.at), lv: Number(m.lv) || 1, name: m.name || '' }));
 }
-function restoreAutoBackup(index, slot) {
-    slot = Math.max(1, Math.floor(Number(slot || currentSlot) || 1));
-    index = Math.max(1, Math.min(AUTO_BACKUP_KEEP, Math.floor(Number(index) || 1)));
-    let key = _autoBackupPrefix(slot) + index;
-    let raw = _lsGet(key);
+let _autoBackupRestoreBusy = false;
+function _autoBackupRestoreRaw(raw, meta, slot) {
     if(!raw) { alert('這份自動備份不存在。'); return false; }
     let currentRaw = _lsGet('lineage_idle_save_' + slot);
-    let meta = autoBackupList(slot).find(x => x.index === index);
     let when = meta && meta.at ? new Date(meta.at).toLocaleString() : '未知時間';
     if(!confirm(`要將存檔 ${slot} 還原到 ${when} 的自動備份嗎？\n目前進度會先保留為一份緊急備份，然後重新載入遊戲。`)) return false;
+    let idb = (typeof window !== 'undefined') ? window.FB5_IDB_SHADOW : null;
+    if(_autoBackupIdbReady(idb) && typeof idb.saveAutoBackup === 'function') {
+        if(_autoBackupRestoreBusy) return false;
+        _autoBackupRestoreBusy = true;
+        let info = { at: Date.now(), lv: 1, name: '還原前緊急備份' };
+        try {
+            let u = currentRaw ? _saveUnwrap(_lzGet('lineage_idle_save_' + slot)) : null;
+            let p = u && u.payload ? JSON.parse(u.payload).p : null;
+            if(p) { info.lv = Math.max(1, Math.floor(Number(p.lv) || 1)); info.name = String(p.name || info.name); }
+        } catch(e) {}
+        let preserve = currentRaw ? idb.saveAutoBackup(slot, currentRaw, info) : Promise.resolve();
+        preserve.then(function () {
+            if(!_lzSetStoredRaw('lineage_idle_save_' + slot, raw)) throw new Error('main save write failed');
+            location.reload();
+        }).catch(function () {
+            _autoBackupRestoreBusy = false;
+            alert('還原失敗，目前存檔沒有變更。');
+        });
+        return true;
+    }
     try {
         if(currentRaw) _lzSetStoredRaw(_autoBackupPrefix(slot) + 'emergency', currentRaw);
         _lzSetStoredRaw('lineage_idle_save_' + slot, raw);
@@ -1725,6 +1754,25 @@ function restoreAutoBackup(index, slot) {
         alert('還原失敗，目前存檔沒有變更。');
         return false;
     }
+}
+function restoreAutoBackup(index, slot) {
+    slot = Math.max(1, Math.floor(Number(slot || currentSlot) || 1));
+    index = Math.max(1, Math.min(AUTO_BACKUP_KEEP, Math.floor(Number(index) || 1)));
+    let idb = (typeof window !== 'undefined') ? window.FB5_IDB_SHADOW : null;
+    if(_autoBackupIdbReady(idb) && typeof idb.getAutoBackup === 'function') {
+        if(_autoBackupRestoreBusy) return false;
+        _autoBackupRestoreBusy = true;
+        idb.getAutoBackup(slot, index).then(function (rec) {
+            _autoBackupRestoreBusy = false;
+            if(!rec) { alert('這份自動備份不存在。'); return; }
+            _autoBackupRestoreRaw(rec.raw, rec, slot);
+        }).catch(function () { _autoBackupRestoreBusy = false; alert('讀取自動備份失敗，請稍後再試。'); });
+        return true;
+    }
+    let key = _autoBackupPrefix(slot) + index;
+    let raw = _lsGet(key);
+    let meta = autoBackupList(slot).find(x => x.index === index);
+    return _autoBackupRestoreRaw(raw, meta, slot);
 }
 function saveGame() {
     // 死亡狀態不寫檔：避免把 player.dead=true 存進去，導致下次讀檔卡在死亡狀態而不出怪。
