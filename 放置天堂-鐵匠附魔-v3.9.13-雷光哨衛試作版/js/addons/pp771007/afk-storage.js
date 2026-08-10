@@ -86,6 +86,18 @@
       '<div class="m-stg-capbar"><div class="m-stg-capbar-fill" style="width:' + Math.min(100, pctCap).toFixed(1) + '%"></div></div>' +
       '</div>';
 
+    var idb = window.FB5_IDB_SHADOW && window.FB5_IDB_SHADOW.getStatus ? window.FB5_IDB_SHADOW.getStatus() : null;
+    if (idb) {
+      var idbClass = idb.state === 'ready' ? 'ok' : ((idb.state === 'failed' || idb.state === 'unsupported' || idb.state === 'degraded') ? 'bad' : 'wait');
+      var idbText = idb.state === 'ready'
+        ? 'IndexedDB 影子備份啟動時已驗證（' + idb.keyCount + ' 筆）；目前仍由 localStorage 正式讀寫。'
+        : (idb.state === 'file-store' ? '打包版使用檔案存檔，不需要 IndexedDB 影子備份。'
+          : (idb.state === 'failed' || idb.state === 'unsupported' || idb.state === 'degraded'
+            ? 'IndexedDB 影子備份未啟用；localStorage 正式存檔不受影響。'
+            : 'IndexedDB 影子備份正在建立與驗證中；localStorage 正式存檔不受影響。'));
+      html += '<div class="m-stg-idb m-stg-idb-' + idbClass + '"><b>資料庫遷移・第一階段</b><br>' + esc(idbText) + '</div>';
+    }
+
     // ⚠️ 未壓縮存檔警示:正常所有存檔都應是「已壓縮(LZ1)」。若有一批停在「未壓縮(SIG1)」,
     //    代表背景壓縮沒生效,同一份資料佔用會膨脹 ~10 倍 → 這才是空間被吃光的元凶。
     if (data.rawChars > 0) {
@@ -130,6 +142,10 @@
     var lines = [];
     lines.push('存檔空間用量  總計 ' + fmtKB(data.total) + '（' + (data.total / CAP_CHARS * 100).toFixed(1) + '% of ~5MB）'
       + (data.rawChars > 0 ? '  未壓縮 ' + fmtKB(data.rawChars) : ''));
+    if (window.FB5_IDB_SHADOW && window.FB5_IDB_SHADOW.getStatus) {
+      var idb = window.FB5_IDB_SHADOW.getStatus();
+      lines.push('IndexedDB phase 1  ' + idb.state + '  verified keys ' + idb.keyCount + '  authoritative ' + idb.authoritative);
+    }
     lines.push('----');
     data.rows.forEach(function (r) {
       var tag = FORM_BADGE[r.form] || r.form || '?';
@@ -223,6 +239,10 @@
       '.m-stg-cap{color:#94a3b8;font-size:12.5px;margin-left:4px;}',
       '.m-stg-capbar{height:8px;background:#1e293b;border-radius:5px;overflow:hidden;margin-top:7px;}',
       '.m-stg-capbar-fill{height:100%;background:linear-gradient(90deg,#22c55e,#eab308,#ef4444);}',
+      '.m-stg-idb{margin:0 0 12px;padding:9px 11px;border-radius:8px;font-size:12.5px;line-height:1.65;}',
+      '.m-stg-idb-ok{background:#052e16;border:1px solid #15803d;color:#bbf7d0;}',
+      '.m-stg-idb-wait{background:#422006;border:1px solid #a16207;color:#fde68a;}',
+      '.m-stg-idb-bad{background:#450a0a;border:1px solid #b91c1c;color:#fecaca;}',
       '.m-stg-warn{margin-top:10px;padding:9px 11px;background:#450a0a;border:1px solid #b91c1c;border-radius:8px;color:#fecaca;font-size:12.5px;line-height:1.7;}',
       '.m-stg-warn b{color:#fca5a5;}',
       /* 儲存形態徽章:壓縮=綠、未壓縮=紅(異常)、明文=灰 */
