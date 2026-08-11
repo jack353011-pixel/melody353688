@@ -47,6 +47,7 @@ function antHelperGuardReductionPercent(magicResistance) {
 function recomputeStats() {
     let p = player, d = p.d, b = p.base, a = p.alloc;
     let _d2 = (typeof d2rEquipTotals === 'function') ? d2rEquipTotals(p) : {};
+    let _d2Combat = (typeof d2rCombatAffixTotals === 'function') ? d2rCombatAffixTotals(p,_d2) : {};
     let _equipMmpPct = Object.values(p.eq || {}).reduce((sum, item) => {
         let def = item && DB.items[item.id], value = Number(def && def.mmpPct);
         return sum + (Number.isFinite(value) ? value : 0);
@@ -722,6 +723,11 @@ d.mr += (baseMr + bonusMr);
         if(pf.spd) spdMult *= (1 / (1 + pf.spd/100));                // 攻速加快%（舊相容欄位）：速度×(1+spd%)，新設定已改速度覆蓋不帶 spd
     }
     if (d.hitstunReduce > 0) d.hitstun = Math.max(0, (d.hitstun || 0) - d.hitstunReduce);   // 🏺 不動的鋼鐵堅壁：硬直減免統一套用點（置於變身速度覆蓋後→變身形態的 pf.stun 也吃減免·夾下限 0）
+    d.fasterHitRecovery = Math.max(0,Number(_d2Combat.fhr)||0);
+    d.fasterCastRate = Math.max(0,Number(_d2Combat.fcr)||0);
+    d.hitstun = d2rHitRecoveryTicks(d.hitstun,d.fasterHitRecovery);   // 先扣固定硬直減免，再套百分比恢復；不碰任何控制狀態計時器
+    d.castLock = d2rCastIntervalWithRate(d.castLock,d.fasterCastRate,false);
+    d.supportCastLock = d2rCastIntervalWithRate(d.supportCastLock,d.fasterCastRate,true);   // 治癒／淨化等輔助施法只吃一半效果
 
     if(p.buffs.sk_soul_up > 0) { p.mhp = Math.floor(p.mhp * 1.2); p.mmp = Math.floor(p.mmp * 1.2); }
     if(_d2.hpp)p.mhp=Math.floor(p.mhp*(1+_d2.hpp/100));if(_d2.mpp)p.mmp=Math.floor(p.mmp*(1+_d2.mpp/100));

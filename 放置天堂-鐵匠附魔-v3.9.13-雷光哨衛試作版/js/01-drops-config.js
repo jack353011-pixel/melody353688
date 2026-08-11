@@ -783,7 +783,7 @@ const D2R_AFFIX_LABEL = {
     str:'力量', dex:'敏捷', con:'體質', int:'智力', wis:'精神', cha:'魅力',
     hp:'HP 上限', mp:'MP 上限', rf:'火屬性抗性', rw:'水屬性抗性', re:'地屬性抗性', ra:'風屬性抗性', rn:'無屬性抗性',
     hpr:'HP 自然恢復量', mpr:'MP 自然恢復量', wt:'負重上限', mf:'物品發現率',
-    as:'攻擊速度', ff:'火焰附傷', fw:'寒冰附傷', fa:'大地附傷', fe:'風雷附傷', ph:'命中回復 HP', pm:'命中回復 MP',
+    as:'攻擊速度', fcr:'施法速度', fhr:'硬直恢復', ff:'火焰附傷', fw:'寒冰附傷', fa:'大地附傷', fe:'風雷附傷', ph:'命中回復 HP', pm:'命中回復 MP',
     ac:'AC', mr:'MR', er:'ER', dr:'傷害減免', mc:'近距離爆擊率', rc:'遠距離爆擊率', gc:'魔法爆擊率',
     mcd:'近距離爆擊傷害', rcd:'遠距離爆擊傷害', gcd:'魔法爆擊傷害', hpp:'HP 上限%', mpp:'MP 上限%', pot:'藥水恢復量', abr:'異常狀態抵抗',
     gf:'金幣取得量', xf:'經驗值取得量', nd:'對一般怪物傷害', bd:'對頭目傷害', kh:'擊殺恢復 HP', km:'擊殺恢復 MP',
@@ -1109,6 +1109,7 @@ const D2R_AFFIX_RANGES = {
     hpr:[[12,16],[8,11],[5,7],[3,4],[1,2]], mpr:[[7,10],[5,7],[3,4],[2,3],[1,1]],
     wt:[[26,35],[20,25],[14,19],[8,13],[4,7]], mf:[[15,20],[11,14],[8,10],[5,7],[2,4]],
     as:[[9,10],[7,8],[5,6],[3,4],[1,2]],
+    fcr:[[8,10],[6,7],[4,5],[3,3],[1,2]], fhr:[[10,12],[8,9],[6,7],[4,5],[2,3]],
     ff:[[25,32],[19,24],[14,18],[9,13],[5,8]], fw:[[25,32],[19,24],[14,18],[9,13],[5,8]],
     fa:[[25,32],[19,24],[14,18],[9,13],[5,8]], fe:[[25,32],[19,24],[14,18],[9,13],[5,8]],
     ph:[[16,20],[12,15],[8,11],[5,7],[2,4]], pm:[[8,10],[6,8],[4,6],[2,4],[1,2]]
@@ -1229,7 +1230,7 @@ function d2rHuntTotals(owner,rawTotals) {
 }
 // 卓越以上的流派詞綴：所有數值先套用強化／耐久實效，再依類別封頂。
 function d2rCombatAffixTotals(owner,rawTotals) {
-    let t=rawTotals||d2rEquipTotals(owner), cap={fpen:30,wpen:30,epen:30,apen:30,sdm:40,bdr:25,und:35,dem:35,dra:35,hsk:30,opn:30,exe:40,pdr:20,mdr:20,ldr:25,adr:25,udr:25,ddr:25,blk:18,mgd:30,rcv:12,sav:20,bar:50,rip:30,ber:35,fmp:30,shp:30,ksh:10,krc:6,kfu:30,frz:35,brn:35,psn:35,bld:35,ctl:30,deb:30,fbr:30,wfr:30,eps:30,wbl:30,fsi:18,wsi:10,esi:18,asi:18}, out={};
+    let t=rawTotals||d2rEquipTotals(owner), cap={fcr:35,fhr:40,fpen:30,wpen:30,epen:30,apen:30,sdm:40,bdr:25,und:35,dem:35,dra:35,hsk:30,opn:30,exe:40,pdr:20,mdr:20,ldr:25,adr:25,udr:25,ddr:25,blk:18,mgd:30,rcv:12,sav:20,bar:50,rip:30,ber:35,fmp:30,shp:30,ksh:10,krc:6,kfu:30,frz:35,brn:35,psn:35,bld:35,ctl:30,deb:30,fbr:30,wfr:30,eps:30,wbl:30,fsi:18,wsi:10,esi:18,asi:18}, out={};
     Object.keys(cap).forEach(k=>out[k]=Math.max(0,Math.min(cap[k],Number(t[k])||0)));
     return out;
 }
@@ -1513,6 +1514,10 @@ function d2rEligibleAffixCodes(def, qualityIndex) {
             (def&&(def.slot==='armor'||def.slot==='helm'))?['hpp']:[],
             (def&&(def.slot==='armor'||def.slot==='helm'||def.slot==='cloak'))?['mpp']:[]);
     if(qualityIndex>=2)pool.push('as','ff','fw','fa','fe','ph','pm','kx','ts','pi','ks');
+    // 速度詞綴只決定擅長的戰鬥節奏，不限制職業使用。施法偏法器／輕裝／首飾，硬直恢復偏重防具／腰鍊。
+    let slot=String(def&&def.slot||'');
+    if(qualityIndex>=2&&(magicWpn||(def&&def.type==='arm'&&['gloves','cloak','tshirt'].includes(slot))||(def&&def.type==='acc'&&['ring','ear','amulet'].includes(slot))))pool.push('fcr');
+    if(qualityIndex>=2&&((def&&def.type==='arm'&&['armor','helm','shield','boots'].includes(slot))||(def&&def.type==='acc'&&['belt','amulet'].includes(slot))))pool.push('fhr');
     if(qualityIndex>=4)pool.push('sp','fh');
     // 技能延伸詞綴只出現在法師可用防具與飾品；核心法杖本身負責啟動流派。
     let req=String(def&&def.req||'');
@@ -1582,9 +1587,9 @@ function d2rRerollSingleAffix(item,index,mode) {
         const skill=new Set(['hy','hd','st','os','cb','mcx','gd','scd','ww','wd','wr','wc','ld','ls','lc','lr','bh','bn','bt','bc','shd','shn','sht','shc','vwd','vwn','vws','vwc','fdd','fdn','fdf','fdc','tjd','tjn','tjs','tjc','med','men','mes','mec','rbd','rbn','rbf','rbc','ard','arn','arc','acd','csd','csn','csp','csc','mzd','mzn','mzt','mzc','trd','trn','trt','trc']);
         const special=new Set(['as','ff','fw','fa','fe','ph','pm','kx','ts','pi','ks','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ber','fmp','shp','ksh','krc','kfu','frz','brn','psn','bld','ctl','deb','fbr','wfr','eps','wbl','fsi','wsi','esi','asi','hy','hd','st','os','cb','mcx','gd','scd','ww','wd','wr','wc','ld','ls','lc','lr','bh','bn','bt','bc','shd','shn','sht','shc','vwd','vwn','vws','vwc','fdd','fdn','fdf','fdc','tjd','tjn','tjs','tjc','med','men','mes','mec','rbd','rbn','rbf','rbc','ard','arn','arc','acd','csd','csn','csp','csc','mzd','mzn','mzt','mzc','trd','trn','trt','trc']),gameplay=new Set(['sp','fh']);
         let specialMax=[0,0,1,1,2,2,3,3][qi],other=rows.filter((r,i)=>i!==index),used=new Set(other.map(r=>r[0]));
-        let specialCount=other.filter(r=>special.has(r[0])).length,gameplayCount=other.filter(r=>gameplay.has(r[0])).length;
+        let specialCount=other.filter(r=>special.has(r[0])||r[0]==='fcr'||r[0]==='fhr').length,gameplayCount=other.filter(r=>gameplay.has(r[0])).length;
         let skillCount=other.filter(r=>skill.has(r[0])).length;
-        let pool=d2rEligibleAffixCodes(def,qi).filter(c=>c!==code&&!used.has(c)&&(!special.has(c)||specialCount<specialMax)&&(!gameplay.has(c)||gameplayCount<1)&&(!skill.has(c)||skillCount<1));
+        let pool=d2rEligibleAffixCodes(def,qi).filter(c=>c!==code&&!used.has(c)&&(!(special.has(c)||c==='fcr'||c==='fhr')||specialCount<specialMax)&&(!gameplay.has(c)||gameplayCount<1)&&(!skill.has(c)||skillCount<1));
         if(!pool.length)return false;code=pool[Math.floor(lootRng('d2-enchant-type')*pool.length)];
     }
     let range=D2R_AFFIX_RANGES[code]&&D2R_AFFIX_RANGES[code][tier-1];if(!range)return false;
@@ -1616,10 +1621,10 @@ function d2rRollAffixes(def, options) {
     let rows = [];
     while (rows.length < count && pool.length) {
         let code = pool.splice(Math.floor(lootRng('d2affix') * pool.length), 1)[0];
-        if (specialCodes.has(code) && specialCount >= specialMax) continue;
+        if ((specialCodes.has(code)||code==='fcr'||code==='fhr') && specialCount >= specialMax) continue;
         if(skillCodes.has(code)&&rows.some(r=>skillCodes.has(r[0])))continue;
         if(gameplayCodes.has(code)&&rows.some(r=>gameplayCodes.has(r[0])))continue;
-        if (specialCodes.has(code)) specialCount++;
+        if (specialCodes.has(code)||code==='fcr'||code==='fhr') specialCount++;
         let tier = d2rRollTier(Number(options.level || (_lootMobInfo && _lootMobInfo.lv)) || 1, qi);
         if (options.bestTier) tier = Math.max(Math.max(1,Math.floor(options.bestTier)), tier);
         if (tier === 1 && t1count >= qdef.t1max) tier = 2;
@@ -1633,6 +1638,8 @@ function d2rAffixText(row) {
     let r = d2rAffixRows({d2:[row]})[0];
     if (!r) return '';
     if (r[0] === 'as') return `攻擊速度 +${r[1]}%`;
+    if (r[0] === 'fcr') return `${D2R_AFFIX_LABEL[r[0]]} +${r[1]}%（縮短施法間隔，不影響技能固有冷卻）`;
+    if (r[0] === 'fhr') return `${D2R_AFFIX_LABEL[r[0]]} +${r[1]}%（縮短直接受擊硬直，不解除控制效果）`;
     if (['ff','fw','fa','fe'].includes(r[0])) return `${D2R_AFFIX_LABEL[r[0]]}：命中 ${9-r[2]}% 追加 ${r[1]} 點傷害`;
     if (r[0] === 'ph' || r[0] === 'pm') return `${D2R_AFFIX_LABEL[r[0]]}：命中 ${9-r[2]}% 回復 ${r[1]}`;
     if(r[0]==='kx')return `擊殺爆炸：一般怪死亡時造成其最大 HP ${r[1]}% 傷害`;
@@ -1751,7 +1758,7 @@ const D2R_NAME_PREFIX = {
     rf:'耐火的', rw:'抗寒的', re:'大地的', ra:'疾風的', rn:'守護的', mf:'幸運的',
     str:'強壯的', dex:'靈巧的', con:'堅韌的', int:'聰慧的', wis:'睿智的', cha:'魅惑的',
     hp:'健壯的', mp:'充能的', hpr:'再生的', mpr:'冥想的', wt:'輕盈的',
-    as:'迅捷的', ff:'燃燒的', fw:'冰封的', fa:'大地震擊的', fe:'風暴的', ph:'汲取的', pm:'聚能的',
+    as:'迅捷的', fcr:'疾詠的', fhr:'穩勢的', ff:'燃燒的', fw:'冰封的', fa:'大地震擊的', fe:'風暴的', ph:'汲取的', pm:'聚能的',
     ac:'堅甲的',mr:'抗魔的',er:'閃避的',dr:'守勢的',mc:'致命的',rc:'神準的',gc:'秘爆的',mcd:'殘酷的',rcd:'穿心的',gcd:'奧秘的',hpp:'巨量生命的',mpp:'巨量魔力的',pot:'療癒的',abr:'不屈的',
     gf:'富饒的',xf:'歷練的',nd:'狩獵的',bd:'弒王的',kh:'收割生命的',km:'收割魔力的',
     kx:'爆裂的',ts:'護壁的',pi:'完美的',ks:'追獵的',sp:'橫掃的',fh:'無傷的',
@@ -1783,7 +1790,7 @@ const D2R_NAME_SUFFIX = {
     hp:'之生命', mp:'之魔力', hpr:'之再生', mpr:'之冥想', wt:'之承載', mf:'之財運',
     md:'之屠戮', rd:'之狙擊', mg:'之奧術', mh:'之準確', rh:'之洞察', gh:'之專注',
     rf:'之烈焰防護', rw:'之寒霜防護', re:'之大地防護', ra:'之風暴防護', rn:'之守護',
-    as:'之迅捷', ff:'之烈焰', fw:'之寒霜', fa:'之震地', fe:'之雷鳴', ph:'之生命汲取', pm:'之魔力汲取',
+    as:'之迅捷', fcr:'之疾詠', fhr:'之穩勢', ff:'之烈焰', fw:'之寒霜', fa:'之震地', fe:'之雷鳴', ph:'之生命汲取', pm:'之魔力汲取',
     ac:'之護甲',mr:'之抗魔',er:'之閃避',dr:'之減傷',mc:'之致命',rc:'之神射',gc:'之魔爆',mcd:'之殘酷',rcd:'之穿心',gcd:'之奧秘',hpp:'之巨量生命',mpp:'之巨量魔力',pot:'之療癒',abr:'之不屈',
     gf:'之財富',xf:'之歷練',nd:'之獵殺',bd:'之弒王',kh:'之生命收割',km:'之魔力收割',
     kx:'之爆裂',ts:'之護壁',pi:'之完美',ks:'之追獵',sp:'之橫掃',fh:'之滿血狩獵',
@@ -1810,8 +1817,8 @@ const D2R_NAME_SUFFIX = {
     mzd:'之馬賽克',mzn:'之廣域終結',mzt:'之凝息',mzc:'之迅終',
     trd:'之雷光哨衛',trn:'之多重電束',trt:'之長鳴',trc:'之迅哨'
 };
-const D2R_PREFIX_PREFERRED = new Set(['as','ff','fw','fa','fe','ph','pm','md','rd','mg','mh','rh','gh','rf','rw','re','ra','rn','mf','fpen','wpen','epen','apen','sdm','und','dem','dra','hsk','opn','exe','ber','fmp','shp','kfu','frz','brn','psn','bld','ctl','deb','fbr','wfr','eps','wbl','fsi','wsi','esi','asi']);
-const D2R_SUFFIX_PREFERRED = new Set(['str','dex','con','int','wis','cha','hp','mp','hpr','mpr','wt','bdr','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ksh','krc']);
+const D2R_PREFIX_PREFERRED = new Set(['as','fcr','ff','fw','fa','fe','ph','pm','md','rd','mg','mh','rh','gh','rf','rw','re','ra','rn','mf','fpen','wpen','epen','apen','sdm','und','dem','dra','hsk','opn','exe','ber','fmp','shp','kfu','frz','brn','psn','bld','ctl','deb','fbr','wfr','eps','wbl','fsi','wsi','esi','asi']);
+const D2R_SUFFIX_PREFERRED = new Set(['str','dex','con','int','wis','cha','hp','mp','hpr','mpr','wt','fhr','bdr','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ksh','krc']);
 function d2rNameAffixes(item) {
     let rows = d2rAffixRows(item).map((r,i) => ({r,i})).sort((a,b) => a.r[2]-b.r[2] || b.r[1]-a.r[1] || a.i-b.i);
     if (!rows.length) return { prefix:'', suffix:'' };
@@ -3368,6 +3375,19 @@ function atkSpdBaseIntervalFromApm(apm) { return Math.round(6000 / Math.max(1, a
 function atkSpdBaseItv(p) { return atkSpdBaseIntervalFromApm(atkSpdApm(p)); }   // 基礎攻擊間隔（秒·2位小數·未含加速/精通等倍率）
 function hitstunTicks(p) { let av = (p && p.avatar && HITSTUN_TICKS[p.avatar]) ? p.avatar : ATK_AV_BY_CLS[(p && p.cls) || '']; return HITSTUN_TICKS[av] != null ? HITSTUN_TICKS[av] : 5; }   // ⚔️ 職業硬直 tick（被擊時延遲攻擊）
 function castLockTicks(p) { let av = (p && p.avatar && CAST_TICKS[p.avatar]) ? p.avatar : ATK_AV_BY_CLS[(p && p.cls) || '']; return CAST_TICKS[av] != null ? CAST_TICKS[av] : 12; }   // 🔮 職業施法冷卻下限 tick
+function d2rHitRecoveryTicks(baseTicks, rate) {
+    let base=Math.max(0,Number(baseTicks)||0),pct=Math.max(0,Math.min(40,Number(rate)||0));
+    if(base<=0||pct<=0)return base;
+    let recovered=base*100/(100+pct);
+    return Math.min(base,Math.max(2.5,recovered));
+}   // 🛡️ 硬直恢復：全身 +40% 封頂，僅縮短直接受擊硬直；不解除暈眩／冰凍等控制，也不把原本 0 硬直加回來。
+function d2rCastIntervalWithRate(baseTicks, rate, support) {
+    let base=Math.max(1,Number(baseTicks)||12),pct=Math.max(0,Math.min(35,Number(rate)||0));
+    if(support)pct*=.5;
+    if(pct<=0)return base;
+    let faster=base*100/(100+pct),floor=support?8:7;
+    return Math.min(base,Math.max(floor,faster));
+}   // 🔮 施法速度：全身 +35% 封頂；輔助施法只吃一半，且不改技能自身 cd。
 function castIntervalTicks(p, support) {
     let key = support ? 'supportCastLock' : 'castLock';
     let v = (p && p.d && p.d[key] != null) ? p.d[key]

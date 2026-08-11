@@ -1217,7 +1217,7 @@ function buildItemDescHTML(item) {
         let _tierText = _best === _worst ? `T${_best}` : `T${_best}～T${_worst}`;
         let _em = typeof d2rEnhanceAffixMult === 'function' ? d2rEnhanceAffixMult(item) : 1, _durm = typeof d2rDurabilityMult === 'function' ? d2rDurabilityMult(item) : 1, _effm = _em * _durm;
         let _effVal = r => {let v=r[1]*_effm;return Number.isInteger(v)?String(v):v.toFixed(1);};
-        let _brief = _d2rows.map(r => {let _v=r[0]==='ac'?`-${_effVal(r)}`:`+${_effVal(r)}${(['mc','rc','gc','mcd','rcd','gcd','hpp','mpp','pot','abr','gf','xf','nd','bd','kx','ts','pi','ks','sp','fh','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ber','fmp','shp','ksh','krc','kfu','frz','brn','psn','bld','ctl','deb','hy','hd','st','gd','scd','ww','wd','wr','wc','ld','ls','lc','lr','bh','bt','bc','med','mes','mec','rbd','rbf','rbc','ard','arc','acd','csd','csp','csc','mzd','mzt','mzc','trd','trt','trc'].includes(r[0])||D2R_ELEMENT_STATUS_PERCENT_CODES.has(r[0]))?'%':''}`;return `<span title="原始：${d2rAffixText(r)}">${D2R_SHORT_LABEL[r[0]] || D2R_AFFIX_LABEL[r[0]]}${_v}<small class="text-emerald-400"> 實效</small><small class="text-slate-500"> T${r[2]}</small></span>`;});
+        let _brief = _d2rows.map(r => {let _v=r[0]==='ac'?`-${_effVal(r)}`:`+${_effVal(r)}${(['fcr','fhr','mc','rc','gc','mcd','rcd','gcd','hpp','mpp','pot','abr','gf','xf','nd','bd','kx','ts','pi','ks','sp','fh','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ber','fmp','shp','ksh','krc','kfu','frz','brn','psn','bld','ctl','deb','hy','hd','st','gd','scd','ww','wd','wr','wc','ld','ls','lc','lr','bh','bt','bc','med','mes','mec','rbd','rbf','rbc','ard','arc','acd','csd','csp','csc','mzd','mzt','mzc','trd','trt','trc'].includes(r[0])||D2R_ELEMENT_STATUS_PERCENT_CODES.has(r[0]))?'%':''}`;return `<span title="原始：${d2rAffixText(r)}">${D2R_SHORT_LABEL[r[0]] || D2R_AFFIX_LABEL[r[0]]}${_v}<small class="text-emerald-400"> 實效</small><small class="text-slate-500"> T${r[2]}</small></span>`;});
         let _briefLines = [];
         for (let _i=0; _i<_brief.length; _i+=3) _briefLines.push(_brief.slice(_i,_i+3).join('｜'));
         desc += `<span class="${_qd.c} font-bold">✦ ${_qd.n}｜${_tierText}｜${_d2rows.length} 詞綴</span><br><span class="d2r-brief">${_briefLines.join('<br>')}</span>`;
@@ -1233,7 +1233,7 @@ function buildItemDescHTML(item) {
             _durBrief = `｜耐久 ${_dn}/${_dm}`;
         }
         let _represent = _d2rows.slice().sort((a,b)=>a[2]-b[2]||b[1]-a[1]).slice(0,2)
-            .map(r=>`${D2R_SHORT_LABEL[r[0]] || D2R_AFFIX_LABEL[r[0]]}${r[0]==='ac'?'-':'+'}${_effVal(r)}${(['mc','rc','gc','mcd','rcd','gcd','hpp','mpp','pot','abr','gf','xf','nd','bd','kx','ts','pi','ks','sp','fh','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ber','fmp','shp','ksh','krc','kfu','frz','brn','psn','bld','ctl','deb','hy','hd','st','gd','scd','ww','wd','wr','wc','ld','ls','lc','lr','bh','bt','bc','med','mes','mec','rbd','rbf','rbc','ard','arc','acd','csd','csp','csc','mzd','mzt','mzc','trd','trt','trc'].includes(r[0])||D2R_ELEMENT_STATUS_PERCENT_CODES.has(r[0]))?'%':''}`).join('｜');
+            .map(r=>`${D2R_SHORT_LABEL[r[0]] || D2R_AFFIX_LABEL[r[0]]}${r[0]==='ac'?'-':'+'}${_effVal(r)}${(['fcr','fhr','mc','rc','gc','mcd','rcd','gcd','hpp','mpp','pot','abr','gf','xf','nd','bd','kx','ts','pi','ks','sp','fh','fpen','wpen','epen','apen','sdm','bdr','und','dem','dra','hsk','opn','exe','pdr','mdr','ldr','adr','udr','ddr','blk','mgd','rcv','sav','bar','rip','ber','fmp','shp','ksh','krc','kfu','frz','brn','psn','bld','ctl','deb','hy','hd','st','gd','scd','ww','wd','wr','wc','ld','ls','lc','lr','bh','bt','bc','med','mes','mec','rbd','rbf','rbc','ard','arc','acd','csd','csp','csc','mzd','mzt','mzc','trd','trt','trc'].includes(r[0])||D2R_ELEMENT_STATUS_PERCENT_CODES.has(r[0]))?'%':''}`).join('｜');
         _compactHead = `<span class="${_qd.c} font-bold">✦ ${_qd.n}｜${_d2rows.length}詞綴</span>` +
             (_rq ? `<span class="text-amber-300">｜Lv.${_rq.level} ${_sn}${_rq.value}</span>` : '') +
             `<span class="text-slate-300">${_em > 1 ? `｜詞綴+${Math.round((_em-1)*100)}%` : ''}${_durBrief}${_socketBrief}</span><br><span class="text-slate-300">代表：${_represent}</span>`;
@@ -1302,8 +1302,9 @@ function buildItemDescHTML(item) {
             if (_apm) _detail.push(`<span class="text-orange-200">攻擊速度: 每分鐘 ${_apm} 次（${player.avatar || '依職業性別'}）</span>`);
             // 🏛️ 天堂動作速度：硬直依職業；施法速度依目前職業／變身 cast，與此武器及攻速加成無關。
             if (typeof hitstunTicks === 'function' && typeof castIntervalTicks === 'function') {
-                let _castTicks = castIntervalTicks(player);
-                _detail.push(`<span class="text-slate-400 text-xs">硬直 ${(hitstunTicks(player)/10).toFixed(1)}秒 · 施法速度每分鐘 ${(600/_castTicks).toFixed(1)} 次（間隔 ${(_castTicks/10).toFixed(1)}秒）</span>`);
+                let _castTicks = castIntervalTicks(player), _hitTicks = player.d && player.d.hitstun != null ? player.d.hitstun : hitstunTicks(player);
+                let _fhr = player.d && player.d.fasterHitRecovery || 0, _fcr = player.d && player.d.fasterCastRate || 0;
+                _detail.push(`<span class="text-slate-400 text-xs">硬直 ${(_hitTicks/10).toFixed(2)}秒${_fhr?`（恢復 +${_fhr.toFixed(_fhr%1?1:0)}%）`:''} · 施法每分鐘 ${(600/_castTicks).toFixed(1)} 次（間隔 ${(_castTicks/10).toFixed(2)}秒${_fcr?`，速度 +${_fcr.toFixed(_fcr%1?1:0)}%`:''}）</span>`);
             }
         }
 
