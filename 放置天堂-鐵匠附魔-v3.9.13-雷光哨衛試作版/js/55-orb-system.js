@@ -398,10 +398,34 @@ function orbPowerText(id,level){
     if(id==='orb_stillwater')return `至少 3 秒未受直接傷害時，下一次直接傷害 -${orbStillWaterPct(lv)}%`;
     return '';
 }
+const ORB_GAMEPLAY_TAGS = {
+    orb_dawn:['滿血','先制'],orb_dusk:['瀕死','處決'],orb_cycle:['四元素','交替施法'],orb_command:['召喚'],orb_void:['無屬性','控場'],
+    orb_storm:['群戰'],orb_challenger:['越級'],orb_berserk:['瀕死','狂戰'],orb_solitude:['單人'],orb_echo:['爆發'],orb_hunter:['掉落'],
+    orb_rhythm:['連擊節奏'],orb_focus:['滿魔'],orb_momentum:['同目標'],orb_bond:['召喚','回魔'],orb_ebb:['低魔'],orb_feint:['切換目標'],
+    orb_vigor:['滿血'],orb_revenge:['受擊反制'],orb_patience:['蓄勢'],orb_iron:['泛用防護'],orb_devour:['元素','吸血'],orb_recovery:['回復'],
+    orb_aegis:['魔法防護'],orb_bastion:['物理防護'],orb_shelter:['召喚','夥伴防護'],orb_laststand:['瀕死','防護'],orb_adapt:['適應防護'],
+    orb_lifeline:['致死保護'],orb_resolve:['控場防護'],orb_stillwater:['蓄勢防護']
+};
+function orbGameplayTags(id){
+    let d=ORB_DEFS[id],out=(ORB_GAMEPLAY_TAGS[id]||[]).slice(),ele=d&&d.ele&&({fire:'火焰',water:'寒冰',earth:'大地',wind:'風雷'}[d.ele]);
+    if(ele)out.unshift(ele);
+    if(d&&d.condition)out.push(d.condition);
+    return [...new Set(out)];
+}
+function orbTagHTML(id,owner){
+    let tags=orbGameplayTags(id),d=ORB_DEFS[id];if(!d||!tags.length)return '';
+    let chips=tags.map(tag=>`<span style="display:inline-flex;padding:1px 5px;margin:1px 3px 1px 0;border-radius:5px;background:rgba(71,85,105,.62);color:#e2e8f0;font-size:.7rem;font-weight:700">[${tag}]</span>`).join('');
+    let eleTag=d.ele&&({fire:'火焰',water:'寒冰',earth:'大地',wind:'風雷'}[d.ele]),status='';
+    if(eleTag&&typeof equipmentBuildTags==='function'){
+        let matched=equipmentBuildTags(owner,['傷害屬性']).includes(eleTag);
+        status=`<span style="margin-left:4px;color:${matched?'#86efac':'#fbbf24'};font-size:.7rem;font-weight:700">${matched?'目前裝備相符':'可使用・目前裝備未含此元素'}</span>`;
+    }
+    return `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:1px">${chips}${status}</div>`;
+}
 function orbRenderPanel(){
     let o=orbEnsure(player),ownedCount=Object.keys(ORB_DEFS).filter(id=>o.owned[id]).length,slotRows=Object.keys(ORB_SLOT_NAME).map(slot=>{
         let x=orbEquipped(player,slot,o);
-        return `<div class="gc-orb-slot"><small>${ORB_SLOT_NAME[slot]}寶珠</small>${x?`<b style="color:${x.def.color}">${x.def.icon} ${x.def.n}</b><span>${ORB_RANK_NAME[x.level]}・Lv.${x.level}</span><button onclick="growthUnequipOrb('${slot}')">卸下</button>`:`<b class="text-slate-400">尚未裝備</b><span>只能裝備${ORB_SLOT_NAME[slot]}類寶珠</span>`}</div>`;
+        return `<div class="gc-orb-slot"><small>${ORB_SLOT_NAME[slot]}寶珠</small>${x?`<b style="color:${x.def.color}">${x.def.icon} ${x.def.n}</b>${orbTagHTML(x.id,player)}<span>${ORB_RANK_NAME[x.level]}・Lv.${x.level}</span><button onclick="growthUnequipOrb('${slot}')">卸下</button>`:`<b class="text-slate-400">尚未裝備</b><span>只能裝備${ORB_SLOT_NAME[slot]}類寶珠</span>`}</div>`;
     }).join('');
     let presetRows=o.presets.map((p,i)=>{
         let equipped=Object.keys(ORB_SLOT_NAME).map(slot=>{let id=p[slot],d=id&&ORB_DEFS[id];return d?`<span style="color:${d.color}">${d.icon} ${d.n}</span>`:'<span class="text-slate-500">空</span>';}).join('');
@@ -409,7 +433,7 @@ function orbRenderPanel(){
     }).join('');
     let cards=Object.keys(ORB_DEFS).map(id=>{
         let d=ORB_DEFS[id],row=o.owned[id],lv=row?row.level:1,equipped=o.equipped[d.slot]===id,cost=row&&lv<ORB_MAX_LEVEL?ORB_UPGRADE_COST[lv]:0;
-        return `<article class="gc-orb-card ${row?'owned':'locked'}"><header><b style="color:${d.color}">${d.icon} ${d.n}</b><small>${ORB_SLOT_NAME[d.slot]}・${row?ORB_RANK_NAME[lv]+' Lv.'+lv:'尚未取得'}</small></header><p>${orbPowerText(id,lv)}</p><details><summary>殘響敘述</summary><p>${d.story}</p></details><div>${row?`<button ${equipped?'disabled':''} onclick="growthEquipOrb('${id}')">${equipped?'裝備中':'裝備'}</button><button ${lv>=ORB_MAX_LEVEL||o.dust<cost?'disabled':''} onclick="growthUpgradeOrb('${id}')">${lv>=ORB_MAX_LEVEL?'已滿級':`升級 ${cost} 粉塵`}</button>`:'<span class="text-slate-500">擊敗頭目或強敵取得</span>'}</div></article>`;
+        return `<article class="gc-orb-card ${row?'owned':'locked'}"><header><b style="color:${d.color}">${d.icon} ${d.n}</b><small>${ORB_SLOT_NAME[d.slot]}・${row?ORB_RANK_NAME[lv]+' Lv.'+lv:'尚未取得'}</small></header>${orbTagHTML(id,player)}<p>${orbPowerText(id,lv)}</p><details><summary>殘響敘述</summary><p>${d.story}</p></details><div>${row?`<button ${equipped?'disabled':''} onclick="growthEquipOrb('${id}')">${equipped?'裝備中':'裝備'}</button><button ${lv>=ORB_MAX_LEVEL||o.dust<cost?'disabled':''} onclick="growthUpgradeOrb('${id}')">${lv>=ORB_MAX_LEVEL?'已滿級':`升級 ${cost} 粉塵`}</button>`:'<span class="text-slate-500">擊敗頭目或強敵取得</span>'}</div></article>`;
     }).join('');
     return `<div class="gc-orbs"><div class="gc-orb-summary"><b>寶珠粉塵：${o.dust.toLocaleString()}</b><span>已收集 ${ownedCount}/${Object.keys(ORB_DEFS).length}・固定三欄；核心負責傷害條件，共鳴調整戰鬥節奏，守護負責生存。</span>${o.trialClaimed?'':'<button onclick="growthClaimTrialOrbs()">領取試作寶珠</button>'}</div><div class="gc-orb-slots">${slotRows}</div><h3>寶珠配置</h3><div class="gc-orb-presets">${presetRows}</div><h3>寶珠收藏</h3><div class="gc-orb-grid">${cards}</div><p class="text-slate-400">前三次擊敗頭目會依序保底核心、共鳴、守護寶珠；之後頭目 12%、強敵 0.2%、一般敵人 0.02%。種類依怪物元素、種族與防禦特性決定；重複寶珠轉為 15 粉塵；連續 4 顆重複後，下一顆優先補未收集種類。寵物與召喚物只讀其召喚者的寶珠；寶珠傷害不會遞迴觸發寶珠。</p></div>`;
 }

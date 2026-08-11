@@ -2479,7 +2479,8 @@ function getPhysicalDmg(diceStr, target, wpn, arrowData, forceHeavy, forceHit, f
     let nearFar = weaponRoll + dmgBonus;
     let _ignHard = !!(_cw && _cw.ignHardSkin);   // 🗡️ 貫穿（暗黑十字弓）：攻擊無視硬皮額外減傷（主攻擊與連射皆走本函式 → 一併涵蓋）
     let _rIgn=((typeof runeEquipTotals==='function'?runeEquipTotals(player):{}).ignoreDef||0)/100;
-    let _rDefense=(target.dr || 0)+(_ignHard?0:mobHardSkin(target));
+    let _sizeBreak=(!player.classicMode&&typeof weaponSizeDefenseBreak==='function')?weaponSizeDefenseBreak(target):0;
+    let _rDefense=Math.max(0,(target.dr || 0)+(_ignHard?0:mobHardSkin(target))-_sizeBreak);
     let inner = Math.floor(nearFar * critMult) + player.d.extraDmg - (Math.floor(_rDefense*(1-_rIgn)) + ((target._siegeDrEnd > state.ticks) ? (target._siegeDrVal || 0) : 0));   // Eth 符文忽略部分一般物理減免／硬皮；攻城固定減傷不受影響。
     inner = Math.max(1, inner);
     if (target._trauma && target._trauma.until > state.ticks) inner += (target._trauma.dmg || 5) * (target._trauma.s || 1);   // 🏺 v3.7.20 創傷（戰士的漆黑之劍）：目標受到的所有物理傷害 +5×層數（玩家物理樞紐·傭兵側 allyStrikeRoll 另掛）
@@ -3139,6 +3140,11 @@ function qiguPlayerAttack(target, wpn) {
     if (typeof reflectWallOnDamage === 'function') reflectWallOnDamage(target, dmg, 'magic', null);   // 🌑 v3.4.14 血壁空間：奇古獸普攻主擊＝魔法反射（玩家傭兵一致）
     if (player.dead) return;   // ☠️ v3.5.87 反射可反殺施放者：死後中止收尾（不結算擊殺/特效 proc·比照 js/04 playerAttack）
     if (target.curHp > 0 && player._setIron5 && typeof ironGuardTaunt === 'function' && ironGuardTaunt(target, player)) logCombat(`<span class="font-bold" style="color:#93c5fd;text-shadow:0 0 6px #3b82f6;">【鐵衛 5/5】</span>嘲諷 <span class="${getMobColor(target.lv)}">${target.n}</span>！（3 秒）`, 'player-special');
+    let _qiguSizeMechanic = (typeof weaponSizeMechanic === 'function') ? weaponSizeMechanic(wpn, target) : null;
+    if (_qiguSizeMechanic && !player.classicMode) {
+        if (_qiguSizeMechanic.effect === 'stagger' && target.curHp > 0 && applyWeaponSizeStagger(target, _qiguSizeMechanic, state.ticks)) logCombat(`<span class="text-violet-200 font-bold">【幻壓】</span>${target.n} 的下一次行動被延後。`, 'player-special');
+        else if (_qiguSizeMechanic.effect === 'focus') { let _mp = applyWeaponSizeFocus(player, _qiguSizeMechanic, state.ticks); if (_mp > 0) { logCombat(`<span class="text-cyan-300 font-bold">【回靈】</span>奇古獸回復 ${_mp} 點 MP。`, 'player-special'); updateUI(); } }
+    }
     logCombat(`<span class="font-bold" style="color:#c4b5fd;text-shadow:0 0 6px #8b5cf6;">【幻術士】</span>奇古獸對 <span class="${getMobColor(target.lv)}">${target.n}</span> 造成 ${dmg} 點魔法傷害。`, 'magic');
     if (target.curHp <= 0) killMob(mapState.targetIdx); else renderMobs();   // 主擊先結算（避免與下方特效各自 killMob 重複擊殺）
     qiguWeaponProc(target, wpn);        // 奇古獸特效（幻影衝擊/心靈破壞；主擊已擊殺則內部 guard 跳過、自行處理擊殺）

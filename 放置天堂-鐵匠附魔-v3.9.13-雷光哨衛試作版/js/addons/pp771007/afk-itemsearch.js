@@ -1,10 +1,10 @@
 /* ============================================================================
- * afk-itemsearch.js — 背包(武器/防具/道具分頁)的「名稱搜尋」
+ * afk-itemsearch.js — 背包(武器/防具/道具分頁)的「名稱／標籤搜尋」
  *
  * 作法:搜尋框放在 #tab-content-panel 層(分頁 div 的「外面」)——核心 renderTabs 只重建各分頁
  *   div 的內容、不動 panel 本身 → 搜尋框永遠是同一顆節點,打字(含中文組字)不會被戰鬥掉寶/裝備
  *   刷新的重繪打斷。三個分頁共用同一個關鍵字;只在 武器/防具/道具 分頁顯示。
- * 過濾:比對列的 textContent(含名稱/詞綴/強化值,子字串命中即顯示),純顯示層、不動遊戲資料。
+ * 過濾:比對列的 textContent(含名稱/詞綴/強化值)及 data-equipment-tags(分層裝備標籤),純顯示層、不動遊戲資料。
  *   ⚠ 隱藏一律 style.setProperty('display','none','important')——條列式外掛(afk-invlist)給每列
  *   display:flex !important,一般 inline display:none 會被壓過(=搜尋看起來沒作用,踩過)。
  * 列的位置:上游 1.8 皮膚把列放在 .classic-inventory-viewport 內層,先找它、沒有才退回分頁 div。
@@ -43,7 +43,8 @@
       var el = container.children[i];
       if (el.id === 'afk-isearch') continue;
       if (el.classList.contains('classic-list-toolbar')) continue;   // 快速操作頭部不過濾
-      if (!kw || norm(el.textContent).indexOf(kw) >= 0) el.style.removeProperty('display');
+      var searchable = norm(el.textContent + ' ' + (el.dataset.equipmentTags || ''));
+      if (!kw || searchable.indexOf(kw) >= 0) el.style.removeProperty('display');
       else el.style.setProperty('display', 'none', 'important');     // !important:蓋過條列式的 display:flex !important
     }
   }
@@ -69,7 +70,7 @@
     box.id = 'afk-isearch';
     var inp = document.createElement('input');
     inp.id = 'afk-isearch-input'; inp.type = 'search'; inp.autocomplete = 'off';
-    inp.placeholder = '🔍 搜尋名稱…(武/防/道具共用)';
+    inp.placeholder = '🔍 搜尋名稱／裝備標籤…';
     inp.addEventListener('input', function () { q = inp.value; filterAll(); });
     box.appendChild(inp);
     panel.insertBefore(box, panel.firstElementChild);   // 分頁 div 外面:核心重繪不會碰到
@@ -102,7 +103,7 @@
   injectCss();
   ensureBox();
   if (typeof window.renderTabs === 'function') {
-    console.log('[AFK-itemsearch] hooks OK — 背包(武/防/道)分頁支援名稱搜尋。');
+    console.log('[AFK-itemsearch] hooks OK — 背包(武/防/道)分頁支援名稱／分層裝備標籤搜尋。');
   } else {
     console.warn('[AFK-itemsearch] 找不到 renderTabs,名稱搜尋停用。');
   }

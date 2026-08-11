@@ -767,19 +767,30 @@ function trialStageItemHeldActiveFor(owner, id, pending, assignedOnly) {
     let held = assignedOnly ? 0 : (owner.inv || []).filter(i => i && i.id === id).reduce((s, i) => s + (i.cnt || 0), 0);
     return held + Math.max(0, Math.floor(Number(pending) || 0)) < (stage.cnt || 1);
 }
+function trialQuestTagRules(cfg) {
+    let rules = [];
+    if (cfg && cfg.actorTagRule) rules.push(cfg.actorTagRule);
+    if (cfg && Array.isArray(cfg.actorTagRules)) rules.push(...cfg.actorTagRules);
+    if (cfg && cfg.cls) rules.push({ all:[classLineageTag(cfg.cls)], scope:'角色' });   // 舊職業欄位只作遷移橋梁
+    return rules;
+}
+function trialQuestTagsAllow(owner, cfg) {
+    let snapshot = characterQualificationTagSnapshot(owner);
+    return trialQuestTagRules(cfg).every(rule => snapshot.match(rule, rule.scope ? { scope:rule.scope } : null).matched);
+}
 // 試煉道具目前是否「可取得」：主玩家看持有量；隊員看隊長端分配進度。
 function trialItemActiveFor(owner, id, pending, assignedOnly) {
     if (!owner) return false;
     let ks = TRIAL_ITEM_Q[id];
     if (ks) return ks.some(k => {
         let c = TRIAL_Q[k];
-        if (owner.cls !== c.cls || trialQStateFor(owner, k) !== 1) return false;
+        if (!trialQuestTagsAllow(owner, c) || trialQStateFor(owner, k) !== 1) return false;
         let r = c.reqs.find(p => p[0] === id);
         return questCountForOwner(owner, id, pending, assignedOnly) < r[1];
     });
     let t = TRIAL50_ITEM[id];
     if (t) {
-        if (owner.cls !== t.cls) return false;
+        if (!trialQuestTagsAllow(owner, t)) return false;
         let cfg = (typeof TRIAL_50_CFG !== 'undefined') && TRIAL_50_CFG[owner.cls]; if (!cfg) return false;
         let st = owner.trialStage || 0, n = t.need || 1;
         if (t.ex) return st === cfg.stages.length + 1 && questCountForOwner(owner, id, pending, assignedOnly) < n;   // 最終兌換階段（未完成·未達量）
@@ -792,7 +803,7 @@ function trialForced100(id) { return !!(TRIAL_ITEM_Q[id] || TRIAL50_ITEM[id]); }
 function _trialRerender(rr) { let _c = document.getElementById('interaction-content'); let f = rr && window[rr]; if (_c && typeof f === 'function') f(_c); else closeNpcInteraction(); }
 // 產生單一試煉區塊 HTML（rr＝重繪函式名）
 function trialQHTML(key, rr) {
-    let c = TRIAL_Q[key]; if (!c || player.cls !== c.cls) return '';
+    let c = TRIAL_Q[key]; if (!c || !trialQuestTagsAllow(player, c)) return '';
     let st = trialQState(key);
     let h = `<div class="mb-2 p-3 bg-slate-800/60 rounded border border-slate-700"><div class="text-amber-300 font-bold text-sm">⚔️ ${c.lv} 級試煉</div>`;
     if (st === 2) return h + `<div class="text-emerald-400 text-sm mt-1">✅ 已完成（每個角色僅能完成一次）。</div></div>`;
@@ -812,7 +823,7 @@ function trialQHTML(key, rr) {
 }
 function trialQAccept(key, rr) {
     let c = TRIAL_Q[key];
-    if (!c || player.cls !== c.cls || (player.lv || 1) < c.lv || trialQState(key) !== 0) return;
+    if (!c || !trialQuestTagsAllow(player, c) || (player.lv || 1) < c.lv || trialQState(key) !== 0) return;
     if (typeof currentRoleIsMercenary === 'function' && currentRoleIsMercenary()) { logSys('<span class="text-amber-300">此角色正在擔任傭兵，請由隊長在傭兵公會接取試煉。</span>'); return; }
     if (!player.trialQ || typeof player.trialQ !== 'object') player.trialQ = {};
     player.trialQ[key] = 1;
@@ -821,7 +832,7 @@ function trialQAccept(key, rr) {
 }
 function trialQComplete(key, rr) {   // 🚫 v3.2.16 移除席琳完成：原第 3 參 sherine（耗結晶必附套裝詞綴）廢止
     let c = TRIAL_Q[key];
-    if (!c || player.cls !== c.cls || trialQState(key) !== 1) return;
+    if (!c || !trialQuestTagsAllow(player, c) || trialQState(key) !== 1) return;
     if (typeof currentRoleIsMercenary === 'function' && currentRoleIsMercenary()) { logSys('<span class="text-amber-300">此角色正在擔任傭兵，請由隊長在傭兵公會交付試煉道具並領取獎勵。</span>'); return; }
     if (!c.reqs.every(p => questCountId(p[0]) >= p[1])) { logSys('試煉道具尚未備齊。' + (typeof lockHintHtml === 'function' ? lockHintHtml(c.reqs.map(p => p[0])) : '')); return; }   // 🔒 v3.5.87 差額若在鎖定件·明講
     c.reqs.forEach(p => questConsumeId(p[0], p[1]));
@@ -835,11 +846,11 @@ function trialQComplete(key, rr) {   // 🚫 v3.2.16 移除席琳完成：原第
 }
 
 function renderRickyQuest(div) {
-    if (player.cls !== 'knight') { div.innerHTML = `<div class="p-6 text-red-400">瑞奇：這是專屬於騎士的榮耀試煉，請回吧。</div>`; return; }
+    if (!characterHasTag(player, classLineageTag('knight'), {scope:'角色'})) { div.innerHTML = `<div class="p-6 text-red-400">瑞奇：這是專屬於騎士的榮耀試煉，請回吧。</div>`; return; }
     div.innerHTML = `<div class="p-4 text-slate-300 leading-relaxed"><div class="text-amber-300 font-bold mb-3">🛡️ 瑞奇的試煉</div>` + trialQHTML('knight15', 'renderRickyQuest') + `</div>`;
 }
 function renderJamesQuest(div) {
-    if (player.cls !== 'mage') { div.innerHTML = `<div class="p-6 text-red-400">詹姆：這是不死族的黑暗試煉，只有法師能夠參與。</div>`; return; }
+    if (!characterHasTag(player, classLineageTag('mage'), {scope:'角色'})) { div.innerHTML = `<div class="p-6 text-red-400">詹姆：這是不死族的黑暗試煉，只有法師能夠參與。</div>`; return; }
     div.innerHTML = `<div class="p-4 text-slate-300 leading-relaxed"><div class="text-amber-300 font-bold mb-3">🔮 詹姆的試煉</div>` + trialQHTML('mage15', 'renderJamesQuest') + `</div>`;
 }
 

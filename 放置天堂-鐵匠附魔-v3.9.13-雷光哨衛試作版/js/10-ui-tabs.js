@@ -312,6 +312,7 @@ player.inv.forEach(i => {
     // className 這裡移除了 isDisabled 相關的判定，讓所有項目都可以互動
     el.className = `list-item tip-host text-base ${itemBg} rounded mb-1 ${i.lock ? 'border-red-900 border-2' : ''}`;
     el.setAttribute('data-tip-uid', i.uid); el.setAttribute('data-tip-src', 'inv');   // 🖱️ hover 即時顯示完整物品資訊 tooltip（同技能·取代原生 title 慢速提示）
+    if (['wpn','arm','acc'].includes(d.type) && !d.isArrow && typeof equipmentTags === 'function') el.dataset.equipmentTags = equipmentTags(i).join(' ');   // 🗂️ v3.9.29：分層裝備標籤只進搜尋索引，不改背包列高
     if (i.lock) el.classList.add('classic-item-locked');
     else if (i.junk) el.classList.add('classic-item-junk');
     
@@ -769,6 +770,244 @@ function weaponPurposeLabels(d) {
     return out;
 }
 
+// 🏷️ 武器技能流派標籤（v3.9.29 第一階段）
+// 只由既有武器資料「推導」分類，不寫回 item / DB、不參與傷害與觸發率計算，因此舊存檔完全相容。
+// 後續寶石、符文、符文組、寶珠與火炬若要支援流派，統一讀 equipmentTagProfile(item).layers／allTags。
+const WEAPON_SKILL_TAG_ELE = { fire:'火焰', water:'寒冰', wind:'風雷', earth:'大地', none:'無屬性', normal:'物理' };
+const WEAPON_SKILL_TAG_COLORS = {
+    '近戰':['#fecaca','#7f1d1d'], '遠程':['#bbf7d0','#14532d'], '魔法':['#ddd6fe','#4c1d95'], '物理':['#e2e8f0','#334155'],
+    '火焰':['#fdba74','#7c2d12'], '寒冰':['#bae6fd','#0c4a6e'], '風雷':['#fde68a','#713f12'], '大地':['#d9f99d','#365314'], '無屬性':['#e9d5ff','#581c87']
+};
+function weaponSkillTagProfile(itemOrId) {
+    let item = typeof itemOrId === 'string' ? { id:itemOrId } : (itemOrId || {});
+    let d = DB.items[item.id];
+    if (!d || d.type !== 'wpn' || d.isArrow) return { version:1, primary:[], allTags:[], sources:[], family:'' };
+
+    let entries = new Map(), sources = [];
+    const add = (label, category, priority) => {
+        if (!label) return;
+        let old = entries.get(label);
+        if (!old || priority > old.priority) entries.set(label, { label, category, priority });
+    };
+    const source = text => { if (text && !sources.includes(text)) sources.push(text); };
+    const addEle = (ele, priority) => add(WEAPON_SKILL_TAG_ELE[ele] || '', 'element', priority || 70);
+    const addSkill = (skId, triggerLabel, priority) => {
+        let sk = DB.skills && DB.skills[skId];
+        if (!sk) return;
+        if (sk.dmgType === 'magic') add('魔法', 'combat', 75);
+        else if (sk.dmgType === 'physical') add('物理', 'element', 65);
+        addEle(sk.ele, priority || 78);
+        if (sk.target === 'all' || sk.aoe) add('範圍', 'mechanic', 64);
+        if (sk.status || sk.kind === 'status') add('異常', 'mechanic', 66);
+        source(`${sk.n || skId}（${triggerLabel}）`);
+    };
+
+    let family = typeof atkSpdFamily === 'function' ? (atkSpdFamily(item.id) || '') : '';
+    let tags = typeof getWeaponTags === 'function' ? getWeaponTags(item.id) : [];
+    if (family) add(family, 'family', 45);
+    if (d.isBow || d.ranged || family === '弓' || family === '十字弓') add('遠程', 'combat', 100);
+    else if (d.qigu) add('魔法', 'combat', 100);
+    else add('近戰', 'combat', 100);
+
+    let attr = typeof getAttrAffix === 'function' ? getAttrAffix(item.attr) : null;
+    let baseEle = (attr && attr.ele) || d.ele;
+    addEle(baseEle || (d.qigu ? 'none' : 'normal'), 72);
+
+    // 武器種類本身帶來的既有技能；標籤只描述來源，不另外授予第二份效果。
+    if (typeof weaponHasBleed === 'function' && weaponHasBleed(item.id)) { add('出血', 'mechanic', 72); source(`${family || '武器'}特性：出血`); }
+    if (tags.includes('單手劍')) { add('反擊', 'mechanic', 73); source('單手劍特性：反擊'); }
+    if (tags.includes('武士刀')) { add('居合', 'mechanic', 76); source('武士刀特性：居合'); }
+    if (tags.includes('單手鈍器')) { add('鈍擊', 'mechanic', 70); source('單手鈍器特性：鈍擊'); }
+    if (tags.includes('雙刀')) { add('雙刃', 'mechanic', 71); source('雙刀特性：雙刃'); }
+    if (tags.includes('鋼爪')) { add('重擊', 'mechanic', 71); source('鋼爪特性：重擊'); }
+    if (typeof WAND_LIGHTARROW_IDS !== 'undefined' && WAND_LIGHTARROW_IDS.includes(item.id)) {
+        add('魔法', 'combat', 80); add('攻擊施法', 'mechanic', 82); source('光箭（魔杖共鳴）');
+    }
+
+    const effTags = {
+        pierce:['穿透',76], moonburst:['攻擊施法',81], dice_death:['即死',83], haste:['加速',68],
+        crush:['重擊',78], cleave:['切割',76], combo:['連擊',80], magicstrike:['魔擊',80], magicburst:['魔爆',82], mp_drain:['回魔',73]
+    };
+    if (effTags[d.eff]) { add(effTags[d.eff][0], 'mechanic', effTags[d.eff][1]); source(`武器特效：${effTags[d.eff][0]}`); }
+    if (d.rapidfire) { add('連射', 'mechanic', 80); source('武器特效：連射'); }
+    if (d.weakExpose) { add('弱點', 'mechanic', 79); source('鎖鏈劍特性：弱點曝光'); }
+    if (typeof weaponSizeMechanicEntries === 'function') weaponSizeMechanicEntries(d).forEach(entry => {
+        add(entry.meta.tag, 'mechanic', 74);
+        source(`對${entry.size}：${entry.meta.n}`);
+    });
+    if (d.ignHardSkin) add('貫穿', 'mechanic', 67);
+    if (d.vampPct) { add('吸血', 'mechanic', 78); source('武器特效：吸取HP'); }
+    if (d.procPoison || d.procPoisonPct || d.procPoisonRate || d.procBurn || d.procStatus || d.procStatusSkill) add('異常', 'mechanic', 77);
+    if (d.procBurn) addEle('fire', 84);
+    if (d.onHitEleDmg) { addEle(d.onHitEleDmg.ele, 82); add('命中附傷', 'mechanic', 79); source('武器特效：命中附傷'); }
+
+    if (d.spellProc) {
+        add('攻擊施法', 'mechanic', 90); add('魔法', 'combat', 78); addEle(d.spellProc.ele, 90);
+        if (d.spellProc.aoe) add('範圍', 'mechanic', 69);
+        if (d.spellProc.status || d.spellProc.burnDot) add('異常', 'mechanic', 76);
+        if (d.spellProc.heal) add('吸血', 'mechanic', 78);
+        source(`${d.spellProc.skn || '附加法術'}（攻擊施法）`);
+    }
+    if (d.meleeHitSpell) {
+        add('命中施法', 'mechanic', 92); add('魔法', 'combat', 78); addEle(d.meleeHitSpell.ele, 90);
+        if (d.meleeHitSpell.freezePbase || d.meleeHitSpell.status) add('異常', 'mechanic', 76);
+        source(`${d.meleeHitSpell.skn || '附加法術'}（命中施法）`);
+    }
+    if (d.procSkill) {
+        let trigger = d.procOnHit ? '命中施法' : '攻擊施法';
+        add(trigger, 'mechanic', d.procOnHit ? 92 : 90); addSkill(d.procSkill, trigger, 90);
+    }
+    if (d.procSkill2 && d.procSkill2.skId) { add('攻擊施法', 'mechanic', 89); addSkill(d.procSkill2.skId, '攻擊施法', 89); }
+    if (d.grantSkills && d.grantSkills.length) {
+        add('固有技能', 'mechanic', 94);
+        d.grantSkills.forEach(skId => addSkill(skId, '裝備授予', 86));
+    }
+    if (d.skillDmgMult || d.classSkillMult > 1) { add('技能增幅', 'mechanic', 86); source('武器能力：技能增幅'); }
+    if (d.hellfireProc) { add('傷害觸發', 'mechanic', 86); addEle('fire', 88); source('地獄火焰（傷害觸發）'); }
+
+    const coreNames = {
+        vanderShockwave:'范德震地', frostDragonChase:'冰龍追擊', mindEcho:'心靈共振',
+        riftBurst:'裂界衝擊', multiArrowRain:'多重箭雨', thunderJavelin:'雷霆標槍'
+    };
+    if (d.core) { add('技能延伸', 'mechanic', 96); source(`${coreNames[d.core] || d.core}（武器核心）`); }
+
+    let values = [...entries.values()];
+    const top = category => values.filter(x => x.category === category).sort((a,b) => b.priority - a.priority || a.label.localeCompare(b.label))[0];
+    let primary = [top('combat'), top('element'), top('mechanic')].filter(Boolean).map(x => x.label);
+    primary = [...new Set(primary)].slice(0, 3);
+    let allTags = values.sort((a,b) => b.priority - a.priority || a.label.localeCompare(b.label)).map(x => x.label);
+    return { version:1, primary, allTags, sources:sources.slice(0, 4), family };
+}
+function weaponSkillTags(itemOrId) { return weaponSkillTagProfile(itemOrId).allTags; }
+function weaponSkillTagEsc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function weaponSkillTagHTML(item) {
+    let p = weaponSkillTagProfile(item);
+    if (!p.primary.length) return '';
+    let chips = p.primary.map(tag => {
+        let colors = WEAPON_SKILL_TAG_COLORS[tag] || ['#cbd5e1','#334155'];
+        return `<span style="display:inline-flex;align-items:center;padding:2px 7px;margin:2px 3px 2px 0;border:1px solid ${colors[0]}66;border-radius:999px;background:${colors[1]}99;color:${colors[0]};font-size:.78rem;font-weight:700;line-height:1.35;white-space:nowrap">${weaponSkillTagEsc(tag)}</span>`;
+    }).join('');
+    let sourceText = p.sources.length ? `<div style="margin-top:3px;color:#94a3b8;font-size:.75rem;line-height:1.35;overflow-wrap:anywhere">來源：${p.sources.map(weaponSkillTagEsc).join('／')}</div>` : '';
+    return `<div class="weapon-skill-tags" style="margin:6px 0 2px;padding:6px 8px;border-left:3px solid #b89243;background:rgba(15,23,42,.55);border-radius:4px"><div style="color:#fcd34d;font-size:.78rem;font-weight:700">武器流派（分類）</div><div style="margin-top:2px">${chips}</div>${sourceText}<div style="margin-top:2px;color:#64748b;font-size:.68rem">標籤只作分類與搜尋，不重複計算技能效果。</div></div>`;
+}
+
+// 🗂️ 分層裝備標籤：每層彼此獨立。標籤決定「擅長／可被加成」，不決定技能能不能使用。
+const EQUIPMENT_SLOT_TAG = {
+    helm:'頭盔', armor:'胸甲', tshirt:'內衣', cloak:'斗篷', gloves:'手套', boots:'長靴', shin:'脛甲', shield:'盾牌',
+    ring:'戒指', ear:'耳環', amulet:'項鍊', belt:'腰帶', charm:'大型護符', doll:'魔法娃娃', arrow:'箭矢'
+};
+function equipmentTagProfile(itemOrId) {
+    let item = typeof itemOrId === 'string' ? { id:itemOrId } : (itemOrId || {}), d = DB.items[item.id];
+    if (!d || !['wpn','arm','acc'].includes(d.type) || d.isArrow) return { version:1, layers:[], allTags:[] };
+    let layers = [], addLayer = (name, values) => {
+        values = [...new Set((values || []).filter(Boolean))];
+        if (values.length) layers.push({ name, tags:values });
+    };
+
+    addLayer('裝備部位', [d.type === 'wpn' ? '武器' : (EQUIPMENT_SLOT_TAG[d.slot] || (d.type === 'arm' ? '防具' : '飾品'))]);
+    addLayer('固有標籤', tagCoreList(d.tags));
+
+    let wp = d.type === 'wpn' ? weaponSkillTagProfile(item) : null;
+    if (wp) {
+        let family = wp.family || '', kind = '';
+        if (/劍/.test(family) && family !== '鎖鏈劍') kind = '劍';
+        else if (/弓/.test(family)) kind = '弓';
+        else if (family === '魔杖') kind = '法杖';
+        else if (/矛/.test(family)) kind = '長柄';
+        else if (/鈍器/.test(family)) kind = '鈍器';
+        else kind = family;
+        addLayer('武器種類', [kind, family !== kind ? family : '']);
+        addLayer('操作特性', [d.w2h ? '雙手' : '單手', (d.isBow || d.ranged) ? '遠程' : '近戰']);
+        const damageSet = new Set(['物理','魔法','火焰','寒冰','風雷','大地','無屬性']);
+        const familySet = new Set([family,kind,'近戰','遠程']);
+        addLayer('傷害屬性', wp.allTags.filter(x => damageSet.has(x)));
+        addLayer('武器技能', wp.allTags.filter(x => !damageSet.has(x) && !familySet.has(x)));
+    } else {
+        let defenseEles = [];
+        if (d.resFire) defenseEles.push('火焰'); if (d.resWater) defenseEles.push('寒冰');
+        if (d.resWind) defenseEles.push('風雷'); if (d.resEarth) defenseEles.push('大地'); if (d.resNone) defenseEles.push('無屬性');
+        addLayer('防護屬性', defenseEles);
+    }
+
+    let nature = [], n = d.n || '', lore = `${d.n || ''} ${d.d || ''}`;
+    if (d.type === 'arm') {
+        if (/金屬|鋼鐵|鐵盔|鏈甲|環甲|鱗甲|板甲|盔甲|鎧/.test(n)) nature.push('重型');
+        else if (/皮|藤|木|夾克|背心|輕/.test(n)) nature.push('輕型');
+        else if (/布|綿|袍|T恤|斗篷|披肩|床單/.test(n)) nature.push('布甲');
+    }
+    if (d.unique) nature.push('唯一');
+    if (d.set) nature.push('套裝');
+    addLayer('裝備性質', nature);
+
+    // 世界觀標籤只採資料名稱／背景中明確出現的詞，不由強度或職業限制猜測，避免亂貼故事標籤。
+    let world = [];
+    if (/龍族|龍鱗|飛龍|巨龍|龍王/.test(lore)) world.push('龍族');
+    if (/王室|皇家|王族|王冠|王子|公主/.test(lore)) world.push('王室');
+    if (/古代|上古|太古/.test(lore)) world.push('古代');
+    if (/詛咒|咒術|咒文|怨念|惡靈/.test(lore)) world.push('詛咒');
+    if (/精靈|靈魂|元素之力/.test(lore)) world.push('精靈');
+    ['拉斯塔巴德','底比斯','日出之國','象牙塔'].forEach(tag => { if (lore.includes(tag)) world.push(tag); });
+    addLayer('世界觀標籤', world);
+
+    let boost = [];
+    if (d.classSkillMult > 1) boost.push('本職技能');
+    if (d.skillDmgMult) boost.push('指定技能');
+    if (d.grantSkills && d.grantSkills.length) boost.push('授予技能');
+    if (d.hellfireProc) boost.push('傷害觸發','火焰');
+    addLayer('增幅目標', boost);
+
+    let origin = [];
+    if (item.d2q && typeof d2rQualityDef === 'function') origin.push(d2rQualityDef(item.d2q).n);
+    if (d.legend) origin.push('傳說');
+    if (d.relic) origin.push('遺物');
+    if (!item.d2q && !d.legend && !d.relic) origin.push('普通');
+    if (d.set) origin.push('套裝');
+    if (d.slot === 'charm' && /地獄火炬/.test(n)) origin.push('火炬');
+    let sockets = typeof equipSocketRows === 'function' ? equipSocketRows(item).filter(Boolean) : [];
+    if (sockets.some(x => x.kind === 'gem')) origin.push('寶石');
+    if (sockets.some(x => x.kind === 'rune')) origin.push('符文');
+    if (typeof activeRuneword === 'function' && activeRuneword(item)) origin.push('符文之語');
+    addLayer('品質／來源', origin);
+
+    return { version:1, layers, allTags:[...new Set(layers.flatMap(x => x.tags))] };
+}
+function equipmentTags(itemOrId) { return equipmentTagProfile(itemOrId).allTags; }
+function equipmentBuildTags(owner, layerNames) {
+    if (!owner || !owner.eq) return [];
+    let wanted = Array.isArray(layerNames) && layerNames.length ? new Set(layerNames) : null;
+    return [...new Set(Object.values(owner.eq).filter(Boolean).flatMap(item => {
+        let p = equipmentTagProfile(item);
+        return p.layers.filter(layer => !wanted || wanted.has(layer.name)).flatMap(layer => layer.tags);
+    }))];
+}
+// 裝備介面的相容包裝；真正判定由 00-tag-core.js 的 tagRuleMatch 統一負責。
+function equipmentTagRuleMatch(itemOrTags, rule) {
+    let match = tagRuleMatch(Array.isArray(itemOrTags) ? itemOrTags : equipmentTags(itemOrTags), rule);
+    return Object.assign(match, { anyMatched:!tagCoreList((rule || {}).any).length || match.anyHits.length > 0 });
+}
+function equipmentTagRuleHTML(itemOrTags, rule) {
+    let m = equipmentTagRuleMatch(itemOrTags, rule), wanted = [...new Set(rule.display || [...(rule.all || []), ...(rule.any || [])])];
+    let wantedText = wanted.length ? wanted.map(tag => `[${weaponSkillTagEsc(tag)}]`).join('') : '[泛用]';
+    let color = m.matched ? '#86efac' : '#fbbf24', state = m.matched ? '標籤相符' : '可使用・目前非主流';
+    return `<span style="color:${color};font-size:.72rem;font-weight:700">${state} ${wantedText}</span>`;
+}
+function equipmentTagHTML(item) {
+    let p = equipmentTagProfile(item);
+    if (!p.layers.length) return '';
+    const chip = tag => `<span style="display:inline-flex;align-items:center;margin:1px 3px 1px 0;padding:1px 5px;border-radius:5px;background:rgba(71,85,105,.62);color:#e2e8f0;font-size:.73rem;font-weight:700;line-height:1.45;white-space:nowrap">[${weaponSkillTagEsc(tag)}]</span>`;
+    let rows = p.layers.map(layer => `<div style="display:grid;grid-template-columns:5.3rem minmax(0,1fr);gap:5px;padding:3px 0;border-top:1px solid rgba(100,116,139,.18)"><span style="color:#cbd5e1;font-size:.72rem;font-weight:700;white-space:nowrap">${weaponSkillTagEsc(layer.name)}</span><span style="min-width:0;line-height:1.25">${layer.tags.map(chip).join('')}</span></div>`).join('');
+    return `<div class="equipment-tag-layers" style="margin:6px 0 3px;padding:7px 8px;border:1px solid rgba(184,146,67,.55);background:rgba(15,23,42,.62);border-radius:6px"><div style="color:#fcd34d;font-size:.8rem;font-weight:800;margin-bottom:3px">裝備標籤</div>${rows}<div style="margin-top:4px;color:#94a3b8;font-size:.68rem;line-height:1.35">能力與適配由標籤互相判定；既有裝備限制由相容層保留，原有武器技能仍獨立生效。</div></div>`;
+}
+
+// 👹 怪物標籤與裝備標籤分開：階級、體型、種族各自一層，供剋星／首領傷害／體型專攻獨立判斷。
+function monsterTagProfile(mob) {
+    if (!mob) return { version:1, layers:[], allTags:[] };
+    let rank = mob.boss ? '首領' : '一般';
+    let size = mob.s === 'L' ? '大型' : (mob.s === 'S' ? '小型' : '中型');
+    let layers = [{name:'階級',tags:[rank]},{name:'體型',tags:[size]},{name:'種族',tags:[mob.race || '未知']}];
+    return { version:1, layers, allTags:layers.flatMap(x => x.tags) };
+}
+
 // 🏺 遺物用途摘要：補足舊遺物只有背景敘述、玩家看不出實際用途的問題。
 // 僅整理「一般特效列尚未涵蓋」的遺物專屬欄位；背包、裝備欄與圖鑑 tooltip 共用。
 function relicPurposeLabels(d) {
@@ -1142,8 +1381,9 @@ function buildItemDescHTML(item) {
     if (d.type === 'wpn' || d.type === 'arm' || d.type === 'acc') {
         let _eff = [];
         if (d.unBonus) _eff.push('不死／狼人加成（額外造成1D20傷害）');   // 🧹 v3.5.87 #128：unDice / sp:'elf' 全 DB.items 零定義（恆假死運算元）→ 只留 unBonus
-        if (d.eff === 'pierce')     _eff.push('穿透 ' + (d.pierceChance !== undefined ? d.pierceChance : 100) + '%（命中後追加攻擊另一名敵人）');
-        if (d.alsoPierce)           _eff.push('穿透 ' + (d.pierceChance !== undefined ? d.pierceChance : 100) + '%（命中後追加攻擊另一名敵人）');   // 主特效槽被占用時仍可附帶「穿透」；與無視硬皮的「貫穿」不同
+        let _prototypeOwnsPierce = typeof weaponPrototypeSuppressesLegacyEffect === 'function' && weaponPrototypeSuppressesLegacyEffect(d, '中型', 'pierce');
+        if (d.eff === 'pierce' && !_prototypeOwnsPierce) _eff.push('穿透 ' + (d.pierceChance !== undefined ? d.pierceChance : 100) + '%（命中後追加攻擊另一名敵人）');
+        if (d.alsoPierce && !_prototypeOwnsPierce) _eff.push('穿透 ' + (d.pierceChance !== undefined ? d.pierceChance : 100) + '%（命中後追加攻擊另一名敵人）');   // 原型政策武器改由體型規則顯示，避免舊穿透文字掩蓋犧牲結果
         if (d.eff === 'moonburst')  _eff.push('月光爆裂（命中時8%造成1D30＋強化×2風屬性魔法傷害·受魔法傷害公式與MR影響）');
         if (d.eff === 'dice_death') _eff.push('即死（命中時1%使非首領目標死亡）');
         if (d.eff === 'haste')      _eff.push('自我加速（裝備時常駐加速）');
@@ -1151,6 +1391,8 @@ function buildItemDescHTML(item) {
         if (d.eff === 'cleave')     _eff.push('切割（重擊時攻速+20%，持續2秒）');
         if (d.eff === 'combo')      _eff.push('雙擊 ' + (d.comboRate || 0) + '%（追加一次完整一般攻擊）');
         if (d.weakExpose)           _eff.push('弱點曝光（命中12%疊加，供屠宰者增傷）');   // 🐉 鎖鏈劍：一般攻擊命中12%附加（最多3層）
+        if (typeof weaponSizeMechanicEntries === 'function') weaponSizeMechanicEntries(d).forEach(entry => _eff.push(weaponSizeMechanicDescription(entry)));
+        if (typeof weaponPrototypePolicyNotes === 'function') _eff.push(...weaponPrototypePolicyNotes(d));
         if (d.vampPct)              _eff.push('吸取HP ' + Math.round(d.vampPct * 100) + '%（依本次傷害恢復）');
         if (d.ignHardSkin)          _eff.push('貫穿（無視硬皮額外減傷）');   // 🗡️ 暗黑十字弓：攻擊無視硬皮額外減傷
         if (d.redSpecter)           _eff.push('紅惡靈逆襲（4%＋每強化1%，造成水魔傷並吸取10%HP）');   // 👹 隱藏的魔族武器

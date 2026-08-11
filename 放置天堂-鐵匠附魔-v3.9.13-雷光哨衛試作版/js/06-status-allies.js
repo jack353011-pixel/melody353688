@@ -870,6 +870,11 @@ function allyQiguAttack(ally, t, wpn) {
     if (typeof reflectWallOnDamage === 'function') reflectWallOnDamage(t, dmg, 'magic', ally);   // 🌑 v3.4.14 血壁空間：奇古獸普攻主擊＝魔法反射（鏡像玩家 qiguPlayerAttack）
     if (t.curHp > 0 && ally._setIron5 && typeof ironGuardTaunt === 'function' && ironGuardTaunt(t, ally)) logCombat(`<span class="font-bold" style="color:#93c5fd;text-shadow:0 0 6px #3b82f6;">【協力·${ally._allyName}·鐵衛 5/5】</span>嘲諷 <span class="${getMobColor(t.lv)}">${t.n}</span>！（3 秒）`, 'player-special');
     if (ally._setWhiteBird5 && t.curHp > 0 && !t._dead) { if (!t.st) t.st = newMobStatus(); t.st.fragile = 30; }   // 🔮 白鳥 5/5（傭兵奇古獸）：命中附加脆弱（魔法路徑不經 allyOnHitEffects，故此處補上）
+    let _qiguSizeMechanic = (typeof weaponSizeMechanic === 'function') ? weaponSizeMechanic(wpn, t) : null;
+    if (_qiguSizeMechanic && !ally.classicMode) {
+        if (_qiguSizeMechanic.effect === 'stagger' && t.curHp > 0 && !t._dead) applyWeaponSizeStagger(t, _qiguSizeMechanic, state.ticks);
+        else if (_qiguSizeMechanic.effect === 'focus') applyWeaponSizeFocus(ally, _qiguSizeMechanic, state.ticks);
+    }
     logCombat(`<span class="text-emerald-300 font-bold">【協力·${ally._allyName}】</span>奇古獸對 <span class="${getMobColor(t.lv)}">${t.n}</span> 造成 ${dmg} 點魔法傷害。`, 'magic');
     // 奇古獸特效（幻影衝擊/心靈破壞，用傭兵最大MP）
     if (wpn.qiguProc) {
@@ -1967,23 +1972,43 @@ function allyWeaponProcs(ally, target, hitInfo, instOverride) {
     if (hitInfo && hitInfo.hit && target && target.curHp > 0 && typeof d2rOnHit === 'function') d2rOnHit(ally, target, hitInfo.dmg || 0);
     if (hitInfo && hitInfo.hit && wpn.meleeHitSpell && target && target.curHp > 0) allyLaiaWandHitProc(ally, target);
 }
-// 命中後物理特效：穿透 / 骰子匕首即死 / 匕首·矛出血 / 單手鈍器鈍擊 / 雙手劍切割
+function allyWeaponSizeSweep(ally, target, mainDamage, cfg, weaponInst, wpn) {
+    if (!cfg || !weaponSizeMechanicCounter(ally, weaponInst, 'sweep', cfg.every)) return false;
+    let candidates = mapState.mobs.filter(m => m && m !== target && !m._dead && m.curHp > 0 && combatTargetSizeTag(m) === '小型');
+    let plan = weaponSizeSplashPlan(mainDamage, cfg, candidates.length);
+    if (!plan.count) return false;
+    candidates.slice(0, plan.count).forEach(m => _allyDamageMob(ally, m, plan.each, getWpnEle(weaponInst, wpn, ally)));
+    logCombat(`<span class="text-orange-300 font-bold">【協力·${ally._allyName}·橫掃】</span>第 ${Math.max(2, Number(cfg.every) || 3)} 擊掃中 ${plan.count} 名小型敵人，各造成 ${plan.each} 點傷害。`, 'player-special');
+    return true;
+}
+
+// 命中後物理特效：體型原型 / 穿透 / 骰子匕首即死 / 匕首·矛出血 / 單手鈍器鈍擊 / 雙手劍切割
 function allyOnHitEffects(ally, t, res) {
     let wpnInst = ally.eq && ally.eq.wpn;
     if (!wpnInst) return;
     let wpn = DB.items[wpnInst.id];
     if (!wpn) return;
     let d = ally.d || {};
-    if ((wpn.eff === 'pierce' || wpn.alsoPierce) && (!ally.classicMode || wpn.classicOk)) {   // 穿透：場上有其他敵人時，依機率額外攻擊另一名敵人（各自獨立判定命中）；🎮 經典模式：傭兵停用穿透（⚔️ v3.2.38 classicOk 特例鏡像）；🌑 v3.3.33 alsoPierce 附帶貫穿（吉爾塔斯之劍/腐壞的長弓）
-        let pc = (wpn.pierceChance !== undefined) ? wpn.pierceChance : 100;
+    let _allySizeMechanic = (typeof weaponSizeMechanic === 'function') ? weaponSizeMechanic(wpn, t) : null;
+    if (_allySizeMechanic && (!ally.classicMode || wpn.classicOk)) {
+        if (_allySizeMechanic.effect === 'break_stance' && t.curHp > 0 && !t._dead) applyWeaponSizeBreak(t, _allySizeMechanic, state.ticks);
+        else if (_allySizeMechanic.effect === 'stagger' && t.curHp > 0 && !t._dead) applyWeaponSizeStagger(t, _allySizeMechanic, state.ticks);
+        else if (_allySizeMechanic.effect === 'disrupt' && t.curHp > 0 && !t._dead) applyWeaponSizeDisrupt(t, _allySizeMechanic, state.ticks);
+        else if (_allySizeMechanic.effect === 'suppress' && t.curHp > 0 && !t._dead) applyWeaponSizeSuppress(t, _allySizeMechanic, state.ticks);
+        else if (_allySizeMechanic.effect === 'sweep') allyWeaponSizeSweep(ally, t, res.dmg, _allySizeMechanic, wpnInst, wpn);
+    }
+    let _allySizePierce = !!(_allySizeMechanic && _allySizeMechanic.effect === 'pierce');
+    let _allyLegacyPierce = !!((wpn.eff === 'pierce' || wpn.alsoPierce) && !(typeof weaponPrototypeSuppressesLegacyEffect === 'function' && weaponPrototypeSuppressesLegacyEffect(wpn, t, 'pierce')));
+    if ((_allyLegacyPierce || _allySizePierce) && (!ally.classicMode || wpn.classicOk)) {   // 原型政策與玩家共用：舊穿透不得繞過替換／犧牲
+        let pc = _allySizePierce ? (_allySizeMechanic.chance == null ? 25 : Math.min(100, Math.max(0, Number(_allySizeMechanic.chance) || 0))) : ((wpn.pierceChance !== undefined) ? wpn.pierceChance : 100);
         let others = [];
         mapState.mobs.forEach((m, i) => { if (m && m.curHp > 0 && !m._dead && m.uid !== t.uid) others.push(i); });
         if (others.length > 0 && roll(1, 100) <= pc) {
             // 🔧 傭兵穿透精通：穿透變全體攻擊；該傷害 100% 無視硬皮值（加回主目標硬皮量）
             let _allyPierce = allyHasMastery(ally, 'k_pierce');
-            let _pT = _allyPierce ? others : [others[Math.floor(Math.random() * others.length)]];
-            let _pd = res.dmg;
-            if (wpn.pierceSubMult) _pd = Math.max(1, Math.floor(_pd * wpn.pierceSubMult));   // 🏺 v3.6.44 艾爾摩尖頭槍（傭兵鏡像）：穿透波及目標傷害 −10%（res.dmg 未含主目標 ×1.3 加成）
+            let _pT = (_allyPierce && !_allySizePierce) ? others : [others[Math.floor(Math.random() * others.length)]];
+            let _pd = _allySizePierce ? Math.max(1, Math.floor(res.dmg * (_allySizeMechanic.splashPct == null ? 40 : Math.min(100, Math.max(1, Number(_allySizeMechanic.splashPct) || 1))) / 100)) : res.dmg;
+            if (!_allySizePierce && wpn.pierceSubMult) _pd = Math.max(1, Math.floor(_pd * wpn.pierceSubMult));
             if (_allyPierce && (res.hardSkin || 0) > 0) _pd += res.hardSkin;
             _pT.forEach(_ix => {
                 let exT = mapState.mobs[_ix];
@@ -1995,7 +2020,7 @@ function allyOnHitEffects(ally, t, res) {
                     logCombat(`<span class="text-sky-300 font-bold">【協力·${ally._allyName}·穿透】</span>對 <span class="${getMobColor(exT.lv)}">${exT.n}</span> 的攻擊未命中。`, 'miss');
                     return;
                 }
-                logCombat(`<span class="text-sky-300 font-bold">【協力·${ally._allyName}·穿透】</span>順勢命中 <span class="${getMobColor(exT.lv)}">${exT.n}</span>，造成 ${_pd} 點傷害。`, 'player');
+                logCombat(`<span class="text-sky-300 font-bold">【協力·${ally._allyName}·${_allySizePierce ? '貫穿' : '穿透'}】</span>順勢命中 <span class="${getMobColor(exT.lv)}">${exT.n}</span>，造成 ${_pd} 點傷害。`, 'player');
                 _allyDamageMob(ally, exT, _pd, getWpnEle(wpnInst, wpn, ally));
             });
         }

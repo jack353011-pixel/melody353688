@@ -925,29 +925,38 @@ function royalEquipOk(d, id) {
     if (ROYAL_WHITELIST.has(d.n || '')) return true;   // 具名開放清單（特定職業限定→開放給王族）
     return false;
 }
+// 舊裝備資料的遷移轉接器：既有 req／白名單先轉成 Tag 規則，讓正式入口只做一次共用判定。
+// 依 Tag 設計原則，新裝備不再新增職業專用限制；Tag 用來決定擅長與觸發，不拿來任意封鎖穿戴。
+function legacyEquipmentTagRule(d, id) {
+    const classes = ['royal','knight','mage','elf','dark','illusion','dragon','warrior'];
+    let allowed = classes.filter(cls => {
+        if (isRelic(d)) return reqAllowsClass(d, cls);
+        if (cls === 'dark') return darkEquipOk(d, id);
+        if (cls === 'illusion') return illusionEquipOk(d, id);
+        if (cls === 'dragon') return dragonEquipOk(d, id);
+        if (cls === 'warrior') return warriorEquipOk(d, id);
+        if (cls === 'royal') return royalEquipOk(d, id);
+        return reqAllowsClass(d, cls);
+    });
+    return { any:allowed.map(classLineageTag), source:'legacy-equipment-bridge' };
+}
+function equipmentAccessTagRule(d, id) {
+    if (!d) return { any:[], none:['角色'], source:'invalid-item' };
+    return legacyEquipmentTagRule(d, id);   // 僅維持既有裝備相容；新裝備預設 req:all／無 req
+}
 function checkCanEquip(item, ignoreD2Requirements) {
     let d = DB.items[item.id];
+    if (!d) return false;
     if (d && d.reqLv && (!player || (player.lv || 1) < d.reqLv)) return false;
     if (d && d.reqAvatar && player && ((d.strictAvatar && player.avatar !== d.reqAvatar) || (!d.strictAvatar && player.avatar && player.avatar !== d.reqAvatar))) return false;   // 👸 性別頭像限定；strictAvatar（純潔少女的憐愛）要求必須明確為女妖精，舊檔缺 avatar 亦不放行
-    let canEquip;
-    // 🏺 遺物：職業限制純以 req 白名單為準＝略過各職業專屬 *EquipOk 武器/防具清單（否則戰士等會被拒）。
-    //    ⚠️ v3.7.83 修：原本這裡是 `return reqAllowsClass(...)` 直接早退，連帶把下方共用尾段的**劍術精通例外**也跳過了
-    //    → 妖精選劍術精通後，一般的騎士限定單手武器借得到、同條件的「遺物」卻裝不上（8 件）。改成只跳過 *EquipOk 分派、
-    //    仍走同一條尾段，遺物與一般裝備的判定路徑就完全一致。
-    if (!isRelic(d)) {
-        if (player.cls === 'dark') canEquip = darkEquipOk(d, item.id);
-        else if (player.cls === 'illusion') canEquip = illusionEquipOk(d, item.id);
-        else if (player.cls === 'dragon') canEquip = dragonEquipOk(d, item.id);
-        else if (player.cls === 'warrior') canEquip = warriorEquipOk(d, item.id);
-        else if (player.cls === 'royal') canEquip = royalEquipOk(d, item.id);
-    }
-    // 1. 基本職業判定
-    if (canEquip == null) canEquip = reqAllowsClass(d, player.cls);
+    let ownerTags = playerQualificationTags(player), accessRule = equipmentAccessTagRule(d, item.id);
+    let canEquip = tagRuleMatch(ownerTags, accessRule).matched;
 
     // 2. 負重強化的擴充判定
     if (!canEquip && loadUpAllows(item.id)) canEquip = true;
-    // 3. 🏅 劍術精通：妖精可裝備騎士限定的單手武器（非雙手、非弓）——⚠️ 遺物同樣適用（v3.7.83 起遺物也會走到這裡）
-    if (!canEquip && hasMastery('e_sword') && d.type === 'wpn' && !d.w2h && !d.isBow && d.req && d.req.includes('knight')) canEquip = true;
+    // 3. 🏅 劍術精通：能力 Tag 可借用「騎士系譜可用」的單手近戰武器；不再反查物品的 req 字串。
+    let bridgeAllowsKnight = tagCoreList(accessRule.any).includes(classLineageTag('knight'));
+    if (!canEquip && ownerTags.includes('精通:e_sword') && d.type === 'wpn' && !d.w2h && !d.isBow && bridgeAllowsKnight) canEquip = true;
     if (canEquip && !ignoreD2Requirements && typeof d2rRequirementStatus === 'function') canEquip = d2rRequirementStatus(item, player).ok;
     return canEquip;
 }

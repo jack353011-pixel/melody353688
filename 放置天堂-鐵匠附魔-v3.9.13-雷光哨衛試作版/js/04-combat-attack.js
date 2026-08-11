@@ -1,3 +1,49 @@
+function weaponSizeSplashAttack(target, mainTaken, cfg, weaponInst, wpn) {
+    if (!target || !cfg || !weaponSizeMechanicCounter(player, weaponInst, 'sweep', cfg.every)) return false;
+    let candidates = [];
+    mapState.mobs.forEach((mob, idx) => {
+        if (!mob || mob === target || mob._dead || mob.curHp <= 0 || combatTargetSizeTag(mob) !== '小型') return;
+        candidates.push({ mob, idx });
+    });
+    let plan = weaponSizeSplashPlan(mainTaken, cfg, candidates.length);
+    if (!plan.count) return false;
+    let hit = 0, dead = [];
+    candidates.slice(0, plan.count).forEach(({ mob, idx }) => {
+        let splash = plan.each;
+        mob.curHp -= splash;
+        let taken = bossResilienceDamageTaken(mob, splash);
+        mob.justHit = getWpnEle(weaponInst, wpn);
+        mobWake(mob);
+        hit++;
+        if (mob.curHp <= 0) dead.push(idx);
+        if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(mob, taken, 'physical', true);
+    });
+    if (hit > 0) logCombat(`<span class="text-orange-300 font-bold">【橫掃】</span>第 ${Math.max(2, Number(cfg.every) || 3)} 擊掃中 ${hit} 名小型敵人，各造成 ${plan.each} 點傷害（總波及 ${plan.each * hit}）。`, 'player-special');
+    dead.sort((a, b) => b - a).forEach(idx => { if (mapState.mobs[idx] && !mapState.mobs[idx]._dead) killMob(idx); });
+    return hit > 0;
+}
+
+function applyWeaponSizeMechanicOnHit(target, mainTaken, cfg, weaponInst, wpn) {
+    if (!target || !cfg) return;
+    if (cfg.effect === 'break_stance') {
+        if (target.curHp <= 0) return;
+        let before = weaponSizeDefenseBreak(target, state.ticks);
+        let defense = applyWeaponSizeBreak(target, cfg, state.ticks);
+        if (defense > before) logCombat(`<span class="text-amber-300 font-bold">【破勢】</span>${target.n} 的物理防禦降低 ${defense} 點。`, 'player-special');
+    } else if (cfg.effect === 'stagger') {
+        if (target.curHp <= 0) return;
+        if (applyWeaponSizeStagger(target, cfg, state.ticks)) logCombat(`<span class="text-yellow-200 font-bold">【震盪】</span>${target.n} 的下一次行動被延後。`, 'player-special');
+    } else if (cfg.effect === 'disrupt') {
+        if (target.curHp <= 0) return;
+        if (applyWeaponSizeDisrupt(target, cfg, state.ticks)) logCombat(`<span class="text-violet-300 font-bold">【施法干擾】</span>${target.n} 的魔力流動暫時中斷。`, 'player-special');
+    } else if (cfg.effect === 'suppress') {
+        if (target.curHp <= 0) return;
+        if (applyWeaponSizeSuppress(target, cfg, state.ticks)) logCombat(`<span class="text-sky-300 font-bold">【壓制】</span>${target.n} 的一般攻擊威力降低。`, 'player-special');
+    } else if (cfg.effect === 'sweep') {
+        weaponSizeSplashAttack(target, mainTaken, cfg, weaponInst, wpn);
+    }
+}
+
 function playerAttack() {
     let target = getTarget();
     if(!target) return;
@@ -22,6 +68,7 @@ function playerAttack() {
     }
 
     let wpn = player.eq.wpn ? DB.items[player.eq.wpn.id] : null;
+    let _sizeMechanic = (typeof weaponSizeMechanic === 'function') ? weaponSizeMechanic(wpn, target) : null;
     let arrowData = null;
     
     // 👇 如果拿弓，執行消耗箭矢判定
@@ -191,18 +238,24 @@ function playerAttack() {
         if (wpn && wpn.hasteStrike && player.buffs && player.buffs.haste > 0) { player.buffs.haste = 0; if (typeof calcStats === 'function') calcStats(); }   // 🏺 遺物 殺人蜂的尾刺：一般攻擊命中時失去加速狀態
         if (wpn && wpn.strawCurse && target.curHp > 0 && Math.random() * 100 < wpn.strawCurse.rate) { if (!target.st) target.st = newMobStatus(); target.st.strawCurse = Math.max(target.st.strawCurse || 0, wpn.strawCurse.stacks || 3); }   // 🐍 庫庫爾坎之矛/鐵手甲/蛇神獠牙：命中 rate% 種下詛咒稻草人（3 層）
 
+        // ⚔️ 體型機制：小型／大型互斥；破勢、震盪、橫掃只由武器該體型的一個設定觸發。
+        if (!player.classicMode || (wpn && wpn.classicOk)) applyWeaponSizeMechanicOnHit(target, _mainTaken, _sizeMechanic, player.eq.wpn, wpn);
+
 		// 穿透（貝卡合金）：場上有兩名以上敵人時，普攻額外攻擊「主目標以外隨機一名敵人」，
-		// 每個波及目標各自獨立判定是否命中，命中則造成與主目標相同的傷害與屬性；僅一名敵人時與一般近戰相同（不額外攻擊）。
-        if (wpn && (wpn.eff === 'pierce' || wpn.alsoPierce) && (!player.classicMode || wpn.classicOk)) {   // 🎮 經典模式：停用穿透（⚔️ v3.2.38 classicOk 特例：黑虎的雙尾鞭經典亦觸發）；🌑 v3.3.33 alsoPierce＝主特效槽已被占用（吉爾塔斯之劍 cleave／腐壞的長弓 rapidfire）仍附帶貫穿
-            let _pc = (wpn.pierceChance !== undefined) ? wpn.pierceChance : 100;   // 穿透發動機率(%)，未設定視為100%
+        // 每個波及目標各自獨立判定是否命中，命中則造成與主目標相同的傷害與屬性；僅一名敵人時與一般近戰相同（不額外攻擊）。
+        let _sizePierce = !!(_sizeMechanic && _sizeMechanic.effect === 'pierce');
+        let _legacyPierce = !!(wpn && (wpn.eff === 'pierce' || wpn.alsoPierce) && !(typeof weaponPrototypeSuppressesLegacyEffect === 'function' && weaponPrototypeSuppressesLegacyEffect(wpn, target, 'pierce')));
+        if (wpn && (_legacyPierce || _sizePierce) && (!player.classicMode || wpn.classicOk)) {   // 採用原型政策後，舊穿透不得繞過「替換／犧牲」；非政策武器維持舊行為
+            let _pc = _sizePierce ? (_sizeMechanic.chance == null ? 25 : Math.min(100, Math.max(0, Number(_sizeMechanic.chance) || 0))) : ((wpn.pierceChance !== undefined) ? wpn.pierceChance : 100);   // 體型貫穿預設25%；舊穿透維持原值
             let otherIdx = [];
             mapState.mobs.forEach((m, i) => { if (m && m.curHp > 0 && !m._dead && m !== target) otherIdx.push(i); });
             if (otherIdx.length > 0 && roll(1, 100) <= _pc) {
                 // 🏅 穿透精通：穿透變成全體攻擊（命中主目標以外的「所有」敵人）；否則隨機一名
-                let _pTargets = hasMastery('k_pierce') ? otherIdx : [otherIdx[Math.floor(Math.random() * otherIdx.length)]];
+                let _pTargets = hasMastery('k_pierce') && !_sizePierce ? otherIdx : [otherIdx[Math.floor(Math.random() * otherIdx.length)]];
                 // 🏅 穿透精通：發動穿透時該次傷害 100% 無視硬皮值（把主目標被硬皮扣減的量加回）
-                let _pierceDmg = result.dmg;
-                if (wpn.pierceSubMult) _pierceDmg = Math.max(1, Math.floor(_dmgBeforeMainMult * wpn.pierceSubMult));   // 🏺 v3.6.44 艾爾摩尖頭槍：波及目標傷害 −10%（以主目標加成前為基準）
+                let _sizePiercePct = _sizePierce ? (_sizeMechanic.splashPct == null ? 40 : Math.min(100, Math.max(1, Number(_sizeMechanic.splashPct) || 1))) : 100;
+                let _pierceDmg = _sizePierce ? Math.max(1, Math.floor(_mainTaken * _sizePiercePct / 100)) : result.dmg;
+                if (!_sizePierce && wpn.pierceSubMult) _pierceDmg = Math.max(1, Math.floor(_dmgBeforeMainMult * wpn.pierceSubMult));   // 舊穿透專用；體型原型必須遵守自己的固定波及預算
                 if (hasMastery('k_pierce') && _mainHardSkin > 0) _pierceDmg += _mainHardSkin;
                 _pTargets.forEach(exIdx => {
                     let exT = mapState.mobs[exIdx];
@@ -217,10 +270,11 @@ function playerAttack() {
                         return;
                     }
                     exT.curHp -= _pierceDmg;
-                    if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(player, exT, _pierceDmg);
+                    let _pierceTaken = bossResilienceDamageTaken(exT, _pierceDmg);
+                    if (typeof moonShatterOnDamage === 'function') moonShatterOnDamage(player, exT, _pierceTaken);
                     exT.justHit = getWpnEle(player.eq.wpn, wpn);
                     mobWake(exT);
-                    logCombat(`【穿透】順勢命中 <span class="${getMobColor(exT.lv)}">${exT.n}</span>，造成 ${_pierceDmg} 點傷害。`, 'player');
+                    logCombat(`【${_sizePierce ? '貫穿' : '穿透'}】順勢命中 <span class="${getMobColor(exT.lv)}">${exT.n}</span>，造成 ${_pierceTaken} 點傷害。`, 'player');
                     if (exT.curHp <= 0) killMob(exIdx);
                 });
             }

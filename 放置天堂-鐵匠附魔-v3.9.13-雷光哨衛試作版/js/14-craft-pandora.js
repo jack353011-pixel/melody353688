@@ -1885,8 +1885,9 @@ window.onload = () => {
         if(d.type === 'wpn' || d.type === 'arm' || d.type === 'acc'){
             let _eff = [];
             if(d.unBonus) _eff.push('不死／狼人加成（額外造成1D20傷害）');   // 🗑️ v3.5.87 刪恆假死運算元 unDice / sp==='elf'（DB.items 全表零定義·sp 只存在於變身型態物件且為數字）
-            if(d.eff === 'pierce')     _eff.push('穿透 ' + (d.pierceChance !== undefined ? d.pierceChance : 100) + '%（命中後追加攻擊另一名敵人）');
-            if(d.alsoPierce)           _eff.push('穿透 ' + (d.pierceChance !== undefined ? d.pierceChance : 100) + '%（命中後追加攻擊另一名敵人）');   // 🌑 v3.3.33 附帶穿透
+            let _prototypeOwnsPierce = typeof weaponPrototypeSuppressesLegacyEffect === 'function' && weaponPrototypeSuppressesLegacyEffect(d, '中型', 'pierce');
+            if(d.eff === 'pierce' && !_prototypeOwnsPierce) _eff.push('穿透 ' + (d.pierceChance !== undefined ? d.pierceChance : 100) + '%（命中後追加攻擊另一名敵人）');
+            if(d.alsoPierce && !_prototypeOwnsPierce)       _eff.push('穿透 ' + (d.pierceChance !== undefined ? d.pierceChance : 100) + '%（命中後追加攻擊另一名敵人）');   // 原型政策武器改由體型規則顯示，避免與犧牲結果矛盾
             if(d.eff === 'moonburst')  _eff.push('月光爆裂（命中時8%造成1D30＋強化×2風傷）');
             if(d.eff === 'dice_death') _eff.push('即死（命中時1%使非首領目標死亡）');
             if(d.eff === 'haste')      _eff.push('自我加速（裝備時常駐加速）');
@@ -1894,6 +1895,8 @@ window.onload = () => {
             if(d.eff === 'cleave')     _eff.push('切割（重擊時攻速+20%，持續2秒）');
             if(d.eff === 'combo')      _eff.push('雙擊 ' + (d.comboRate||0) + '%（追加一次完整一般攻擊）');   // 🔧 鋼爪/雙刀：雙擊特效
             if(d.weakExpose)           _eff.push('弱點曝光（命中12%疊加，供屠宰者增傷）');   // 🐉 鎖鏈劍
+            if(typeof weaponSizeMechanicEntries === 'function') weaponSizeMechanicEntries(d).forEach(entry => _eff.push(weaponSizeMechanicDescription(entry)));
+            if(typeof weaponPrototypePolicyNotes === 'function') _eff.push(...weaponPrototypePolicyNotes(d));
             if(d.vampPct)              _eff.push('吸取HP ' + Math.round(d.vampPct * 100) + '%（依本次傷害恢復）');   // 🐉 嗜血者鎖鏈劍
             if(d.ignHardSkin)          _eff.push('貫穿（無視硬皮額外減傷）');   // 🗡️ 暗黑十字弓
             if(d.redSpecter)           _eff.push('紅惡靈逆襲（4%＋每強化1%，造成水魔傷並吸取10%HP）');   // 👹 隱藏的魔族武器

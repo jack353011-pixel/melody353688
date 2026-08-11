@@ -288,19 +288,32 @@ function prideHasTalisman(tier, kinds) {
     let allow = kinds || ['pass', 'dom', 'scroll'];
     return player.inv.some(i => { let d = DB.items[i.id]; return d && d.prideTier === tier && d.prideKind && allow.includes(d.prideKind) && (i.cnt || 1) >= 1; });
 }
+// 地圖條件統一轉成 Tag 規則。故事專屬鑰匙仍保留精確物品 ID，但由「持有」範圍 Tag 表達，
+// 不會因為裝備上恰好有相似的世界觀標籤就誤開地圖。
+function mapEntryTagRules(m) {
+    let rules = [];
+    if (m.enterTagRule) rules.push(m.enterTagRule);
+    if (Array.isArray(m.enterTagRules)) rules.push(...m.enterTagRules);
+    if (m.classicHide) rules.push({ none:['模式:經典'], scope:'狀態' });
+    if (m.needKey) rules.push({ all:[`持有:${m.needKey}`], scope:'持有' });
+    if (m.keyHoldReq) rules.push({ all:[`持有:${m.keyHoldReq}`], scope:'持有' });
+    if (m.questReq === 'demonTemple') rules.push({ all:['任務:魔族神殿開放'], scope:'任務' });
+    if (m.affinityReq === 1000) rules.push({ all:['友好:炎魔1000'], scope:'任務' });
+    if (m.prideReq === 'jenis') rules.push({ all:['進度:擊敗潔尼斯女王'], scope:'任務' });
+    if (typeof m.prideReq === 'number') rules.push({ all:[`傲慢通行:${m.prideReq}`], scope:'持有' });
+    return rules;
+}
+function mapEntryTagsAllow(m, owner) {
+    let snapshot = characterQualificationTagSnapshot(owner || player);
+    return mapEntryTagRules(m).every(rule => snapshot.match(rule, rule.scope ? { scope:rule.scope } : null).matched);
+}
 function mapOptDisabled(m) {
     if (m.disabled) return true;
     // 🧑‍🤝‍🧑 v3.7.84 受僱為其他角色的傭兵期間＝只能停留在安全區 → 下拉中所有非 town_ 地圖一律灰階不可選
     //    （與 changeMap 的 mercenaryRoleBattleBlocked 同一條規則·此處只是把它前推到 UI 上；快取版避免每個選項都掃 localStorage）
     if (m.v && !String(m.v).startsWith('town_') && typeof mercRoleSafeAreaOnly === 'function' && mercRoleSafeAreaOnly()) return true;
-    if (m.classicHide && player.classicMode) return true;   // 🔥 經典模式：席琳神殿不可進入（縱深防護，配合 populateMapSelect 隱藏選項）
-    if (m.needKey && !player.inv.some(i => i.id === m.needKey && (i.cnt || 1) >= 1)) return true;   // 🔑 需鑰匙地圖：背包無鑰匙 → 灰色不可選
+    if (!mapEntryTagsAllow(m, player)) return true;
     // 🗼 傲慢之塔樓層門檻：2~10樓需曾擊敗潔尼斯女王；11樓以上需持有對應傳送符/支配符/移動卷軸
-    if (m.questReq === 'demonTemple' && !player.demonTempleOpen) return true;   // 🔥 魔族神殿：須完成該角色 50 級試煉指定階段才開放（逐角色）
-    if (m.keyHoldReq && !player.inv.some(i => i.id === m.keyHoldReq && (i.cnt || 1) >= 1)) return true;   // 🌑 暗影神殿：需「持有」指定鑰匙才可進入（不消耗，與 needKey 不同）
-    if (m.affinityReq && (player.flameAffinity || 0) < m.affinityReq) return true;   // 🔥 炎魔謁見所：除完成試煉外，還需炎魔友好度（隱藏值，於魔族神殿擊殺累積）達標
-    if (m.prideReq === 'jenis' && !player.prideBeatJenis) return true;
-    if (typeof m.prideReq === 'number' && !prideHasTalisman(m.prideReq)) return true;
     return false;
 }
 function populateMapSelect(cat) {
@@ -1429,9 +1442,16 @@ function renderHanNPC(div) {
     let btn = (id) => {
         let m = md.list[id];
         let active = cur === id;
+        let tagRule = m.equipmentTagRule, tagHint = '';
+        if (tagRule) {
+            let status = masteryEquipmentTagStatus(player, id), wanted = [...new Set([...(tagRule.all || []), ...(tagRule.any || [])])];
+            let chips = wanted.map(tag => `<span style="display:inline-block;margin:1px 2px;padding:1px 4px;border-radius:4px;background:rgba(51,65,85,.85)">[${weaponSkillTagEsc(tag)}]</span>`).join('');
+            tagHint = `<div class="text-[10px] mt-1 ${status.matched ? 'text-emerald-300' : 'text-amber-300'}">${status.matched ? '標籤相符' : '目前未相符'} ${chips}</div>`;
+        }
         return `<button class="btn w-full h-full py-3 px-2 border-2 ${MASTERY_POS_STYLE[m.pos]} ${active ? 'ring-2 ring-yellow-300 shadow-[0_0_14px_rgba(253,224,71,0.6)]' : ''}" onclick="chooseMastery('${id}')" title="${m.d}">
             <div class="font-bold text-base ${active ? 'text-yellow-300' : 'text-white'}">${active ? '★ ' : ''}${m.n}</div>
             <div class="text-[11px] text-slate-300 leading-tight mt-1">${m.msg}</div>
+            ${tagHint}
         </button>`;
     };
     let ids = Object.keys(md.list);
@@ -1657,8 +1677,7 @@ function interactNPC(npcId, townId) {
     let npc = DB.towns[townId].npcs.find(n => n.id === npcId);
     if(!npc) return;
     if ((npc.id === 'npc_esti' || npc.id === 'npc_tros') && typeof clanNpcVisible === 'function' && !clanNpcVisible(npc.id, townId)) return;
-    if (npc.classicHide && player.classicMode) return;   // 🔥 經典模式：漢 不可互動（縱深防護，正常情況卡片已不渲染；v3.0.77 碧恩經典可用）
-    if (npc.classicOnly && !player.classicMode) return;   // 🕊️ 經典限定 NPC（聖使阿卡塔）：一般模式不可互動（縱深防護，渲染層已過濾）
+    if (!npcTagsVisible(npc, player)) return;
     if (typeof worldLoreOnNpcTalk === 'function') worldLoreOnNpcTalk(npc);
     _activePanel = null;   // 開啟新面板：先清除自動刷新標記，由對應 render 視需要重新設定
 
@@ -2117,6 +2136,19 @@ function _townCastleCrownHtml(npc) {
 }
 // 👑 v3.6.76 城鎮 NPC 王冠錨點（tools/crown-anchor-gen.js 離線掃 idle 幀產出·勿手改）。
 //    值＝[頭頂質心x, 畫布底至頭頂px+2]，與 js/09 的 PM_CROWN_ANCHOR 同語意。3227＝依詩蒂(公主)／3225＝特羅斯(王子)。
+function npcVisibilityTagRules(npc) {
+    let rules = [];
+    if (npc.visibleTagRule) rules.push(npc.visibleTagRule);
+    if (Array.isArray(npc.visibleTagRules)) rules.push(...npc.visibleTagRules);
+    if (npc.darkOnly) rules.push({ all:[classLineageTag('dark')], scope:'角色' });
+    if (npc.classicHide) rules.push({ none:['模式:經典'], scope:'狀態' });
+    if (npc.classicOnly) rules.push({ all:['模式:經典'], scope:'狀態' });
+    return rules;
+}
+function npcTagsVisible(npc, owner) {
+    let snapshot = characterQualificationTagSnapshot(owner || player);
+    return npcVisibilityTagRules(npc).every(rule => snapshot.match(rule, rule.scope ? { scope:rule.scope } : null).matched);
+}
 const TN_NPC_CROWN_ANCHOR = { '3227':[19,53], '3225':[18,87] };
 // ⚠️ v3.6.76 本函式**不得**再用 canvas getImageData 找頭頂：file:// 下本地圖片污染 canvas → 擲 SecurityError
 //    被 catch 吃掉 → 靜默落到 {x:寬/2, bottom:高} 粗略後備 → 王冠飄在頭頂正上方好幾十 px（叫賣王族玩家最明顯：
@@ -2161,9 +2193,7 @@ function renderTownNPCMap(townId) {
         if (npc.id === 'npc_esti' || npc.id === 'npc_tros') {
             return typeof clanNpcVisible === 'function' && clanNpcVisible(npc.id, townId);
         }
-        if (npc.darkOnly && player.cls !== 'dark') return false;
-        if (npc.classicHide && player.classicMode) return false;
-        if (npc.classicOnly && !player.classicMode) return false;   // 🕊️ 經典限定 NPC（聖使阿卡塔）：一般模式不渲染
+        if (!npcTagsVisible(npc, player)) return false;
         return true;
     }).map(npc => {
         if ((npc.id === 'npc_esti' || npc.id === 'npc_tros') && typeof clanNpcDisplayName === 'function') {

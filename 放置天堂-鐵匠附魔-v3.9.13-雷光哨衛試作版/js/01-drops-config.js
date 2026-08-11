@@ -863,6 +863,13 @@ function gemEffectForItem(gemId,item) {
     } else return null;
     return {code,value:v,label};
 }
+const EQUIPMENT_ARMOR_PART_TAGS = ['頭盔','胸甲','內衣','斗篷','手套','長靴','脛甲','盾牌'];
+function gemTagRule(gemId,item) {
+    let g=gemDef(gemId),d=item&&DB.items[item.id];if(!g||!d)return {any:[]};
+    if(d.type==='arm')return {any:EQUIPMENT_ARMOR_PART_TAGS,display:['防具']};
+    let byColor={red:['近戰'],green:['遠程'],blue:['魔法'],white:['近戰','遠程','魔法'],yellow:['近戰','遠程','魔法'],purple:['近戰','遠程','魔法']};
+    return {all:['武器'],any:byColor[g.color]||[]};
+}
 const RUNE_DEFS = {
     rune_el:  {n:'El 符文', tier:1, slot:'wpn', code:'killHp', value:2, cap:10, p:50000, d:'擊殺時恢復 2% 最大 HP。'},
     rune_eld: {n:'Eld 符文',tier:1, slot:'wpn', code:'killMp', value:2, cap:10, p:50000, d:'擊殺時恢復 2% 最大 MP。'},
@@ -909,6 +916,13 @@ function runeSingleEffectFitsItem(id,item){
     if(r.slot==='arm')return d.type==='arm';
     if(r.slot==='wpnhelm')return (d.type==='wpn'&&!d.isArrow)||(d.type==='arm'&&d.slot==='helm');
     return (d.type==='wpn'&&!d.isArrow)||d.type==='arm';
+}
+function runeTagRule(id) {
+    let r=runeDef(id);if(!r)return {any:[]};
+    if(r.slot==='wpn')return {all:['武器']};
+    if(r.slot==='arm')return {any:EQUIPMENT_ARMOR_PART_TAGS,display:['防具']};
+    if(r.slot==='wpnhelm')return {any:['武器','頭盔']};
+    return {any:['武器',...EQUIPMENT_ARMOR_PART_TAGS],display:['武器','防具']};
 }
 const RUNEWORDS = [
     {id:'steel',n:'鋼鐵',seq:['rune_tir','rune_el'],kind:'wpn',effects:{basicDmg:10,killHp:3},d:'一般攻擊傷害 +10%、擊殺恢復 HP +3%。'},
@@ -971,6 +985,19 @@ function runewordBaseFits(word,item){
     if(word.kind==='helm')return d.type==='arm'&&d.slot==='helm';
     if(word.kind==='shield')return d.type==='arm'&&d.slot==='shield';
     return false;
+}
+function runewordTagRule(word) {
+    if(!word)return {any:[]};
+    if(word.kind==='wpn')return {all:['武器']};
+    if(word.kind==='meleewpn')return {all:['武器','近戰']};
+    if(word.kind==='magicwpn')return {all:['武器','魔法']};
+    if(word.kind==='rangedwpn')return {all:['武器','遠程']};
+    if(word.kind==='mosaicclaw')return {all:['武器'],any:['鋼爪','雙刀']};
+    if(word.kind==='magicorshield')return {any:['魔法','盾牌']};
+    if(word.kind==='armor')return {all:['胸甲']};
+    if(word.kind==='helm')return {all:['頭盔']};
+    if(word.kind==='shield')return {all:['盾牌']};
+    return {any:[]};
 }
 function runewordSocketState(item){
     let sockets=equipSocketRows(item),runes=[],gap=false;
@@ -2170,7 +2197,7 @@ const MASTERY_DATA = {
     elf: { logo: 'assets/logo/妖精logo.png', boss: '飛龍', list: {
         e_rapid:  { n: '連射精通', pos: 'top',    msg: '連射更強，箭勢更加密集',                   d: '將風的律動融入弓弦，使每次連射都能放出更多、更具威力的箭矢。' },
         e_spirit: { n: '精靈精通', pos: 'left',   msg: '呼喚元素精靈王降臨',     d: '與元素締結最高階的契約，使強力精靈昇華為精靈王；精靈王能以同屬性的強大法術席捲敵陣。' },
-        e_sword:  { n: '劍術精通', pos: 'right',  msg: '掌握騎士劍術並發動看破',         d: '學會駕馭騎士的單手武器，以迅捷劍勢貼近敵人，並在交鋒中看破其弱點。' },
+        e_sword:  { n: '劍術精通', pos: 'right',  msg: '掌握騎士劍術並發動看破', equipmentTagRule:{all:['單手','近戰']}, d: '學會駕馭騎士的單手武器，以迅捷劍勢貼近敵人，並在交鋒中看破其弱點。' },
         e_magic:  { n: '魔導精通', pos: 'bottom', msg: '深化屬性魔法並研習高階法術',     d: '與自身元素共鳴，降低同屬性魔法的負擔，並開啟研習高階元素法術的道路。' }
     } },
     dark: { logo: 'assets/logo/黑暗妖精logo.png', boss: '飛龍', list: {
@@ -2180,8 +2207,8 @@ const MASTERY_DATA = {
         d_evade:  { n: '迴避精通', pos: 'bottom', msg: '承受攻勢後伺機閃避反殺',     d: '在敵人的連續攻勢中逐漸看清其動作；成功閃避後，下一擊將準確命中要害。' }
     } },
     illusion: { logo: 'assets/logo/幻術士logo.png', boss: '飛龍', list: {
-        i_qigu:       { n: '奇古獸精通', pos: 'top',    msg: '奇古獸之力穿透魔法防護',         d: '與奇古獸完全同步，使攻擊與奇異能力不再受魔法防護阻隔，出手也更加迅捷。' },
-        i_magicsword: { n: '魔劍精通',   pos: 'left',   msg: '將近戰兵刃化為魔力媒介', d: '以魔杖之外的近戰武器承載奇古獸之力，使斬擊化為精準的魔法傷害，並提升攻勢。' },
+        i_qigu:       { n: '奇古獸精通', pos: 'top',    msg: '奇古獸之力穿透魔法防護', equipmentTagRule:{all:['奇古獸']}, d: '與奇古獸完全同步，使攻擊與奇異能力不再受魔法防護阻隔，出手也更加迅捷。' },
+        i_magicsword: { n: '魔劍精通',   pos: 'left',   msg: '將近戰兵刃化為魔力媒介', equipmentTagRule:{all:['近戰'],none:['奇古獸','法杖']}, d: '以魔杖之外的近戰武器承載奇古獸之力，使斬擊化為精準的魔法傷害，並提升攻勢。' },
         i_illusion:   { n: '幻術精通',   pos: 'right',  msg: '幻覺法術召喚幻象並肩作戰',               d: '施放特定幻覺法術（幻覺：歐吉／巫妖／鑽石高崙）時，產生對應的召喚幻象一同戰鬥（需習得對應記憶水晶法術）' },
         i_mana:       { n: '魔力精通',   pos: 'bottom', msg: '擴張魔力並與傭兵共享',             d: '大幅擴張幻術士的魔力容器，代價是法術更為沉重；施法時逸散的魔力會流向同行的傭兵。' }
     } },
@@ -2200,7 +2227,7 @@ const MASTERY_DATA = {
     royal: { logo: 'assets/logo/王族logo.png', boss: '飛龍', list: {
         k_royal_pet:    { n: '夥伴精通', pos: 'top',    msg: '王者威儀鍛鑄不屈的夥伴', d: '出戰寵物的最終傷害與命中皆提升 50%（×1.5），且受到的傷害減少 50%（持續傷害為固定真傷，不受此減免）。魅力仍照常提供寵物傷害與命中；傭兵沿用各自的王族鼓舞效果，不受此精通影響。' },
         k_royal_pledge: { n: '血盟精通', pos: 'left',   msg: '減輕號令負擔並強化精準目標',           d: '呼喚盟友時消耗較少魔力；精準目標會隨王族的歷練成長，使全體盟友更容易重創敵人。' },
-        k_royal_sword:  { n: '劍術精通', pos: 'right',  msg: '強化王族劍術與勇猛意志',           d: '持單手劍或雙手劍時展現王族劍術，攻勢更加迅捷，也更容易喚醒勇猛意志。' },
+        k_royal_sword:  { n: '劍術精通', pos: 'right',  msg: '強化王族劍術與勇猛意志', equipmentTagRule:{any:['單手劍','雙手劍']}, d: '持單手劍或雙手劍時展現王族劍術，攻勢更加迅捷，也更容易喚醒勇猛意志。' },
         k_royal_magic:  { n: '魔法精通', pos: 'bottom', msg: '研習法師魔法並以劍引術',       d: '開啟研習中階法師魔法的道路；一般攻擊命中時，偶爾能不耗魔力地引發設定中的攻擊法術。' }
     } }
 };
@@ -2213,6 +2240,17 @@ const MASTERY_POS_STYLE = {   // 四向按鈕四色（上紅/左藍/右紫/下�
 const MAGIC_MASTERY_SKILLS = ['sk_blizzard', 'sk_tornado', 'sk_quake', 'sk_fire_storm'];   // 魔導精通可學的法師法術
 function hasMastery(id) { return !!(player && player.mastery === id); }
 function allyHasMastery(ally, id) { return !!(ally && ally.mastery === id); }   // 🔧 傭兵吃「自身存檔」的精通（不吃主玩家精通）
+function masteryEquipmentTagStatus(owner, id) {
+    owner = owner || player;
+    let def = owner && MASTERY_DATA[owner.cls] && MASTERY_DATA[owner.cls].list[id], rule = def && def.equipmentTagRule;
+    if (!rule) return { matched:true, rule:null, tags:[] };
+    let snapshot = characterAffinityTagSnapshot(owner);
+    return Object.assign({ rule }, snapshot.match(rule, { scope:'裝備中' }));
+}
+function masteryEquipmentTagActive(owner, id) {
+    owner = owner || player;
+    return !!(owner && owner.mastery === id && masteryEquipmentTagStatus(owner, id).matched);
+}
 function repairMasteryState(p) {
     let result = { changed: false, reset: false, reason: null };
     if (!p || typeof p !== 'object') return result;
@@ -2282,30 +2320,9 @@ function _teamAuraHas(sid, exclude) {
     return false;
 }
 function masteryChangeCost() { return { gold: 3000000 }; }   // 固定費用：每次更換都維持 300 萬金幣，不隨次數遞增
-// 技能職業需求等級（單一事實來源）：🏅 魔導精通的妖精可學四項法師法術（需求等級沿用法師）
+// 技能需求等級（單一事實來源）：正式判定統一走 Tag 核心；舊 reqK/reqM 等欄位由 skillAccessTagRules 轉成相容規則。
 function skillReqLv(sk, skId) {
-    if (player.cls === 'dark') {
-        if (sk.reqD !== undefined) return sk.reqD;                                  // 黑暗妖精專屬魔法
-        if (sk.reqM !== undefined && (sk.tier === 1 || sk.tier === 2)) return sk.tier === 1 ? 12 : 24;   // 基礎法師魔法：一階 Lv12 / 二階 Lv24（學不到精靈水晶與高階法師魔法）
-        return undefined;
-    }
-    if (player.cls === 'illusion') return sk.reqI;   // 🔮 幻術士：只學帶 reqI 的法術（記憶水晶＋日光術）；undefined＝不可學（不再誤用 reqE）
-    if (player.cls === 'dragon') return sk.reqDk;   // 🐉 龍騎士：只學帶 reqDk 的龍魔法（含日光術）；undefined＝不可學
-    if (player.cls === 'warrior') {                  // ⚔️ 戰士：只學帶 reqW 的技能印記；另可在 Lv15 學一階法師魔法
-        if (sk.reqW !== undefined) return sk.reqW;
-        if (sk.reqM !== undefined && sk.tier === 1) return 15;
-        return undefined;
-    }
-    if (player.cls === 'royal') {                    // 👑 王族：學帶 reqRoy 的王族魔法；另可在 Lv10/Lv20 學一/二階法師魔法（魔法精通可再學三~五階）
-        if (sk.reqRoy !== undefined) return sk.reqRoy;
-        if (sk.reqM !== undefined && sk.tier === 1) return 10;
-        if (sk.reqM !== undefined && sk.tier === 2) return 20;
-        if (player.mastery === 'k_royal_magic' && sk.reqM !== undefined && (sk.tier === 3 || sk.tier === 4 || sk.tier === 5)) return sk.reqM;   // 🏅 魔法精通：可學法師三~五階魔法
-        return undefined;
-    }
-    let lv = player.cls === 'mage' ? sk.reqM : (player.cls === 'knight' ? sk.reqK : sk.reqE);
-    if (lv === undefined && player.cls === 'elf' && player.mastery === 'e_magic' && skId && MAGIC_MASTERY_SKILLS.includes(skId)) lv = sk.reqM;
-    return lv;
+    return skillAccessTagStatus(player, sk, skId).level;
 }
 // 🔥 地獄火炬只增幅「該職業原本就能學會」的技能；裝備授予、跨職精通借來的技能不算。
 // helper 由玩家與傭兵的傷害、治癒、召喚共用，避免把 +10% 散落成不同口徑。
