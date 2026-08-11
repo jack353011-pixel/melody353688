@@ -10,8 +10,8 @@
  *   一度寫成「只搬 lineage_idle_/fb5_/afk_/dograce_ 前綴」,已否決。任何形式的清單都要跟著
  *   上游走,作者哪天新增一個 key 我們不會知道,漏搬是**安靜失效**(玩家搬完、玩一陣子才發現
  *   東西不見,而且查不出來)。正確性論證很硬:B 變成 A 的完整複本,A 跑得動 B 就跑得動。
- *   → 匯出 localStorage 全部 key；v3.9.26 起另帶 IndexedDB 自動備份桶。還原時把兩邊
- *      原樣寫回，舊 schema 1 備份仍可讀；IndexedDB 不可用時自動降級回舊 localStorage 備份鍵。
+ *   → 匯出 localStorage 全部 key；v3.9.27 起另帶 IndexedDB 主資料與自動備份桶。還原時把兩邊
+ *      原樣寫回，舊 schema 1/2 備份仍可讀；IndexedDB 不可用時自動降級回 localStorage。
  *
  * 還原的安全設計(每一條都是「弄壞玩家存檔」的防線):
  *   ① 備份只用**文字建議**(確認框裡提醒「先按上面的匯出」),刻意不做「強制自動下載一份」——
@@ -76,7 +76,7 @@
   }
 
   var FORMAT = 'idle-lineage-full';
-  var SCHEMA = 2;
+  var SCHEMA = 3;
 
   function lsKeys() {
     var out = [];
@@ -89,7 +89,7 @@
     return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
   }
 
-  // localStorage keys 內容一律原封不動；IndexedDB 只匯出已正式遷移的自動備份桶。
+  // localStorage keys 內容一律原封不動；IndexedDB 另匯出第三階段起的主資料與自動備份桶。
   function buildPack() {
     var keys = {}, n = 0;
     lsKeys().forEach(function (k) { var v = localStorage.getItem(k); if (v != null) { keys[k] = v; n++; } });
@@ -99,14 +99,15 @@
     var idb = window.FB5_IDB_SHADOW;
     var idbReady = false;
     try { idbReady = !!(idb && typeof idb.getStatus === 'function' && idb.getStatus().state === 'ready'); } catch (e) {}
-    if (!idbReady || typeof idb.exportAutoBackups !== 'function') {
+    if (!idbReady || typeof idb.exportAutoBackups !== 'function' || typeof idb.exportPrimaryRecords !== 'function') {
       var pack = buildPack();
-      pack.indexedDB = { autoBackups: [], autoBackupCount: 0 };
+      pack.indexedDB = { primaryRecords: [], primaryCount: 0, autoBackups: [], autoBackupCount: 0 };
       return Promise.resolve(pack);
     }
-    return idb.exportAutoBackups().then(function (rows) {
+    return Promise.all([idb.exportPrimaryRecords(), idb.exportAutoBackups()]).then(function (parts) {
+      var primary = parts[0] || [], rows = parts[1] || [];
       var pack = buildPack();   // 等待在途備份完成後再掃 localStorage，連失敗降級寫回的備份也不漏
-      pack.indexedDB = { autoBackups: rows || [], autoBackupCount: (rows || []).length };
+      pack.indexedDB = { primaryRecords: primary, primaryCount: primary.length, autoBackups: rows, autoBackupCount: rows.length };
       return pack;
     });
   }
@@ -224,6 +225,14 @@
         var rec = d.indexedDB.autoBackups[j];
         if (!rec || typeof rec !== 'object' || typeof rec.raw !== 'string' || !rec.raw) return { ok: false, err: '備份檔的自動備份內容不完整，請重新匯出一份。' };
       }
+      if (Number(d.schema) >= 3) {
+        if (!Array.isArray(d.indexedDB.primaryRecords)) return { ok: false, err: '備份檔的主資料內容不完整，請重新匯出一份。' };
+        if (d.indexedDB.primaryCount != null && Number(d.indexedDB.primaryCount) !== d.indexedDB.primaryRecords.length) return { ok: false, err: '備份檔的主資料內容不完整，請重新匯出一份。' };
+        for (var k = 0; k < d.indexedDB.primaryRecords.length; k++) {
+          var primary = d.indexedDB.primaryRecords[k];
+          if (!primary || typeof primary.key !== 'string' || !primary.key || typeof primary.value !== 'string') return { ok: false, err: '備份檔的主資料內容不完整，請重新匯出一份。' };
+        }
+      }
     }
     return { ok: true, pack: d };
   }
@@ -247,6 +256,7 @@
     var names = Object.keys(pack.keys);
     try { localStorage.clear(); }
     catch (e) { return Promise.resolve({ ok: false, done: 0, err: '清除舊資料時失敗：' + (e && e.message || e) }); }
+    try { localStorage.setItem('fb5_idb_primary_reset_v1', '1'); } catch (e) {}
     for (var i = 0; i < names.length; i++) {
       var k = names[i], okw = false;
       try { okw = _lzSetStoredRaw(k, pack.keys[k]) !== false; } catch (e) { okw = false; }
@@ -257,9 +267,17 @@
     var idbReady = false;
     try { idbReady = !!(idb && typeof idb.getStatus === 'function' && idb.getStatus().state === 'ready'); } catch (e) {}
     if (idbReady && typeof idb.importAutoBackups === 'function') {
-      return idb.importAutoBackups(records).then(function () { return { ok: true, done: names.length }; }).catch(function () {
-        return restoreBackupsToLegacy(records) ? { ok: true, done: names.length } : { ok: false, err: '自動備份還原失敗' };
-      });
+      var primaryRecords = pack.indexedDB && Array.isArray(pack.indexedDB.primaryRecords) ? pack.indexedDB.primaryRecords : null;
+      // 某些不支援 IndexedDB 的瀏覽器仍會產生 schema 3 備份，但其中主資料陣列為空。
+      // 此時應以備份內已還原的 localStorage 重建，不能把空陣列當作「清空主資料」。
+      var primaryTask = primaryRecords && primaryRecords.length > 0 && typeof idb.importPrimaryRecords === 'function'
+        ? idb.importPrimaryRecords(primaryRecords)
+        : (typeof idb.replacePrimaryFromLocal === 'function' ? idb.replacePrimaryFromLocal() : Promise.resolve());
+      return primaryTask.then(function () { return idb.importAutoBackups(records); })
+        .then(function () { return { ok: true, done: names.length }; }).catch(function () {
+          // 主資料仍完整存在 localStorage；保留 reset 旗標，下一次載入會由目前資料階段重新建立 IndexedDB。
+          return restoreBackupsToLegacy(records) ? { ok: true, done: names.length } : { ok: false, err: '自動備份還原失敗' };
+        });
     }
     return Promise.resolve(restoreBackupsToLegacy(records) ? { ok: true, done: names.length } : { ok: false, err: '自動備份還原失敗' });
   }

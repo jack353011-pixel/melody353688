@@ -90,12 +90,12 @@
     if (idb) {
       var idbClass = idb.state === 'ready' ? 'ok' : ((idb.state === 'failed' || idb.state === 'unsupported' || idb.state === 'degraded') ? 'bad' : 'wait');
       var idbText = idb.state === 'ready'
-        ? '主存檔影子已驗證（' + idb.keyCount + ' 筆）；' + idb.backupCount + ' 份自動備份由 IndexedDB 保存，角色主檔仍由 localStorage 正式讀寫。'
+        ? 'IndexedDB 已精簡保存 ' + idb.primaryCount + ' 筆角色／共用主資料（約 ' + fmtKB(idb.primaryBytes || 0) + '）；localStorage 保留必要同步快取，待提交日誌 ' + (idb.journalCount || 0) + ' 筆；另有 ' + idb.backupCount + ' 份自動備份。' + (idb.primaryRestored ? ' 本次已自動恢復 ' + idb.primaryRestored + ' 筆快取。' : '')
         : (idb.state === 'file-store' ? '打包版使用檔案存檔，不需要 IndexedDB 影子備份。'
           : (idb.state === 'failed' || idb.state === 'unsupported' || idb.state === 'degraded'
-            ? 'IndexedDB 影子備份未啟用；localStorage 正式存檔不受影響。'
-            : 'IndexedDB 影子備份正在建立與驗證中；localStorage 正式存檔不受影響。'));
-      html += '<div class="m-stg-idb m-stg-idb-' + idbClass + '"><b>資料庫遷移・第二階段</b><br>' + esc(idbText) + '</div>';
+            ? 'IndexedDB 主資料未啟用；系統已回退使用 localStorage，角色存檔仍可正常讀寫。'
+            : 'IndexedDB 主資料正在遷移與對帳；完成前由 localStorage 相容快取維持讀寫。'));
+      html += '<div class="m-stg-idb m-stg-idb-' + idbClass + '"><b>資料庫遷移・第四階段</b><br>' + esc(idbText) + '</div>';
     }
 
     // ⚠️ 未壓縮存檔警示:正常所有存檔都應是「已壓縮(LZ1)」。若有一批停在「未壓縮(SIG1)」,
@@ -144,7 +144,7 @@
       + (data.rawChars > 0 ? '  未壓縮 ' + fmtKB(data.rawChars) : ''));
     if (window.FB5_IDB_SHADOW && window.FB5_IDB_SHADOW.getStatus) {
       var idb = window.FB5_IDB_SHADOW.getStatus();
-      lines.push('IndexedDB phase 1  ' + idb.state + '  verified keys ' + idb.keyCount + '  authoritative ' + idb.authoritative);
+      lines.push('IndexedDB phase 4  ' + idb.state + '  primary keys ' + (idb.primaryCount || 0) + '  primary bytes ' + (idb.primaryBytes || 0) + '  journal ' + (idb.journalCount || 0) + '  restored ' + (idb.primaryRestored || 0) + '  authoritative ' + idb.authoritative);
     }
     lines.push('----');
     data.rows.forEach(function (r) {

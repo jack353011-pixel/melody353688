@@ -410,7 +410,7 @@ function _offlineFeatureEnabledForStorage(){
         if(_offlineFeatureEnabledForStorage()) return;
         Object.keys(localStorage)
             .filter(k => String(k).indexOf('lineage_idle_offline_v1_') === 0)
-            .forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
+            .forEach(k => { try { if(typeof _lsRemove === 'function') _lsRemove(k); else localStorage.removeItem(k); } catch(e){} });
     } catch(e){}
 })();
 // 🗑️ v3.5.83 移除 anySaveExists()：唯一用途是顯示主選單的 #btn-load，而該按鈕早已從 HTML 移除
