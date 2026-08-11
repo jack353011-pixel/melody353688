@@ -1883,7 +1883,7 @@ window.onload = () => {
             parts.push(`<div class="text-purple-300">習得技能：${DB.skills[d.sk].n}</div>`);
         }
         if(d.type === 'wpn' || d.type === 'arm' || d.type === 'acc'){
-            let _eff = [];
+            let _eff = [], _sizeEff = [];
             if(d.unBonus) _eff.push('不死／狼人加成（額外造成1D20傷害）');   // 🗑️ v3.5.87 刪恆假死運算元 unDice / sp==='elf'（DB.items 全表零定義·sp 只存在於變身型態物件且為數字）
             let _prototypeOwnsPierce = typeof weaponPrototypeSuppressesLegacyEffect === 'function' && weaponPrototypeSuppressesLegacyEffect(d, '中型', 'pierce');
             if(d.eff === 'pierce' && !_prototypeOwnsPierce) _eff.push('穿透 ' + (d.pierceChance !== undefined ? d.pierceChance : 100) + '%（命中後追加攻擊另一名敵人）');
@@ -1895,8 +1895,8 @@ window.onload = () => {
             if(d.eff === 'cleave')     _eff.push('切割（重擊時攻速+20%，持續2秒）');
             if(d.eff === 'combo')      _eff.push('雙擊 ' + (d.comboRate||0) + '%（追加一次完整一般攻擊）');   // 🔧 鋼爪/雙刀：雙擊特效
             if(d.weakExpose)           _eff.push('弱點曝光（命中12%疊加，供屠宰者增傷）');   // 🐉 鎖鏈劍
-            if(typeof weaponSizeMechanicEntries === 'function') weaponSizeMechanicEntries(d).forEach(entry => _eff.push(weaponSizeMechanicDescription(entry)));
-            if(typeof weaponPrototypePolicyNotes === 'function') _eff.push(...weaponPrototypePolicyNotes(d));
+            if(typeof weaponSizeMechanicEntries === 'function') weaponSizeMechanicEntries(d).forEach(entry => _sizeEff.push(weaponSizeMechanicDescription(entry)));
+            if(typeof weaponPrototypePolicyNotes === 'function') _sizeEff.push(...weaponPrototypePolicyNotes(d));
             if(d.vampPct)              _eff.push('吸取HP ' + Math.round(d.vampPct * 100) + '%（依本次傷害恢復）');   // 🐉 嗜血者鎖鏈劍
             if(d.ignHardSkin)          _eff.push('貫穿（無視硬皮額外減傷）');   // 🗡️ 暗黑十字弓
             if(d.redSpecter)           _eff.push('紅惡靈逆襲（4%＋每強化1%，造成水魔傷並吸取10%HP）');   // 👹 隱藏的魔族武器
@@ -1981,6 +1981,7 @@ window.onload = () => {
                 ? dedupeGeneratedTooltipEffects([...new Set(_eff)], d)
                 : [...new Set(_eff)];
             _eff = filterClassicEffLabels(_eff, d);   // 🎮 經典模式：移除已停用特效字樣（classicOk 物品不過濾）
+            if(_sizeEff.length) parts.push(`<div class="text-cyan-300 font-bold" style="font-size:12px;">體型機制：${_sizeEff.join(' / ')}</div>`);
             if(_eff.length) parts.push(`<div class="text-rose-300 font-bold" style="font-size:12px;">特效：${_eff.join(' / ')}</div>`);
         }
         if(!hidePrice && typeof d.p === 'number' && d.p > 0) parts.push(`<div class="text-yellow-400" style="font-size:12px;">售價 ${d.p.toLocaleString()} 金幣</div>`);   // 🗡️ 裝備收集冊 hidePrice=true：隱藏售價

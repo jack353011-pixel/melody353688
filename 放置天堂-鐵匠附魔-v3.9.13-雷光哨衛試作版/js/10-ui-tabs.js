@@ -1379,7 +1379,7 @@ function buildItemDescHTML(item) {
 
     // 👇 裝備特效標籤：顯示「名稱＋精簡機制說明」，讓玩家不必只靠特效名稱猜用途。涵蓋 武器/防具/飾品。
     if (d.type === 'wpn' || d.type === 'arm' || d.type === 'acc') {
-        let _eff = [];
+        let _eff = [], _sizeEff = [];
         if (d.unBonus) _eff.push('不死／狼人加成（額外造成1D20傷害）');   // 🧹 v3.5.87 #128：unDice / sp:'elf' 全 DB.items 零定義（恆假死運算元）→ 只留 unBonus
         let _prototypeOwnsPierce = typeof weaponPrototypeSuppressesLegacyEffect === 'function' && weaponPrototypeSuppressesLegacyEffect(d, '中型', 'pierce');
         if (d.eff === 'pierce' && !_prototypeOwnsPierce) _eff.push('穿透 ' + (d.pierceChance !== undefined ? d.pierceChance : 100) + '%（命中後追加攻擊另一名敵人）');
@@ -1391,8 +1391,8 @@ function buildItemDescHTML(item) {
         if (d.eff === 'cleave')     _eff.push('切割（重擊時攻速+20%，持續2秒）');
         if (d.eff === 'combo')      _eff.push('雙擊 ' + (d.comboRate || 0) + '%（追加一次完整一般攻擊）');
         if (d.weakExpose)           _eff.push('弱點曝光（命中12%疊加，供屠宰者增傷）');   // 🐉 鎖鏈劍：一般攻擊命中12%附加（最多3層）
-        if (typeof weaponSizeMechanicEntries === 'function') weaponSizeMechanicEntries(d).forEach(entry => _eff.push(weaponSizeMechanicDescription(entry)));
-        if (typeof weaponPrototypePolicyNotes === 'function') _eff.push(...weaponPrototypePolicyNotes(d));
+        if (typeof weaponSizeMechanicEntries === 'function') weaponSizeMechanicEntries(d).forEach(entry => _sizeEff.push(weaponSizeMechanicDescription(entry)));
+        if (typeof weaponPrototypePolicyNotes === 'function') _sizeEff.push(...weaponPrototypePolicyNotes(d));
         if (d.vampPct)              _eff.push('吸取HP ' + Math.round(d.vampPct * 100) + '%（依本次傷害恢復）');
         if (d.ignHardSkin)          _eff.push('貫穿（無視硬皮額外減傷）');   // 🗡️ 暗黑十字弓：攻擊無視硬皮額外減傷
         if (d.redSpecter)           _eff.push('紅惡靈逆襲（4%＋每強化1%，造成水魔傷並吸取10%HP）');   // 👹 隱藏的魔族武器
@@ -1478,6 +1478,7 @@ function buildItemDescHTML(item) {
         if (d.relic) _eff.push(...relicPurposeLabels(d));
         _eff = dedupeGeneratedTooltipEffects([...new Set(_eff)], d, { main:true });
         _eff = filterClassicEffLabels(_eff, d);   // 🎮 經典模式：移除已停用特效字樣（classicOk 物品不過濾）
+        if (_sizeEff.length) desc += `<br><span class="text-cyan-300 font-bold">體型機制：${_sizeEff.join(' / ')}</span>`;
         if (_eff.length) desc += `<br><span class="text-rose-300 font-bold">特效：${_eff.join(' / ')}</span>`;
     }
     // 👆

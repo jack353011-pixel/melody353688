@@ -23,6 +23,7 @@ const result = vm.runInContext(`(() => {
     const sword = DB.items.wpn_2hsword;
     const spear = DB.items.wpn_4;
     const autoLegacySpear = DB.items.wpn_17;
+    const broadSpear = DB.items.wpn_14;
     const owner = {};
     const inst = {id:'wpn_2hsword',uid:'size-test'};
     const breakTarget = {s:'L'};
@@ -321,6 +322,7 @@ const result = vm.runInContext(`(() => {
         ordinarySwordLarge:weaponSizeMechanic(ordinarySword,{s:'L'}),
         ordinaryMaceSmall:weaponSizeMechanic(ordinaryMace,{s:'S'}),
         ordinaryBowLarge:weaponSizeMechanic(ordinaryBow,{s:'L'}),
+        broadSpearText:weaponSizeMechanicEntries(broadSpear).map(weaponSizeMechanicDescription).join(' / '),
         namedLowWeightSmall:weaponSizeMechanic(namedLowWeight,{s:'S'}),
         unassignedRelicSmall:weaponSizeMechanic(unassignedRelic,{s:'S'}),
         autoAudit:auditAutomaticWeaponPrototypeInheritance(DB.items),
@@ -723,6 +725,7 @@ assert.equal(result.ordinaryMaceSmall.effect, 'stagger');
 assert.equal(result.ordinaryMaceSmall.prototypeFamily, '單手鈍器');
 assert.equal(result.ordinaryBowLarge.effect, 'break_stance');
 assert.equal(result.ordinaryBowLarge.prototypeFamily, '弓');
+assert.match(result.broadSpearText, /對小型.*貫穿.*25%.*40%.*對大型.*破勢.*2 點.*5 秒/);
 assert.equal(result.namedLowWeightSmall, null);
 assert.equal(result.unassignedRelicSmall, null);
 assert.deepEqual(Array.from(result.autoAudit), []);
@@ -985,4 +988,6 @@ const pandoraSource = fs.readFileSync(path.join(root, 'js/14-craft-pandora.js'),
 assert.match(pandoraSource, /weaponPrototypeSuppressesLegacyEffect\(d, '中型', 'pierce'\)/);
 assert.match(pandoraSource, /weaponSizeMechanicEntries\(d\).*weaponSizeMechanicDescription\(entry\)/);
 assert.match(pandoraSource, /weaponPrototypePolicyNotes\(d\)/);
+assert.match(uiSource, /體型機制：\$\{_sizeEff\.join\(' \/ '\)\}/);
+assert.match(pandoraSource, /體型機制：\$\{_sizeEff\.join\(' \/ '\)\}/);
 console.log('weapon-size-mechanics: ok');
