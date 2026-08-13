@@ -873,7 +873,8 @@ function weaponSkillTagProfile(itemOrId) {
         whirlwind:'炫風斬',leap:'躍擊',blessedHammer:'祝福之鎚',shadowClone:'暗影分身',
         vanderShockwave:'范德震地',frostDragonChase:'冰龍追擊',mindEcho:'心靈共振',riftBurst:'裂界衝擊',multiArrowRain:'多重箭雨',lightningSentry:'雷光哨衛',
         royalCommand:'王者號令',shieldCounter:'盾反壁壘',fireDragonForm:'火龍化身',royalValorBlade:'王者劍氣',
-        unyieldingFortress:'不屈堡壘',thunderDragonStorm:'雷龍風暴'
+        unyieldingFortress:'不屈堡壘',thunderDragonStorm:'雷龍風暴',bloodAxeHunt:'血斧追獵',titanWall:'泰坦逆壁',
+        cubeResonance:'立方共鳴',painMirror:'痛覺鏡界'
     };
     if (d.core) { add('核心特化', 'mechanic', 96); source(`${coreNames[d.core] || d.core}（流派核心特化）`); }
 

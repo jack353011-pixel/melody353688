@@ -94,12 +94,16 @@ const BUILD_FLOW_RULES = Object.freeze({
     thunderJavelin:{ skills:['sk_elf_triple'], slot:'wpn', gear:'launcher', tag:'流派:雷霆標槍' },
     whirlwind:{ skills:['sk_warrior_roar'], slot:'wpn', gear:'axe', tag:'流派:炫風斬' },
     leap:{ skills:['sk_warrior_outlaw'], slot:'boots', gear:'slot', tag:'流派:躍擊' },
+    bloodAxeHunt:{ skills:['sk_warrior_throwaxe'], slot:'wpn', gear:'axe', tag:'流派:血斧追獵' },
+    titanWall:{ skills:['sk_warrior_titan_rock','sk_warrior_titan_magic','sk_warrior_titan_bullet'], slot:'armor', gear:'heavyArmor', tag:'流派:泰坦逆壁' },
     blessedHammer:{ skills:['sk_royal_callally'], slot:'shield', gear:'slot', tag:'流派:祝福之鎚' },
     shadowClone:{ skills:['sk_dark_stealth'], slot:'cloak', gear:'slot', tag:'流派:暗影分身' },
     vanderShockwave:{ skills:['sk_shock_stun'], slot:'wpn', gear:'sword', tag:'流派:范德震地' },
     frostDragonChase:{ skills:['sk_dragon_slaughter'], slot:'wpn', gear:'chainSword', tag:'流派:冰龍追擊' },
     mindEcho:{ skills:['sk_illu_mindbreak'], slot:'wpn', gear:'qigu', tag:'流派:心靈共振' },
     riftBurst:{ skills:['sk_illu_crush'], slot:'wpn', gear:'qigu', tag:'流派:裂界衝擊' },
+    cubeResonance:{ skills:['sk_illu_cube_burn','sk_illu_cube_quake','sk_illu_cube_shock','sk_illu_cube_harmony'], slot:'wpn', gear:'qigu', tag:'流派:立方共鳴' },
+    painMirror:{ skills:['sk_illu_pain'], slot:'armor', gear:'slot', tag:'流派:痛覺鏡界' },
     multiArrowRain:{ skills:['sk_elf_triple'], slot:'wpn', gear:'bow', tag:'流派:多重箭雨' },
     lightningSentry:{ skills:['sk_dark_fang'], slot:'wpn', gear:'claw', tag:'流派:雷光哨衛' },
     royalCommand:{ skills:['sk_royal_burnweapon'], slot:'helm', gear:'slot', tag:'流派:王者號令' },
@@ -126,6 +130,7 @@ function buildFlowGearMatches(def, kind, itemId) {
     if (kind === 'chainSword') return !!(def.chainsword || family === '鎖鏈劍' || /鎖鏈劍/.test(def.n || ''));
     if (kind === 'qigu') return !!(def.qigu || family === '奇古獸');
     if (kind === 'claw') return !!(family === '鋼爪' || /鋼爪/.test(def.n || ''));
+    if (kind === 'heavyArmor') return !!(def.slot === 'armor' && (def.heavyArmor || /重裝|重鎧|板甲|鎖甲|金屬盔甲|鋼鐵|冥皇鎧甲|巴風特盔甲|安塔瑞斯的力量/.test(def.n || '')));
     return false;
 }
 function buildFlowEquippedCore(owner, buildId) {
