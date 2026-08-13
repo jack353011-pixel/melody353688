@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'js/27-offline-rewards.js'), 'utf8');
 
-assert.match(source, /const OFFLINE_VERSION = 8;/, '離線存檔版本尚未升級');
+assert.match(source, /const OFFLINE_VERSION = 9;/, '離線存檔版本尚未升級');
 
 const qualification = source.match(/function _offlineRuntimeQualified\(now, profile, map, difficulty\) \{[\s\S]*?\n    \}\n\n    function _offlineRuntimeStale[\s\S]*?\n    \}/);
 assert.ok(qualification, '找不到離線實戰資格判定');
@@ -64,32 +64,33 @@ assert.match(source, /saved\.claimedUntil = Math\.max\([\s\S]*?now\);/,
     '領取時間沒有與角色獎勵一起寫入角色狀態');
 assert.match(source, /if \(savedOk\)[\s\S]*?_offlineCommitClaim\(options\.claimHandle, now\)/,
     '角色存檔成功後沒有提交領取時間');
-assert.match(source, /_offlinePendingClaimAt = Math\.max\(_offlinePendingClaimAt, now\);[\s\S]*?_offlineReleaseClaim\(options\.claimHandle, true\)/,
+assert.match(source, /_offlineRememberDeferredClaim\(now\);[\s\S]*?_offlineReleaseClaim\(options\.claimHandle, true\)/,
     '角色存檔失敗時沒有回復外部領取點與 checkpoint');
-assert.match(source, /if \(result === true\) _offlineCommitDeferredClaim\(\);/,
+assert.match(source, /if \(result === true\) \{[\s\S]*?_offlineCommitDeferredClaim\(\);/,
     '後續手動存檔成功時沒有提交延後領取時間');
 
 const claimSection = source.match(/function _offlineClaimTime\(value, now\) \{[\s\S]*?\n    function _offlineApplyAllyExp/);
 assert.ok(claimSection, '找不到 claim 生命週期程式');
 const claimStore = Object.create(null);
+let activeRoleSuffix = '';
 const claimCtx = vm.createContext({
     player: { offlineHunt: { claimedUntil: 0 } },
-    OFFLINE_VERSION: 8,
+    OFFLINE_VERSION: 9,
     OFFLINE_CLAIM_LOCK_MS: 60000,
     _offlineClaimOwner: 'owner-a',
     _offlineFinite: (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback,
-    _offlineStoreKey: kind => kind,
+    _offlineStoreKey: kind => kind + activeRoleSuffix,
     _offlineReadJson: key => claimStore[key] ? JSON.parse(JSON.stringify(claimStore[key])) : null,
     _offlineWriteJson: (key, value) => { claimStore[key] = JSON.parse(JSON.stringify(value)); return true; },
     _offlineStorageRemove: key => { delete claimStore[key]; return true; },
     _offlineNow: () => 5000,
     Math
 });
-vm.runInContext('let _offlinePendingClaimAt = 0;\n' +
+vm.runInContext('let _offlinePendingClaims = Object.create(null);\n' +
     claimSection[0].replace(/\n    function _offlineApplyAllyExp$/, '') + '\n' +
     'globalThis.acquireClaim=_offlineAcquireClaim; globalThis.commitClaim=_offlineCommitClaim; ' +
     'globalThis.releaseClaim=_offlineReleaseClaim; globalThis.commitDeferred=_offlineCommitDeferredClaim; ' +
-    'globalThis.setPendingAt=v=>{_offlinePendingClaimAt=v}; globalThis.getPendingAt=()=>_offlinePendingClaimAt;', claimCtx);
+    'globalThis.rememberDeferred=_offlineRememberDeferredClaim; globalThis.pendingClaims=()=>_offlinePendingClaims;', claimCtx);
 
 claimStore.claim = { status: 'committed', claimedUntil: 900 };
 claimStore.checkpoint = { marker: 'old' };
@@ -110,15 +111,27 @@ assert.equal(claimStore.claim.claimedUntil, 1700, '提交 claim 不得早於角�
 
 claimStore.claim = { status: 'committed', claimedUntil: 3000 };
 claimCtx.player.offlineHunt.claimedUntil = 2500;
-claimCtx.setPendingAt(2000);
+claimCtx.rememberDeferred(2000);
 assert.equal(claimCtx.commitDeferred(), true, '沒有有效鎖時應能提交延後 claim');
 assert.equal(claimStore.claim.claimedUntil, 3000, '延後 claim 不得讓既有領取時間倒退');
 claimStore.claim = { status: 'pending', token: 'foreign-live', owner: 'owner-b', claimedUntil: 4000, lockUntil: 65000 };
-claimCtx.setPendingAt(3500);
+claimCtx.rememberDeferred(3500);
 assert.equal(claimCtx.commitDeferred(), false, '其他分頁持有有效鎖時不得插隊提交');
 assert.equal(claimStore.claim.token, 'foreign-live', '延後 claim 覆蓋了其他分頁的有效鎖');
 
-const restoreSection = source.match(/function _offlineRestorePendingCatchup\(sourceOverride\) \{[\s\S]*?\n    function _offlineCommitRestoredCatchup/);
+activeRoleSuffix = '-a';
+claimStore['claim-a'] = { status: 'committed', claimedUntil: 1000 };
+claimCtx.rememberDeferred(4200);
+activeRoleSuffix = '-b';
+claimStore['claim-b'] = { status: 'committed', claimedUntil: 1500 };
+assert.equal(claimCtx.commitDeferred(), false, '角色 A 的延後 claim 不得由角色 B 的存檔提交');
+assert.equal(claimStore['claim-b'].claimedUntil, 1500, '切換角色後誤改了角色 B 的 claim');
+activeRoleSuffix = '-a';
+assert.equal(claimCtx.commitDeferred(), true, '切回原角色後應能提交該角色自己的延後 claim');
+assert.equal(claimStore['claim-a'].claimedUntil, 4200, '角色 A 的延後 claim 時間未正確提交');
+activeRoleSuffix = '';
+
+const restoreSection = source.match(/function _offlineRestorePendingCatchup\(sourceOverride, settleOptions\) \{[\s\S]*?\n    function _offlineCommitRestoredCatchup/);
 assert.ok(restoreSection, '找不到待補跑恢復流程');
 const catchupStore = { catchup: { ms: 5000 } };
 const sourceOverride = { eligible: true, map: 'field', profile: { map: 'field', killsPerMin: 10 } };
@@ -128,9 +141,10 @@ const restoreCtx = vm.createContext({
     _offlineStoreKey: () => 'catchup',
     _offlineReadJson: key => catchupStore[key] || null,
     _offlineStorageRemove: key => { delete catchupStore[key]; return true; },
+    _offlineReleaseClaim: () => true,
     _offlineFinite: (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback
 });
-vm.runInContext('let _offlineRestoredCatchupKey=""; let _offlineLastBatchSavedOk=false;\n' +
+vm.runInContext('let _offlineRestoredCatchupKey=""; let _offlineRestoredCatchupClaim=null; let _offlineLastBatchSavedOk=false;\n' +
     restoreSection[0].replace(/\n    function _offlineCommitRestoredCatchup$/, '') + '\n' +
     'globalThis.restorePending=_offlineRestorePendingCatchup; globalThis.restoredKey=()=>_offlineRestoredCatchupKey;', restoreCtx);
 assert.throws(() => restoreCtx.restorePending(sourceOverride), /simulated grant failure/,
@@ -140,9 +154,41 @@ assert.equal(restoreCtx.restoredKey(), '', '補跑例外後不應留下可被普
 
 assert.match(source, /catchupSource = \{[\s\S]*?profile: JSON\.parse\(JSON\.stringify\(profile\)\)/,
     '主離線結算前沒有保存合格補跑來源');
-assert.match(source, /_offlineRestorePendingCatchup\(catchupSource\)/,
+assert.match(source, /_offlineRestorePendingCatchup\(catchupSource, \{ parentSettling: true \}\)/,
     '待補跑沒有使用結算前保存的合格來源');
-assert.match(source, /function _offlineSettleCatchup\(elapsedMs, reason, sourceOverride\)/,
+assert.match(source, /function _offlineSettleCatchup\(elapsedMs, reason, sourceOverride, settleOptions\)/,
     '背景補跑結算沒有接收保存的來源');
+
+const settleSection = source.match(/function _offlineSettle\(reason\) \{[\s\S]*?\n    function _offlineHealingPotionId/);
+assert.ok(settleSection, '找不到主離線結算流程');
+assert.ok(settleSection[0].indexOf('_offlineRestorePendingCatchup(catchupSource') <
+    settleSection[0].indexOf('_offlineGrantBatch(source, profile'),
+    '背景補跑必須在真正離線收益之前依時間順序處理');
+assert.match(source, /preserveOfflineState: restoredBatch/,
+    '恢復背景補跑時沒有保留真正離線區間的 checkpoint');
+
+const transactionSection = source.match(/function _offlineTransactionClone\(value\) \{[\s\S]*?\n    function _offlineGrantBatch/);
+assert.ok(transactionSection, '找不到離線獎勵交易與回滾流程');
+const transactionCtx = vm.createContext({
+    player: { gold: 100, inv: [{ id: 'old', cnt: 1 }], cardDex: { old: 1 } },
+    window: {}, JSON, Object
+});
+vm.runInContext('let _offlineRuntime={kills:3}; let _offlineSurvivalRuntime={map:"field"};\n' +
+    transactionSection[0].replace(/\n    function _offlineGrantBatch$/, '') + '\n' +
+    'globalThis.beginTx=_offlineBeginRewardTransaction; globalThis.finishTx=_offlineFinishRewardTransaction; ' +
+    'globalThis.runtime=()=>_offlineRuntime;', transactionCtx);
+const tx = transactionCtx.beginTx();
+transactionCtx.player.gold = 999;
+transactionCtx.player.inv.push({ id: 'new', cnt: 1 });
+transactionCtx.player.cardDex.new = 100;
+transactionCtx.finishTx(tx, true);
+assert.equal(transactionCtx.player.gold, 100, '離線批次例外後金幣沒有回滾');
+assert.equal(transactionCtx.player.inv.length, 1, '離線批次例外後背包掉落沒有回滾');
+assert.equal(transactionCtx.player.cardDex.new, undefined, '離線批次例外後圖鑑沒有回滾');
+assert.equal(transactionCtx.window.__fb5OfflineRewardTransaction, false, '離線批次結束後仍鎖住圖鑑寫入');
+
+const dexSource = fs.readFileSync(path.join(root, 'js/12-npc-quests.js'), 'utf8');
+assert.equal((dexSource.match(/window\.__fb5OfflineRewardTransaction/g) || []).length, 4,
+    '四種共用圖鑑沒有全部接上離線交易閘門');
 
 console.log('離線掛網核心回歸測試通過');

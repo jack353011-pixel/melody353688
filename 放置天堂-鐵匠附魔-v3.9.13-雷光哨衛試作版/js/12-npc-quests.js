@@ -208,6 +208,7 @@ function _readDex(base){ try { let s = _lzGet(_dexKey(base)); if (s) { let o = J
 // 🔄 多開同步：回寫前先讀桶現值並合併（卡片取較高分、_v:2＝積分制；裝備布林聯集），避免用本分頁快照覆蓋其他分頁的進度（lost-update）
 function saveCardDex(){
     if (!player || !player.cardDex) return;
+    if (typeof window !== 'undefined' && window.__fb5OfflineRewardTransaction) return;   // 離線批次成功存檔後再一次提交，避免中途例外留下半套圖鑑
     try {
         let cur = _readDex(CARDDEX_KEY);
         let _mig = (typeof cardTierToScore === 'function') ? cardTierToScore : function(v){ return v || 0; };
@@ -220,6 +221,7 @@ function saveCardDex(){
 }
 function saveEquipDex(){
     if (!player || !player.equipDex) return;
+    if (typeof window !== 'undefined' && window.__fb5OfflineRewardTransaction) return;
     try {
         let out = Object.assign({}, _readDex(EQUIPDEX_KEY));   // 桶現值（其他分頁可能剛寫入）
         for (let k in player.equipDex) if (player.equipDex[k]) out[k] = true;   // 布林聯集（只增不減）
@@ -228,6 +230,7 @@ function saveEquipDex(){
 }
 function saveMiscDex(){   // 🧰 道具收集冊：布林聯集回寫共用桶（同 saveEquipDex）
     if (!player || !player.miscDex) return;
+    if (typeof window !== 'undefined' && window.__fb5OfflineRewardTransaction) return;
     try {
         let out = Object.assign({}, _readDex(MISCDEX_KEY));
         for (let k in player.miscDex) if (player.miscDex[k]) out[k] = true;
@@ -236,6 +239,7 @@ function saveMiscDex(){   // 🧰 道具收集冊：布林聯集回寫共用桶�
 }
 function saveRelicDex(){   // 🏺 遺物收集冊：布林聯集回寫共用桶（同 saveEquipDex）
     if (!player || !player.relicDex) return;
+    if (typeof window !== 'undefined' && window.__fb5OfflineRewardTransaction) return;
     try {
         let out = Object.assign({}, _readDex(RELICDEX_KEY));
         for (let k in player.relicDex) if (player.relicDex[k]) out[k] = true;

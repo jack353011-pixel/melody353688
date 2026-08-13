@@ -13,7 +13,7 @@
         if (localStorage.getItem('afk_toggle_offline') === '0') return;
     } catch (e) {}
 
-    const OFFLINE_VERSION = 8;
+    const OFFLINE_VERSION = 9;
     const OFFLINE_MIN_MS = 1 * 60 * 1000;
     const OFFLINE_MAX_MS = 12 * 60 * 60 * 1000;
     const OFFLINE_EFFICIENCY = 0.70;
@@ -50,8 +50,10 @@
     let _offlineSettling = false;
     let _offlineInternalSave = false;
     let _offlineRestoredCatchupKey = '';
+    let _offlineRestoredCatchupClaim = null;
     let _offlineLastBatchSavedOk = false;
-    let _offlinePendingClaimAt = 0;
+    // 延後提交必須綁定角色的 claim key；單一 timestamp 會在切換角色後誤寫到另一角色。
+    let _offlinePendingClaims = Object.create(null);
     let _offlineRoleDetached = false;
     let _offlineSurvivalRuntime = null;
     let _offlineSurvivalTickCtx = null;
@@ -816,7 +818,7 @@
         });
     }
 
-    function _offlineRestorePendingCatchup(sourceOverride) {
+    function _offlineRestorePendingCatchup(sourceOverride, settleOptions) {
         let key = _offlineStoreKey('catchup');
         let pending = _offlineReadJson(key);
         if (!key || !pending) return false;
@@ -831,14 +833,18 @@
         let settled = false;
         try {
             settled = typeof window.offlineSettleCatchup === 'function' &&
-                window.offlineSettleCatchup(ms, 'restore', sourceOverride) === true;
+                window.offlineSettleCatchup(ms, 'restore', sourceOverride, settleOptions) === true;
         } catch (e) {
             // 獎勵流程例外時只清除本頁記憶體標記，持久憑證必須留下供下次載入重試。
+            if (_offlineRestoredCatchupClaim) _offlineReleaseClaim(_offlineRestoredCatchupClaim, true);
+            _offlineRestoredCatchupClaim = null;
             _offlineRestoredCatchupKey = '';
             _offlineLastBatchSavedOk = false;
             throw e;
         }
         if (!settled) {
+            if (_offlineRestoredCatchupClaim) _offlineReleaseClaim(_offlineRestoredCatchupClaim, true);
+            _offlineRestoredCatchupClaim = null;
             _offlineRestoredCatchupKey = '';
             return false;
         }
@@ -851,6 +857,8 @@
         let key = _offlineRestoredCatchupKey;
         if (!_offlineStorageRemove(key)) return false;
         _offlineRestoredCatchupKey = '';
+        if (_offlineRestoredCatchupClaim) _offlineReleaseClaim(_offlineRestoredCatchupClaim, false);
+        _offlineRestoredCatchupClaim = null;
         return true;
     }
     window.offlineCatchupSaveCommitted = _offlineCommitRestoredCatchup;
@@ -903,8 +911,15 @@
             _offlineClaimTime(player.offlineHunt.claimedUntil, now) : 0;
         let committedAt = Math.max(now, previousAt, internalAt);
         let ok = _offlineWriteJson(handle.key, { v: OFFLINE_VERSION, status: 'committed', claimedUntil: committedAt });
-        if (ok) _offlinePendingClaimAt = 0;
+        if (ok) delete _offlinePendingClaims[handle.key];
         return ok;
+    }
+
+    function _offlineRememberDeferredClaim(at) {
+        let key = _offlineStoreKey('claim');
+        if (!key) return false;
+        _offlinePendingClaims[key] = Math.max(Math.floor(_offlineFinite(_offlinePendingClaims[key], 0)), Math.floor(_offlineFinite(at, 0)));
+        return true;
     }
 
     function _offlineReleaseClaim(handle, restoreCheckpoint) {
@@ -924,9 +939,9 @@
     }
 
     function _offlineCommitDeferredClaim() {
-        if (!(_offlinePendingClaimAt > 0)) return false;
-        let at = _offlinePendingClaimAt;
         let key = _offlineStoreKey('claim');
+        let at = Math.max(0, Math.floor(_offlineFinite(_offlinePendingClaims[key], 0)));
+        if (!key || !(at > 0)) return false;
         let now = _offlineNow();
         let current = _offlineReadJson(key);
         // 其他分頁仍持有有效鎖時不可插隊；過期鎖則由角色存檔中的 internal claim 接手提交。
@@ -936,7 +951,7 @@
             _offlineClaimTime(player.offlineHunt.claimedUntil, now) : 0;
         let committedAt = Math.max(at, externalAt, internalAt);
         let ok = _offlineWriteJson(key, { v: OFFLINE_VERSION, status: 'committed', claimedUntil: committedAt });
-        if (ok) _offlinePendingClaimAt = 0;
+        if (ok) delete _offlinePendingClaims[key];
         return ok;
     }
 
@@ -1739,15 +1754,60 @@
         } catch (e) {}
     }
 
+    function _offlineTransactionClone(value) {
+        if (value == null) return value;
+        // _faceTgt 是戰鬥期循環參照，存檔本來也不保存；其他角色資料完整保留供失敗回滾。
+        return JSON.parse(JSON.stringify(value, function (key, row) {
+            return key === '_faceTgt' ? undefined : row;
+        }));
+    }
+
+    function _offlineBeginRewardTransaction() {
+        let tx = {
+            player: _offlineTransactionClone(player),
+            runtime: _offlineTransactionClone(_offlineRuntime),
+            survivalRuntime: _offlineTransactionClone(_offlineSurvivalRuntime),
+            previousCollectionGate: !!(typeof window !== 'undefined' && window.__fb5OfflineRewardTransaction)
+        };
+        if (typeof window !== 'undefined') window.__fb5OfflineRewardTransaction = true;
+        return tx;
+    }
+
+    function _offlineFinishRewardTransaction(tx, rollback) {
+        if (!tx) return;
+        if (rollback && typeof player !== 'undefined' && player && tx.player) {
+            Object.keys(player).forEach(function (key) { delete player[key]; });
+            Object.assign(player, _offlineTransactionClone(tx.player));
+            _offlineRuntime = _offlineTransactionClone(tx.runtime);
+            _offlineSurvivalRuntime = _offlineTransactionClone(tx.survivalRuntime);
+            try { if (typeof resetCatchupGainItemIndex === 'function') resetCatchupGainItemIndex(); } catch (e) {}
+            try { if (typeof discardCatchupAutoSort === 'function') discardCatchupAutoSort(); } catch (e) {}
+            try { if (typeof calcStats === 'function') calcStats(); } catch (e) {}
+            try { if (typeof updateUI === 'function') updateUI(); } catch (e) {}
+            try { if (typeof renderTabs === 'function') renderTabs(true); } catch (e) {}
+        }
+        if (typeof window !== 'undefined') window.__fb5OfflineRewardTransaction = tx.previousCollectionGate;
+    }
+
+    function _offlineFlushSharedCollections() {
+        try { if (typeof saveCardDex === 'function') saveCardDex(); } catch (e) {}
+        try { if (typeof saveEquipDex === 'function') saveEquipDex(); } catch (e) {}
+        try { if (typeof saveMiscDex === 'function') saveMiscDex(); } catch (e) {}
+        try { if (typeof saveRelicDex === 'function') saveRelicDex(); } catch (e) {}
+    }
+
     function _offlineGrantBatch(source, profile, elapsed, rawElapsed, efficiency, options) {
         options = options || {};
         let now = options.now || _offlineNow();
         let requestedElapsed = elapsed;
-        let survivalPlan = _offlineSurvivalPlan(profile, elapsed, efficiency, true);
+        let survivalPlan, bossPlan, exp, gold, kills, loot, savedOk = false;
+        let transaction = _offlineBeginRewardTransaction();
+        try {
+        survivalPlan = _offlineSurvivalPlan(profile, elapsed, efficiency, true);
         elapsed = survivalPlan.elapsedMs;
         let bossRoom = profile.bossRoom === true;
         let previewKills = bossRoom ? 0 : _offlineRewardAmount(profile.killsPerMin, elapsed, efficiency);
-        let bossPlan = bossRoom ? _offlineBossRoomPlan(profile, elapsed, efficiency, true) :
+        bossPlan = bossRoom ? _offlineBossRoomPlan(profile, elapsed, efficiency, true) :
             (options.allowBosses ? _offlineBossPlan(profile, previewKills, elapsed) :
                 { rows: [], kills: 0, timeMs: 0, exp: 0, gold: 0, petExp: 0, allyExp: 0 });
         let nativePlanner = typeof window !== 'undefined' ? window.idleLineageNativeOffline : null;
@@ -1772,7 +1832,7 @@
         let nativeTotalsValid = nativeTotals && totalKeys.every(key =>
             Number.isFinite(nativeTotals[key]) && nativeTotals[key] >= 0 && nativeTotals[key] <= Number.MAX_SAFE_INTEGER) &&
             nativeTotals.huntElapsedMs <= elapsed;
-        let huntElapsed, normalKills, exp, gold, kills, petExp, allyExp;
+        let huntElapsed, normalKills, petExp, allyExp;
         if (nativeTotalsValid) {
             huntElapsed = nativeTotals.huntElapsedMs;
             normalKills = nativeTotals.normalKills;
@@ -1794,7 +1854,7 @@
             allyExp = Math.min(Number.MAX_SAFE_INTEGER, bossRoom ? bossPlan.allyExp :
                 _offlineRewardAmount(profile.allyExpPerMin, huntElapsed, efficiency) + bossPlan.allyExp);
         }
-        let loot = kills > 0 ? _offlineRollLoot(profile, normalKills, bossPlan) :
+        loot = kills > 0 ? _offlineRollLoot(profile, normalKills, bossPlan) :
             { items: {}, cards: {}, itemCount: 0, cardCount: 0 };
         let safeRoom = Number.MAX_SAFE_INTEGER - Math.max(0, Number(player.gold) || 0);
         gold = Math.min(gold, Math.max(0, safeRoom));
@@ -1813,29 +1873,37 @@
         if (options.advanceCombatTime) _offlineAdvanceCombatTime(elapsed);
         if (survivalPlan.died) _offlineLockAfterDeath();
 
-        _offlineResetRuntime(typeof mapState !== 'undefined' && mapState ? mapState.current : '');
-        _offlinePrepareSnapshot(now);
+        if (!options.preserveOfflineState) {
+            _offlineResetRuntime(typeof mapState !== 'undefined' && mapState ? mapState.current : '');
+            _offlinePrepareSnapshot(now);
+        }
         try { if (typeof calcStats === 'function') calcStats(); } catch (e) {}
         try { if (typeof updateUI === 'function') updateUI(); } catch (e) {}
         try { if (typeof renderTabs === 'function') renderTabs(true); } catch (e) {}
-        let savedOk = false;
         _offlineInternalSave = true;
         try { savedOk = _offlineOriginalSaveGame() === true; } finally { _offlineInternalSave = false; }
         _offlineLastBatchSavedOk = savedOk;
         if (options.claimHandle) {
             if (savedOk) {
                 // 獎勵與 player.offlineHunt.claimedUntil 已在同一份角色存檔落地；外部 claim 只做跨分頁互斥。
-                if (!_offlineCommitClaim(options.claimHandle, now)) _offlinePendingClaimAt = Math.max(_offlinePendingClaimAt, now);
+                if (!_offlineCommitClaim(options.claimHandle, now)) _offlineRememberDeferredClaim(now);
             } else {
                 // 角色仍保留本次畫面收益與內部 claim，避免目前分頁重領；外部時間點與 checkpoint 回滾，
                 // 下一次成功手動存檔後再由 _offlineCommitDeferredClaim 提交。
-                _offlinePendingClaimAt = Math.max(_offlinePendingClaimAt, now);
+                _offlineRememberDeferredClaim(now);
                 _offlineReleaseClaim(options.claimHandle, true);
             }
         }
+        _offlineFinishRewardTransaction(transaction, false);
+        transaction = null;
+        if (savedOk) _offlineFlushSharedCollections();
+        } catch (e) {
+            _offlineFinishRewardTransaction(transaction, true);
+            throw e;
+        }
         let label = options.label || '離線收益';
         if (!savedOk && typeof logSys === 'function') {
-            logSys('<span class="text-red-400 font-bold">' + label + '已套用至目前畫面，但存檔失敗，請立即再按一次存檔。</span>');
+            try { logSys('<span class="text-red-400 font-bold">' + label + '已套用至目前畫面，但存檔失敗，請立即再按一次存檔。</span>'); } catch (e) {}
         }
         let result = {
             mapName: source.mapName || profile.mapName || source.map,
@@ -1858,32 +1926,39 @@
             cardCount: loot.cardCount
         };
         if (typeof logSys === 'function' && options.catchupFormat) {
-            logSys('<span class="' + (survivalPlan.died ? 'text-red-400' : 'text-cyan-300') + ' font-bold">⏩ 掛機補跑完成：</span>已補上 ' +
-                _offlineFormatCatchupDuration(elapsed) + ' 的進度' + (gold > 0 ? ('，金幣 +' + gold.toLocaleString()) : '') +
-                (survivalPlan.died ? '，角色在戰鬥中死亡，後續時間不再計算收益。' : '。'));
-            let gains = _offlineCatchupGainRows(loot);
-            if (gains.length) logSys('<span class="sys-item-gain">掛機期間獲得：' + gains.join('、') + '</span>');
+            try {
+                logSys('<span class="' + (survivalPlan.died ? 'text-red-400' : 'text-cyan-300') + ' font-bold">⏩ 掛機補跑完成：</span>已補上 ' +
+                    _offlineFormatCatchupDuration(elapsed) + ' 的進度' + (gold > 0 ? ('，金幣 +' + gold.toLocaleString()) : '') +
+                    (survivalPlan.died ? '，角色在戰鬥中死亡，後續時間不再計算收益。' : '。'));
+                let gains = _offlineCatchupGainRows(loot);
+                if (gains.length) logSys('<span class="sys-item-gain">掛機期間獲得：' + gains.join('、') + '</span>');
+            } catch (e) {}
         } else if (typeof logSys === 'function') {
-            logSys('<span class="text-amber-300 font-bold">' + label + '：</span>經驗 ' + exp.toLocaleString() +
-                '、金幣 ' + gold.toLocaleString() + '、擊殺怪物 ' + kills.toLocaleString() +
-                (bossPlan.kills > 0 ? ('（含頭目 ' + bossPlan.kills.toLocaleString() + '）') : '') +
-                '、掉落物 ' + loot.itemCount.toLocaleString() + '、卡片 ' + loot.cardCount.toLocaleString() + '。');
-            if (survivalPlan.died) {
-                logSys('<span class="text-red-400 font-bold">角色在離線戰鬥 ' + _offlineFormatDuration(elapsed) +
-                    ' 後死亡，後續收益已停止；離線頭目戰需再次擊敗頭目才能解鎖，普通狩獵復活後仍可掛機。</span>');
-            }
+            try {
+                logSys('<span class="text-amber-300 font-bold">' + label + '：</span>經驗 ' + exp.toLocaleString() +
+                    '、金幣 ' + gold.toLocaleString() + '、擊殺怪物 ' + kills.toLocaleString() +
+                    (bossPlan.kills > 0 ? ('（含頭目 ' + bossPlan.kills.toLocaleString() + '）') : '') +
+                    '、掉落物 ' + loot.itemCount.toLocaleString() + '、卡片 ' + loot.cardCount.toLocaleString() + '。');
+                if (survivalPlan.died) {
+                    logSys('<span class="text-red-400 font-bold">角色在離線戰鬥 ' + _offlineFormatDuration(elapsed) +
+                        ' 後死亡，後續收益已停止；離線頭目戰需再次擊敗頭目才能解鎖，普通狩獵復活後仍可掛機。</span>');
+                }
+            } catch (e) {}
         }
         if (survivalPlan.died) _offlineApplySettledDeath();
-        if (options.showModal) _offlineShowSummary(result);
+        if (options.showModal) { try { _offlineShowSummary(result); } catch (e) {} }
         return true;
     }
 
-    function _offlineSettleCatchup(elapsedMs, reason, sourceOverride) {
-        if (_offlineSettling || _offlineLoading || typeof document === 'undefined' || document.hidden) return false;
+    function _offlineSettleCatchup(elapsedMs, reason, sourceOverride, settleOptions) {
+        settleOptions = settleOptions || {};
+        let nestedRestore = settleOptions.parentSettling === true && reason === 'restore';
+        if ((_offlineSettling && !nestedRestore) || _offlineLoading || typeof document === 'undefined' || document.hidden) return false;
         if (typeof player === 'undefined' || !player || !player.cls || typeof state === 'undefined' || !state.running) return true;
         let rawElapsed = Math.max(0, Math.floor(_offlineFinite(elapsedMs, 0)));
         if (rawElapsed < TICK_MS) return true;
         _offlineLastBatchSavedOk = false;
+        let previousSettling = _offlineSettling;
         _offlineSettling = true;
         try {
             let now = _offlineNow();
@@ -1891,15 +1966,20 @@
             let saved = _offlineEnsureState();
             let map = typeof mapState !== 'undefined' && mapState ? String(mapState.current || '') : '';
             let restoredSource = sourceOverride && typeof sourceOverride === 'object' ? sourceOverride : null;
+            let restoredBatch = reason === 'restore' && !!restoredSource;
             let profile = restoredSource ? _offlineProfile(restoredSource.profile) : _offlineProfileForMap(saved, map);
             let eligible = restoredSource ? restoredSource.eligible === true && restoredSource.map === map :
                 !!(saved && saved.eligible && saved.map === map);
             _offlineHiddenAt = 0;
             // 沒有合格實戰樣本時仍消耗背景時間與狀態，不退回逐 tick 補跑。
             if (!saved || !eligible || !profile || profile.map !== map || profile.killsPerMin <= 0) {
+                let transaction = _offlineBeginRewardTransaction();
+                try {
                 _offlineAdvanceCombatTime(elapsed);
-                _offlineResetRuntime(map);
-                _offlinePrepareSnapshot(now);
+                if (!restoredBatch) {
+                    _offlineResetRuntime(map);
+                    _offlinePrepareSnapshot(now);
+                }
                 try { if (typeof calcStats === 'function') calcStats(); } catch (e) {}
                 try { if (typeof updateUI === 'function') updateUI(); } catch (e) {}
                 try { if (typeof renderTabs === 'function') renderTabs(true); } catch (e) {}
@@ -1907,29 +1987,41 @@
                 try {
                     _offlineLastBatchSavedOk = _offlineOriginalSaveGame() === true;
                     if (_offlineLastBatchSavedOk) _offlineCommitDeferredClaim();
-                } catch (e) {}
-                finally { _offlineInternalSave = false; }
+                } finally { _offlineInternalSave = false; }
+                _offlineFinishRewardTransaction(transaction, false);
+                transaction = null;
+                if (_offlineLastBatchSavedOk) _offlineFlushSharedCollections();
                 return true;
+                } catch (e) {
+                    _offlineFinishRewardTransaction(transaction, true);
+                    throw e;
+                }
             }
             let claimHandle = _offlineAcquireClaim(now);
             if (!claimHandle) return false;
-            saved.claimedUntil = Math.max(Math.floor(_offlineFinite(saved.claimedUntil, 0)), now);
+            // 關頁前的背景債務早於真正離線區間，只借 claim 當跨分頁互斥鎖，不提前消耗後面的離線時間。
+            if (!restoredBatch) saved.claimedUntil = Math.max(Math.floor(_offlineFinite(saved.claimedUntil, 0)), now);
             try {
-                return _offlineGrantBatch(restoredSource || saved, profile, elapsed, rawElapsed, 1, {
+                let result = _offlineGrantBatch(restoredSource || saved, profile, elapsed, rawElapsed, 1, {
                     now: now,
                     label: '掛機結算',
                     advanceCombatTime: true,
                     catchupFormat: true,
                     showModal: false,
-                    claimHandle: claimHandle
+                    claimHandle: restoredBatch ? null : claimHandle,
+                    preserveOfflineState: restoredBatch
                 });
+                if (restoredBatch) _offlineRestoredCatchupClaim = claimHandle;
+                return result;
             } catch (e) {
-                saved.claimedUntil = claimHandle.previousPlayerClaim;
+                let currentSaved = _offlineEnsureState();
+                if (!restoredBatch && currentSaved) currentSaved.claimedUntil = claimHandle.previousPlayerClaim;
                 _offlineReleaseClaim(claimHandle, true);
+                if (restoredBatch) _offlineRestoredCatchupClaim = null;
                 throw e;
             }
         } finally {
-            _offlineSettling = false;
+            _offlineSettling = previousSettling;
         }
     }
     window.offlineSettleCatchup = _offlineSettleCatchup;
@@ -1984,6 +2076,19 @@
                     profile: JSON.parse(JSON.stringify(profile))
                 };
             }
+            // 關頁前尚未補完的背景時間在時間軸上較早，必須先結算；其存檔保留原離線 checkpoint，
+            // 因此即使兩批之間關閉頁面，真正離線區間仍可在下次載入續領。
+            let pendingCatchup = _offlineReadJson(_offlineStoreKey('catchup'));
+            if (pendingCatchup) {
+                let catchupCommitted = false;
+                try {
+                    catchupCommitted = _offlineRestorePendingCatchup(catchupSource, { parentSettling: true }) === true;
+                } catch (e) {
+                    try { console.error('[offline catchup] restore failed', e); } catch (_e) {}
+                    return false;
+                }
+                if (!catchupCommitted || !_offlineLastBatchSavedOk || (player && player.dead)) return false;
+            }
             if (!source.eligible || bossLocked || !profile || profile.map !== source.map || elapsed < OFFLINE_MIN_MS || profile.killsPerMin <= 0) {
                 _offlineResetRuntime(typeof mapState !== 'undefined' && mapState ? mapState.current : '');
                 _offlinePrepareSnapshot(now);
@@ -2003,15 +2108,13 @@
                     claimHandle: claimHandle
                 });
             } catch (e) {
-                saved.claimedUntil = claimHandle.previousPlayerClaim;
+                let currentSaved = _offlineEnsureState();
+                if (currentSaved) currentSaved.claimedUntil = claimHandle.previousPlayerClaim;
                 _offlineReleaseClaim(claimHandle, true);
                 throw e;
             }
         } finally {
             _offlineSettling = false;
-            try { _offlineRestorePendingCatchup(catchupSource); } catch (e) {
-                try { console.error('[offline catchup] restore failed', e); } catch (_e) {}
-            }
         }
     }
 
@@ -2235,7 +2338,10 @@
             }
             let result = _offlineOriginalSaveGame.apply(this, arguments);
             if (result === true && _offlineRestoredCatchupKey) _offlineCommitRestoredCatchup();
-            if (result === true) _offlineCommitDeferredClaim();
+            if (result === true) {
+                _offlineCommitDeferredClaim();
+                _offlineFlushSharedCollections();
+            }
             return result;
         };
     }
