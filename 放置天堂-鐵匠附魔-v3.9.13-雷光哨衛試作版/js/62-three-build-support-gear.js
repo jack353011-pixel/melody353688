@@ -89,3 +89,78 @@ addDrops('克特',['hlm_royal_valor_crown','clk_royal_lion_mantle','glv_royal_sw
 addDrops('古代巨人',['hlm_unyielding_bastion','shd_unyielding_bulwark','glv_unyielding_impact','bot_unyielding_march']);
 addDrops('林德拜爾',['hlm_thunder_dragon_horn','clk_thunder_dragon_tempest','glv_thunder_dragon_spine','bot_thunder_dragon_step']);
 })();
+
+// 🧩 v3.9.70 技能觸發熱修：先集中驗證，穩定後再拆回各技能檔。
+(function(){
+'use strict';
+const FANG='sk_dark_fang',STEALTH='sk_dark_stealth';
+
+function equipCore(slot,core){
+ let item=player&&player.eq&&player.eq[slot],def=item&&DB.items[item.id];
+ return !!(item&&def&&def.core===core);
+}
+function totals(){return typeof d2rEquipTotals==='function'?d2rEquipTotals(player):{}}
+function living(){return typeof mapState!=='undefined'&&mapState&&Array.isArray(mapState.mobs)?mapState.mobs.filter(m=>m&&m.curHp>0&&!m._dead):[]}
+function sentryBonus(){let t=totals();return{trt:Math.min(60,Number(t.trt)||0),trc:Math.min(50,Number(t.trc)||0)}}
+function cloneBonus(){let t=totals();return{shn:Math.min(2,Math.floor(Number(t.shn)||0)),sht:Math.min(60,Number(t.sht)||0),shc:Math.min(40,Number(t.shc)||0)}}
+
+function deploySentryFallback(){
+ if(!player||player.cls!=='dark'||player.dead||!equipCore('wpn','lightningSentry')||(Number(player.lightningSentryCd313)||0)>0)return false;
+ let b=sentryBonus();
+ player.lightningSentryCd313=Math.max(60,Math.round(120*(1-b.trc/100)));
+ player.lightningSentryActive313=Math.round(60*(1+b.trt/100));
+ player.lightningSentryNext313=1;
+ if(typeof logCombat==='function')logCombat('<span class="text-cyan-200 font-bold">【雷光哨衛鋼爪】</span>觸發保險補上雷光哨衛部署。','player-special');
+ return true;
+}
+function deployCloneFallback(){
+ if(!player||player.cls!=='dark'||player.dead||!equipCore('cloak','shadowClone')||(Number(player.shadowCloneCd93)||0)>0||!living().length)return false;
+ let b=cloneBonus();
+ player.shadowCloneCd93=Math.max(70,Math.round(140*(1-b.shc/100)));
+ player.shadowClone93={left:Math.round(60*(1+b.sht/100)),next:1,count:1+b.shn,hit:0,anim:0};
+ if(typeof logCombat==='function')logCombat('<span class="text-fuchsia-300 font-bold">【暗影幻身斗篷】</span>敵人出現，補上先前暗隱術的暗影分身。','player-special');
+ return true;
+}
+function ensureLatch(){
+ if(!player)return;
+ if(!Number.isFinite(player._skillHotfixFangSeen370))player._skillHotfixFangSeen370=0;
+ if(!Number.isFinite(player._skillHotfixStealthSeen370))player._skillHotfixStealthSeen370=0;
+ if(typeof player._skillHotfixFangHandled370!=='boolean')player._skillHotfixFangHandled370=false;
+ if(typeof player._skillHotfixStealthHandled370!=='boolean')player._skillHotfixStealthHandled370=false;
+}
+function syncFallbacks(){
+ if(typeof player==='undefined'||!player)return;
+ ensureLatch();
+ let fang=Number(player.buffs&&player.buffs[FANG])||0,fangPrev=Number(player._skillHotfixFangSeen370)||0;
+ if(fang<=0)player._skillHotfixFangHandled370=false;
+ else{
+  if(fang>fangPrev+1)player._skillHotfixFangHandled370=false;
+  if(!equipCore('wpn','lightningSentry')||player.cls!=='dark')player._skillHotfixFangHandled370=true;
+  else if((Number(player.lightningSentryActive313)||0)>0||(Number(player.lightningSentryCd313)||0)>0)player._skillHotfixFangHandled370=true;
+  else if(!player._skillHotfixFangHandled370&&deploySentryFallback())player._skillHotfixFangHandled370=true;
+ }
+ player._skillHotfixFangSeen370=fang;
+
+ let stealth=Number(player.buffs&&player.buffs[STEALTH])||0,stealthPrev=Number(player._skillHotfixStealthSeen370)||0;
+ if(stealth<=0)player._skillHotfixStealthHandled370=false;
+ else{
+  if(stealth>stealthPrev+1)player._skillHotfixStealthHandled370=false;
+  if(!equipCore('cloak','shadowClone')||player.cls!=='dark')player._skillHotfixStealthHandled370=true;
+  else if(player.shadowClone93||(Number(player.shadowCloneCd93)||0)>0)player._skillHotfixStealthHandled370=true;
+  else if(!player._skillHotfixStealthHandled370&&living().length&&deployCloneFallback())player._skillHotfixStealthHandled370=true;
+ }
+ player._skillHotfixStealthSeen370=stealth;
+}
+
+let oldTick370=window.tick;
+if(typeof oldTick370==='function'){
+ window.tick=function(){
+  if(typeof state!=='undefined'&&!state.running)return;
+  if(typeof player!=='undefined'&&player&&player.dead)return;
+  let result=oldTick370.apply(this,arguments);
+  try{syncFallbacks()}catch(e){if(typeof console!=='undefined'&&console.warn)console.warn('[skill-trigger-hotfix]',e)}
+  return result;
+ };
+ if(typeof tick==='function')tick=window.tick;
+}
+})();
