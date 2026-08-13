@@ -23,7 +23,7 @@
     const OFFLINE_MAX_SAVED_PROFILES = 15;
     const OFFLINE_RECENT_KILL_MS = 5 * 60 * 1000;
     const OFFLINE_HEARTBEAT_MS = 30 * 1000;
-    const OFFLINE_CLAIM_LOCK_MS = 15 * 1000;
+    const OFFLINE_CLAIM_LOCK_MS = 60 * 1000;
     const OFFLINE_MAX_KILLS_PER_MIN = 3000;
     const OFFLINE_MAX_EXP_PER_MIN = 1e12;
     const OFFLINE_MAX_GOLD_PER_MIN = 1e10;
@@ -816,7 +816,7 @@
         });
     }
 
-    function _offlineRestorePendingCatchup() {
+    function _offlineRestorePendingCatchup(sourceOverride) {
         let key = _offlineStoreKey('catchup');
         let pending = _offlineReadJson(key);
         if (!key || !pending) return false;
@@ -828,7 +828,17 @@
         }
         _offlineRestoredCatchupKey = key;
         _offlineLastBatchSavedOk = false;
-        if (typeof window.offlineSettleCatchup !== 'function' || !window.offlineSettleCatchup(ms, 'restore')) {
+        let settled = false;
+        try {
+            settled = typeof window.offlineSettleCatchup === 'function' &&
+                window.offlineSettleCatchup(ms, 'restore', sourceOverride) === true;
+        } catch (e) {
+            // 獎勵流程例外時只清除本頁記憶體標記，持久憑證必須留下供下次載入重試。
+            _offlineRestoredCatchupKey = '';
+            _offlineLastBatchSavedOk = false;
+            throw e;
+        }
+        if (!settled) {
             _offlineRestoredCatchupKey = '';
             return false;
         }
@@ -885,8 +895,14 @@
     function _offlineCommitClaim(handle, now) {
         if (!handle) return false;
         let current = _offlineReadJson(handle.key);
-        if (current && current.status === 'pending' && current.token !== handle.token) return false;
-        let ok = _offlineWriteJson(handle.key, { v: OFFLINE_VERSION, status: 'committed', claimedUntil: now });
+        // 只有仍持有同一枚 pending token 的分頁能提交；鎖過期後被別頁接手時，舊分頁不可覆蓋新 claim。
+        if (!current || current.status !== 'pending' || current.token !== handle.token) return false;
+        let previousAt = handle.previous && handle.previous.status !== 'pending' ?
+            _offlineClaimTime(handle.previous.claimedUntil, now) : 0;
+        let internalAt = typeof player !== 'undefined' && player && player.offlineHunt ?
+            _offlineClaimTime(player.offlineHunt.claimedUntil, now) : 0;
+        let committedAt = Math.max(now, previousAt, internalAt);
+        let ok = _offlineWriteJson(handle.key, { v: OFFLINE_VERSION, status: 'committed', claimedUntil: committedAt });
         if (ok) _offlinePendingClaimAt = 0;
         return ok;
     }
@@ -898,10 +914,11 @@
         if (owned) {
             if (handle.previous) _offlineWriteJson(handle.key, handle.previous);
             else _offlineStorageRemove(handle.key);
-        }
-        if (restoreCheckpoint && handle.checkpointKey) {
-            if (handle.previousCheckpoint) _offlineWriteJson(handle.checkpointKey, handle.previousCheckpoint);
-            else _offlineStorageRemove(handle.checkpointKey);
+            // 只有 claim 仍屬於本分頁時才可回滾 checkpoint，避免覆蓋另一分頁剛建立的新快照。
+            if (restoreCheckpoint && handle.checkpointKey) {
+                if (handle.previousCheckpoint) _offlineWriteJson(handle.checkpointKey, handle.previousCheckpoint);
+                else _offlineStorageRemove(handle.checkpointKey);
+            }
         }
         return owned;
     }
@@ -909,7 +926,16 @@
     function _offlineCommitDeferredClaim() {
         if (!(_offlinePendingClaimAt > 0)) return false;
         let at = _offlinePendingClaimAt;
-        let ok = _offlineWriteJson(_offlineStoreKey('claim'), { v: OFFLINE_VERSION, status: 'committed', claimedUntil: at });
+        let key = _offlineStoreKey('claim');
+        let now = _offlineNow();
+        let current = _offlineReadJson(key);
+        // 其他分頁仍持有有效鎖時不可插隊；過期鎖則由角色存檔中的 internal claim 接手提交。
+        if (current && current.status === 'pending' && _offlineClaimTime(current.lockUntil, now) > now) return false;
+        let externalAt = current && current.status !== 'pending' ? _offlineClaimTime(current.claimedUntil, now) : 0;
+        let internalAt = typeof player !== 'undefined' && player && player.offlineHunt ?
+            _offlineClaimTime(player.offlineHunt.claimedUntil, now) : 0;
+        let committedAt = Math.max(at, externalAt, internalAt);
+        let ok = _offlineWriteJson(key, { v: OFFLINE_VERSION, status: 'committed', claimedUntil: committedAt });
         if (ok) _offlinePendingClaimAt = 0;
         return ok;
     }
@@ -1852,7 +1878,7 @@
         return true;
     }
 
-    function _offlineSettleCatchup(elapsedMs, reason) {
+    function _offlineSettleCatchup(elapsedMs, reason, sourceOverride) {
         if (_offlineSettling || _offlineLoading || typeof document === 'undefined' || document.hidden) return false;
         if (typeof player === 'undefined' || !player || !player.cls || typeof state === 'undefined' || !state.running) return true;
         let rawElapsed = Math.max(0, Math.floor(_offlineFinite(elapsedMs, 0)));
@@ -1864,10 +1890,13 @@
             let elapsed = rawElapsed;
             let saved = _offlineEnsureState();
             let map = typeof mapState !== 'undefined' && mapState ? String(mapState.current || '') : '';
-            let profile = _offlineProfileForMap(saved, map);
+            let restoredSource = sourceOverride && typeof sourceOverride === 'object' ? sourceOverride : null;
+            let profile = restoredSource ? _offlineProfile(restoredSource.profile) : _offlineProfileForMap(saved, map);
+            let eligible = restoredSource ? restoredSource.eligible === true && restoredSource.map === map :
+                !!(saved && saved.eligible && saved.map === map);
             _offlineHiddenAt = 0;
             // 沒有合格實戰樣本時仍消耗背景時間與狀態，不退回逐 tick 補跑。
-            if (!saved || !saved.eligible || saved.map !== map || !profile || profile.killsPerMin <= 0) {
+            if (!saved || !eligible || !profile || profile.map !== map || profile.killsPerMin <= 0) {
                 _offlineAdvanceCombatTime(elapsed);
                 _offlineResetRuntime(map);
                 _offlinePrepareSnapshot(now);
@@ -1886,7 +1915,7 @@
             if (!claimHandle) return false;
             saved.claimedUntil = Math.max(Math.floor(_offlineFinite(saved.claimedUntil, 0)), now);
             try {
-                return _offlineGrantBatch(saved, profile, elapsed, rawElapsed, 1, {
+                return _offlineGrantBatch(restoredSource || saved, profile, elapsed, rawElapsed, 1, {
                     now: now,
                     label: '掛機結算',
                     advanceCombatTime: true,
@@ -1908,6 +1937,7 @@
     function _offlineSettle(reason) {
         if (_offlineSettling || _offlineLoading || typeof document === 'undefined' || document.hidden) return false;
         if (typeof player === 'undefined' || !player || !player.cls || typeof state === 'undefined' || !state.running) return false;
+        let catchupSource = null;
         _offlineSettling = true;
         try {
             let now = _offlineNow();
@@ -1944,6 +1974,16 @@
             let elapsed = Math.min(rawElapsed, OFFLINE_MAX_MS);
             let profile = _offlineProfile(source.profile);
             let bossLocked = source.bossUnlocked === false && profile && profile.bossRoom === true;
+            if (source.eligible && !bossLocked && profile && profile.map === source.map && profile.killsPerMin > 0) {
+                // 主離線批次會重置 runtime／eligible；保留結算前快照，讓關頁前尚未跑完的背景債務仍按原地圖發放。
+                catchupSource = {
+                    eligible: true,
+                    bossUnlocked: source.bossUnlocked !== false,
+                    map: String(source.map || ''),
+                    mapName: String(source.mapName || profile.mapName || ''),
+                    profile: JSON.parse(JSON.stringify(profile))
+                };
+            }
             if (!source.eligible || bossLocked || !profile || profile.map !== source.map || elapsed < OFFLINE_MIN_MS || profile.killsPerMin <= 0) {
                 _offlineResetRuntime(typeof mapState !== 'undefined' && mapState ? mapState.current : '');
                 _offlinePrepareSnapshot(now);
@@ -1969,7 +2009,9 @@
             }
         } finally {
             _offlineSettling = false;
-            try { _offlineRestorePendingCatchup(); } catch (e) {}
+            try { _offlineRestorePendingCatchup(catchupSource); } catch (e) {
+                try { console.error('[offline catchup] restore failed', e); } catch (_e) {}
+            }
         }
     }
 
