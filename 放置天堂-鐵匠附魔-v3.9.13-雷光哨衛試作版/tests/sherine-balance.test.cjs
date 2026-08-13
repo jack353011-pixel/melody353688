@@ -126,6 +126,18 @@ resilienceCtx.activateBossResilience(damagedBoss);
 damagedBoss.curHp -= 10;   // 模擬任意傷害來源經過統一 curHp 扣血層
 assert.equal(damagedBoss._lastDamageTick, 77, '任意傷害應記錄席琳頭目回血抑制時間');
 
+let phaseCalls = 0;
+resilienceCtx.sherineBossPhaseTick = mob => { mob._sherineBossPhase++; phaseCalls++; };
+let gatedBoss = { curHp:101, hp:101, _bossResiliencePct:0.08, _sherineBossThresholds:[0.5], _sherineBossPhase:0 };
+resilienceCtx.activateBossResilience(gatedBoss);
+gatedBoss.curHp -= 1000;
+assert.equal(gatedBoss.curHp, 50, '致命爆發應停在下一個席琳頭目生命門檻');
+assert.equal(gatedBoss._sherineBossPhase, 1, '抵達生命門檻時應立即完成裂界進階');
+assert.equal(gatedBoss._lastDamageTaken, 51, '生命閘門後的實際傷害紀錄應等於實際扣血');
+assert.equal(phaseCalls, 1, '單次傷害只能推進一個裂界階段');
+gatedBoss.curHp -= 1000;
+assert.ok(gatedBoss.curHp <= 0, '所有裂界階段完成後不應繼續鎖住致命傷害');
+
 const damagePaths = [combat, pets, summons, guards].join('\n');
 assert.doesNotMatch(damagePaths, /_sherineMad\s*\?\s*3\s*:\s*2/, '仍有單位沿用舊席琳傷害倍率');
 assert.match(damagePaths, /sherineEnemyDamageMult\(mob\)/, '戰鬥路徑未使用共用席琳傷害倍率');
@@ -135,6 +147,8 @@ assert.match(combatCore, /mob\._lastDamageTick = state\.ticks/, '頭目受到任
 assert.match(combatCore, /m\._sherine \? m\._lastDamageTick : m\._lastPhysicalHitTick/, '席琳頭目回血仍只接受物理傷害抑制');
 assert.match(offline, /function _offlineSherineCrystalCount/, '離線結算缺少結晶保底');
 assert.match(offline, /mob\.sherineMad \? 40 : 100/, '離線結晶保底門檻錯誤');
+assert.match(offline, /function _offlineEquipmentBlessRate/, '離線裝備缺少共用祝福率計算');
+assert.match(summons, /pr\.stun && !m\.boss/, '召喚物暈眩仍可繞過頭目硬控免疫');
 assert.match(drops, /sherineCrystalPity: \{ world:0, mad:0 \}/, '存檔預設缺少結晶保底進度');
 assert.match(world, /頭目累積 100 次未掉落時保底/, '煉獄介面未顯示保底');
 assert.match(world, /頭目 40 次保底/, '地獄介面未顯示保底');

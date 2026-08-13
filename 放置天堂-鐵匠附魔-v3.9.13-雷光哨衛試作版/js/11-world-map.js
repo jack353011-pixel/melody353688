@@ -1517,16 +1517,17 @@ function fmtPrideTime(ms) {
     return `${p(h)}:${p(m)}:${p(sec)}`;
 }
 function renderPrideEntrance(container) {
-    // 一般 / 席琳的世界 兩種排名各自獨立顯示；席琳的紀錄以綠色呈現
-    let rankBlock = (r, sherine) => {
+    // 普通／煉獄／地獄三種排名各自獨立顯示。
+    let rankBlock = (r, mode) => {
         r = r || { best: null, last: null, isNew: false };
         let lastTxt = r.last ? `第 ${r.last.floor} 樓，花費時間 ${fmtPrideTime(r.last.ms)}` : '尚無紀錄';
         let bestTxt = r.best ? `第 ${r.best.floor} 樓，花費時間 ${fmtPrideTime(r.best.ms)}` : '尚無紀錄';
         let newBadge = (r.isNew && r.best) ? ' <span class="text-yellow-300 font-bold animate-pulse">new</span>' : '';
-        let titleCls = sherine ? 'c-sherine' : 'text-amber-300';
-        let bodyCls = sherine ? 'text-green-300' : 'text-slate-200';
-        let title = sherine ? '排名紀錄（席琳的世界）' : '排名紀錄（一般）';
-        return `<div class="bg-slate-900/70 border ${sherine ? 'border-green-700/60' : 'border-slate-700'} rounded-lg p-3 text-sm leading-relaxed">
+        let sherine = mode !== 'normal', mad = mode === 'mad';
+        let titleCls = mad ? 'text-rose-300' : (sherine ? 'c-sherine' : 'text-amber-300');
+        let bodyCls = mad ? 'text-rose-200' : (sherine ? 'text-green-300' : 'text-slate-200');
+        let title = mad ? '排名紀錄（地獄）' : (sherine ? '排名紀錄（煉獄）' : '排名紀錄（普通）');
+        return `<div class="bg-slate-900/70 border ${mad ? 'border-rose-700/60' : (sherine ? 'border-green-700/60' : 'border-slate-700')} rounded-lg p-3 text-sm leading-relaxed">
             <div class="${titleCls} font-bold mb-1">${title}</div>
             <div class="${bodyCls}">本次紀錄　${lastTxt}</div>
             <div class="${bodyCls}">最高紀錄　${bestTxt}${newBadge}</div>
@@ -1537,9 +1538,10 @@ function renderPrideEntrance(container) {
     box.innerHTML = `
         <button onclick="startPrideClimb(false)" class="btn w-full py-4 text-xl font-bold bg-rose-800 hover:bg-rose-700 border border-rose-500 text-white shadow-lg">🗼 進入傲慢之塔</button>
         <button onclick="startPrideClimb(true)" class="btn w-full py-4 text-xl font-bold bg-amber-800 hover:bg-amber-700 border border-amber-500 text-white shadow-lg">🏆 挑戰排名模式</button>
-        ${rankBlock(player.prideRank, false)}
-        ${player.classicMode ? '' : rankBlock(player.prideRankSherine, true)}
-        <div class="text-slate-500 text-xs">排名模式中即使持有支配符也無法使用傳送術與瞬間移動卷軸；回村或擊敗 100 層頭目時結算。${player.classicMode ? '' : '一般與席琳的世界的排名各自獨立計算。'}</div>`;
+        ${rankBlock(player.prideRank, 'normal')}
+        ${player.classicMode ? '' : rankBlock(player.prideRankSherine, 'world')}
+        ${player.classicMode ? '' : rankBlock(player.prideRankSherineMad, 'mad')}
+        <div class="text-slate-500 text-xs">排名模式中即使持有支配符也無法使用傳送術與瞬間移動卷軸；回村或擊敗 100 層頭目時結算。${player.classicMode ? '' : '普通、煉獄與地獄的排名各自獨立計算。'}</div>`;
     container.appendChild(box);
 }
 

@@ -1979,10 +1979,21 @@ function activateBossResilience(mob) {
                 let attempted = storedHp - next;
                 let pct = Math.max(0, Math.min(BOSS_RESILIENCE_CAP, Number(mob._bossResiliencePct) || 0));
                 let dealt = pct > 0 ? Math.max(1, Math.round(attempted * (1 - pct))) : attempted;
-                storedHp -= dealt;
+                let settledHp = storedHp - dealt;
+                let thresholds = Array.isArray(mob._sherineBossThresholds) ? mob._sherineBossThresholds : [];
+                let phase = Math.max(0, Math.floor(Number(mob._sherineBossPhase) || 0));
+                let threshold = phase < thresholds.length ? Number(thresholds[phase]) : NaN;
+                // 向下取整才能保證 curHp / hp 已真正抵達門檻（奇數 HP 若向上取整會停在門檻外）。
+                let gateHp = Number.isFinite(threshold) && mob.hp > 0 ? Math.max(1, Math.floor(mob.hp * threshold)) : 0;
+                let enteredPhase = gateHp > 0 && storedHp > gateHp && settledHp <= gateHp;
+                if (enteredPhase) settledHp = gateHp;   // 席琳頭目每個裂界門檻都是生命閘門，爆發傷害不能跳階。
+                dealt = Math.max(0, storedHp - settledHp);
+                storedHp = settledHp;
                 mob._lastRawDamage = attempted;
                 mob._lastDamageTaken = dealt;
                 if (typeof state !== 'undefined' && state) mob._lastDamageTick = state.ticks;   // 席琳頭目回血抑制：物理／魔法／召喚／DoT 共用
+                // 立即完成本階進化，讓同一 tick 的下一個傷害來源只能推進下一個門檻，不會在階段處理前擊殺。
+                if (enteredPhase && typeof sherineBossPhaseTick === 'function') sherineBossPhaseTick(mob);
                 return;
             }
             storedHp = next;

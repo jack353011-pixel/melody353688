@@ -1925,8 +1925,8 @@ const SAVE_DEFAULTS = {
     hellfireTorchOpened: 0,
     magicShieldCd: 0, reviveScrollCd: 0, lastMapByCat: {}, lastBattleMap: null, tracking: null, sherineWorld: false, sherineMad: false, sherineCrystalPity: { world:0, mad:0 }, classicMode: false, traditionalMode: false,
     masteryQuest: null, mastery: null, masteryChangeCnt: 0,
-    prideBeatJenis: false, demonTempleOpen: false, flameAffinity: 0, trialStage: 0, prideRank: { best: null, last: null, isNew: false }, prideRankSherine: { best: null, last: null, isNew: false },
-    riftRank: { best: null, last: null, isNew: false }, riftRankSherine: { best: null, last: null, isNew: false }, riftRewardMs: null,
+    prideBeatJenis: false, demonTempleOpen: false, flameAffinity: 0, trialStage: 0, prideRank: { best: null, last: null, isNew: false }, prideRankSherine: { best: null, last: null, isNew: false }, prideRankSherineMad: { best: null, last: null, isNew: false },
+    riftRank: { best: null, last: null, isNew: false }, riftRankSherine: { best: null, last: null, isNew: false }, riftRankSherineMad: { best: null, last: null, isNew: false }, riftRewardMs: null,
     elfEle: null, poly: null, summon: null, charmed: null, hots: {},   // 🔧 v3.5.94 移除零讀取的舊制孤兒欄位 hot(單數)；團隊 HoT 休眠機制實際用的是 hots(複數 dict)，改在此初始化與 js/05/js/13 重設點一致
     manualCd: {}, cardDex: {}, cardDexV: 0, equipDex: {}, miscDex: {},
     eq: { charm:null },
@@ -1949,6 +1949,8 @@ function applySaveDefaults(p) {
             p[k] = dv;
         }
     }
+    // 難度旗標互斥；匯入異常舊檔若兩者同時為 true，以較高的地獄難度為準。
+    if (p.sherineMad) p.sherineWorld = false;
 }
 
 // ============================================================================

@@ -13,13 +13,14 @@
         if (localStorage.getItem('afk_toggle_offline') === '0') return;
     } catch (e) {}
 
-    const OFFLINE_VERSION = 6;
+    const OFFLINE_VERSION = 7;
     const OFFLINE_MIN_MS = 1 * 60 * 1000;
     const OFFLINE_MAX_MS = 12 * 60 * 60 * 1000;
     const OFFLINE_EFFICIENCY = 0.70;
     const OFFLINE_SAMPLE_MIN_MS = 15 * 1000;
     const OFFLINE_SAMPLE_MIN_KILLS = 3;
-    const OFFLINE_MAX_SAVED_PROFILES = 5;
+    // 同一張地圖的普通／煉獄／地獄實戰樣本必須分開保存；保留原本約五張地圖的容量。
+    const OFFLINE_MAX_SAVED_PROFILES = 15;
     const OFFLINE_RECENT_KILL_MS = 5 * 60 * 1000;
     const OFFLINE_HEARTBEAT_MS = 30 * 1000;
     const OFFLINE_MAX_KILLS_PER_MIN = 3000;
@@ -319,11 +320,34 @@
         return risk * risk * OFFLINE_LATENT_DEATH_MAX_PER_HOUR;                        // 平方＝越接近全滅才明顯上升
     }
 
+    function _offlineCurrentDifficulty() {
+        if (typeof player !== 'undefined' && player && player.sherineMad) return 'mad';
+        if (typeof player !== 'undefined' && player && player.sherineWorld) return 'world';
+        return 'normal';
+    }
+
+    // v7 前沒有 difficulty 欄位；從實戰怪物快照回推，無證據時按普通世界處理，避免誤發高難度收益。
+    function _offlineProfileDifficulty(raw, mobs, bosses) {
+        let saved = raw && String(raw.difficulty || '');
+        if (saved === 'normal' || saved === 'world' || saved === 'mad') return saved;
+        let rows = (Array.isArray(mobs) ? mobs : []).concat(Array.isArray(bosses) ? bosses : []);
+        if (rows.some(row => row && row.sherineMad)) return 'mad';
+        if (rows.some(row => row && row.sherine)) return 'world';
+        return 'normal';
+    }
+
+    function _offlineProfileKey(profile) {
+        return profile ? String(profile.map || '') + '|' + String(profile.difficulty || 'normal') : '';
+    }
+
     function _offlineProfile(raw) {
         if (!raw || typeof raw !== 'object' || !raw.map) return null;
+        let mobs = _offlineMobProfiles(raw.mobs);
+        let bosses = _offlineBossProfiles(raw.bosses);
         return {
             map: String(raw.map),
             mapName: String(raw.mapName || _offlineMapName(raw.map)),
+            difficulty: _offlineProfileDifficulty(raw, mobs, bosses),
             bossRoom: raw.bossRoom === true,
             bossCycleMs: Math.max(0, Math.floor(_offlineFinite(raw.bossCycleMs, 0))),
             survival: _offlineSurvivalProfile(raw.survival),
@@ -333,8 +357,8 @@
             petExpPerMin: _offlineClamp(raw.petExpPerMin, 0, OFFLINE_MAX_EXP_PER_MIN),
             allyExpPerMin: _offlineClamp(raw.allyExpPerMin, 0, OFFLINE_MAX_EXP_PER_MIN),
             sampleMs: Math.max(0, Math.floor(_offlineFinite(raw.sampleMs, 0))),
-            mobs: _offlineMobProfiles(raw.mobs),
-            bosses: _offlineBossProfiles(raw.bosses),
+            mobs: mobs,
+            bosses: bosses,
             sampleKills: Math.max(0, Math.floor(_offlineFinite(raw.sampleKills, 0))),
             updatedAt: Math.max(0, Math.floor(_offlineFinite(raw.updatedAt, 0)))
         };
@@ -343,28 +367,30 @@
     function _offlineSavedProfiles(raw, legacyProfile) {
         let rows = Array.isArray(raw) ? raw.slice() : [];
         if (legacyProfile) rows.push(legacyProfile);
-        let byMap = Object.create(null);
+        let byKey = Object.create(null);
         rows.forEach(row => {
             let profile = _offlineProfile(row);
             if (!profile) return;
-            let old = byMap[profile.map];
-            if (!old || profile.updatedAt >= old.updatedAt) byMap[profile.map] = profile;
+            let key = _offlineProfileKey(profile);
+            let old = byKey[key];
+            if (!old || profile.updatedAt >= old.updatedAt) byKey[key] = profile;
         });
-        return Object.keys(byMap)
-            .map(map => byMap[map])
+        return Object.keys(byKey)
+            .map(key => byKey[key])
             .sort((a, b) => b.updatedAt - a.updatedAt)
             .slice(0, OFFLINE_MAX_SAVED_PROFILES);
     }
 
-    function _offlineProfileForMap(st, map) {
+    function _offlineProfileForMap(st, map, difficulty) {
         map = String(map || '');
+        difficulty = difficulty || _offlineCurrentDifficulty();
         if (!st || !map) return null;
         let current = _offlineProfile(st.profile);
-        if (current && current.map === map) return current;
+        if (current && current.map === map && current.difficulty === difficulty) return current;
         let profiles = Array.isArray(st.profiles) ? st.profiles : [];
         for (let i = 0; i < profiles.length; i++) {
             let profile = _offlineProfile(profiles[i]);
-            if (profile && profile.map === map) return profile;
+            if (profile && profile.map === map && profile.difficulty === difficulty) return profile;
         }
         return null;
     }
@@ -383,7 +409,7 @@
         if (!raw || typeof raw !== 'object') raw = {};
         let profile = _offlineProfile(raw.profile);
         let profiles = _offlineSavedProfiles(raw.profiles, profile);
-        if (profile) profile = profiles.find(row => row.map === profile.map) || profile;
+        if (profile) profile = profiles.find(row => _offlineProfileKey(row) === _offlineProfileKey(profile)) || profile;
         player.offlineHunt = {
             v: OFFLINE_VERSION,
             eligible: raw.eligible === true,
@@ -401,6 +427,7 @@
     function _offlineResetRuntime(map) {
         _offlineRuntime = {
             map: String(map || ''),
+            difficulty: _offlineCurrentDifficulty(),
             firstKillAt: 0,
             lastKillAt: 0,
             kills: 0,
@@ -417,7 +444,7 @@
         let hp = typeof player !== 'undefined' && player ? Math.max(0, Number(player.hp) || 0) : 0;
         let mhp = typeof player !== 'undefined' && player ? Math.max(1, Number(player.mhp) || 1) : 1;
         _offlineSurvivalRuntime = {
-            map: String(map || ''), activeMs: 0, damage: 0, healing: 0,
+            map: String(map || ''), difficulty: _offlineCurrentDifficulty(), activeMs: 0, damage: 0, healing: 0,
             potionHealing: 0, potionUses: 0, potionCounts: Object.create(null), potionHeals: Object.create(null),
             deaths: 0, minHpPct: _offlineClamp(hp / mhp, 0, 1),
             lastHp: hp, lastTick: -1, deathTick: -1,
@@ -457,8 +484,9 @@
         if (player.offlineHunt.bossUnlocked === false && _offlineBossRoomMap(mapState.current)) return false;
         if (player.siege && player.siege.active) return false;
         if (state.prideClimb || state.riftRun) return false;
-        if (!profile || profile.map !== String(mapState.current) || profile.killsPerMin <= 0) return false;
-        if (_offlineRuntime && _offlineRuntime.map === String(mapState.current) && _offlineRuntime.lastKillAt > 0 &&
+        let difficulty = _offlineCurrentDifficulty();
+        if (!profile || profile.map !== String(mapState.current) || profile.difficulty !== difficulty || profile.killsPerMin <= 0) return false;
+        if (_offlineRuntime && _offlineRuntime.map === String(mapState.current) && _offlineRuntime.difficulty === difficulty && _offlineRuntime.lastKillAt > 0 &&
             now - _offlineRuntime.lastKillAt > OFFLINE_RECENT_KILL_MS) return false;
         return true;
     }
@@ -473,8 +501,9 @@
         if (typeof player !== 'undefined' && player && player.offlineHunt && player.offlineHunt.bossUnlocked === false && _offlineBossRoomMap(map)) {
             return { state: 'blocked', map: map, mapName: mapName };
         }
-        if (!profile || profile.map !== map || profile.killsPerMin <= 0) return { state: 'sampling', map: map, mapName: mapName };
-        if (_offlineRuntime && _offlineRuntime.map === map && _offlineRuntime.lastKillAt > 0 && now - _offlineRuntime.lastKillAt > OFFLINE_RECENT_KILL_MS) {
+        let difficulty = _offlineCurrentDifficulty();
+        if (!profile || profile.map !== map || profile.difficulty !== difficulty || profile.killsPerMin <= 0) return { state: 'sampling', map: map, mapName: mapName };
+        if (_offlineRuntime && _offlineRuntime.map === map && _offlineRuntime.difficulty === difficulty && _offlineRuntime.lastKillAt > 0 && now - _offlineRuntime.lastKillAt > OFFLINE_RECENT_KILL_MS) {
             return { state: 'stale', map: map, mapName: mapName };
         }
         return { state: 'blocked', map: map, mapName: mapName };
@@ -511,7 +540,7 @@
     function _offlineSurvivalSnapshot(map, previous, now, force) {
         let rt = _offlineSurvivalRuntime;
         previous = _offlineSurvivalProfile(previous);
-        if (!rt || rt.map !== String(map || '')) return previous;
+        if (!rt || rt.map !== String(map || '') || rt.difficulty !== _offlineCurrentDifficulty()) return previous;
         if (!rt.baseSet) {
             rt.baseSurvival = previous;
             rt.baseSet = true;
@@ -577,7 +606,8 @@
     }
 
     function _offlineRecordKill(mob, map, expGain, goldGain, petExpGain, allyExpGain, now) {
-        if (!_offlineRuntime || _offlineRuntime.map !== String(map)) _offlineResetRuntime(map);
+        let difficulty = _offlineCurrentDifficulty();
+        if (!_offlineRuntime || _offlineRuntime.map !== String(map) || _offlineRuntime.difficulty !== difficulty) _offlineResetRuntime(map);
         let rt = _offlineRuntime;
         if (!rt.firstKillAt) rt.firstKillAt = now;
         rt.lastKillAt = now;
@@ -608,7 +638,7 @@
         if (!st || !mob) return;
         let wasLocked = st.bossUnlocked === false;
         let previous = _offlineProfileForMap(st, map) || {
-            map: String(map), mapName: _offlineMapName(map), expPerMin: 0, goldPerMin: 0,
+            map: String(map), mapName: _offlineMapName(map), difficulty: _offlineCurrentDifficulty(), expPerMin: 0, goldPerMin: 0,
             killsPerMin: 0, petExpPerMin: 0, allyExpPerMin: 0, sampleMs: 0,
             mobs: [], bosses: [], sampleKills: 0, updatedAt: 0
         };
@@ -670,13 +700,14 @@
         if (!_offlineRuntime || !_offlineRuntime.firstKillAt) return previous;
         let rt = _offlineRuntime;
         let elapsed = Math.max(0, now - rt.firstKillAt);
-        if (rt.map !== currentMap || elapsed < OFFLINE_SAMPLE_MIN_MS || rt.kills < OFFLINE_SAMPLE_MIN_KILLS) {
+        if (rt.map !== currentMap || rt.difficulty !== _offlineCurrentDifficulty() || elapsed < OFFLINE_SAMPLE_MIN_MS || rt.kills < OFFLINE_SAMPLE_MIN_KILLS) {
             return previous;
         }
         let mins = elapsed / 60000;
         return _offlineRememberProfile(st, {
             map: rt.map,
             mapName: _offlineMapName(rt.map),
+            difficulty: rt.difficulty,
             expPerMin: rt.exp / mins,
             goldPerMin: rt.gold / mins,
             killsPerMin: rt.kills / mins,
@@ -816,8 +847,9 @@
         return mob;
     }
 
-    function _offlineFallbackMobs(map) {
+    function _offlineFallbackMobs(map, difficulty) {
         if (typeof DB === 'undefined' || !DB.maps || !DB.mobs || !Array.isArray(DB.maps[map])) return [];
+        difficulty = difficulty || _offlineCurrentDifficulty();
         let byKey = Object.create(null);
         DB.maps[map].forEach(id => {
             let root = DB.mobs[id];
@@ -830,8 +862,8 @@
                 lv: mob && mob.lv,
                 race: mob && mob.race,
                 transformTo: mob && mob.transformTo,
-                sherine: !!(player && player.sherineWorld),
-                sherineMad: !!(player && player.sherineWorld && player.sherineMad),
+                sherine: difficulty !== 'normal',
+                sherineMad: difficulty === 'mad',
                 grace: false
             });
             if (!snap) return;
@@ -887,7 +919,7 @@
         kills = Math.max(0, Math.floor(_offlineFinite(kills, 0)));
         if (!kills) return [];
         let mobs = _offlineMobProfiles(profile && profile.mobs);
-        if (!mobs.length) mobs = _offlineFallbackMobs(profile && profile.map);
+        if (!mobs.length) mobs = _offlineFallbackMobs(profile && profile.map, profile && profile.difficulty);
         let totalWeight = mobs.reduce((sum, mob) => sum + mob.count, 0);
         if (!totalWeight) return [];
         let plan = mobs.map(mob => {
@@ -1216,6 +1248,11 @@
         if (info) _offlineTrackItem(loot, info.id, info.cnt);
     }
 
+    function _offlineEquipmentBlessRate(mob) {
+        if (mob && mob.sherine && mob.boss) return mob.sherineMad ? 0.30 : 0.20;
+        return 0.01 * (mob && mob.sherine ? (mob.sherineMad ? 5 : 3) : 1);
+    }
+
     function _offlineGainItem(id, count, mob, loot) {
         count = Math.max(0, Math.floor(_offlineFinite(count, 0)));
         let d = typeof DB !== 'undefined' && DB.items ? DB.items[id] : null;
@@ -1241,7 +1278,7 @@
             if (info) _offlineTrackItem(loot, info.id, info.cnt);
             return;
         }
-        let blessRate = 0.01 * (mob.sherine ? (mob.sherineMad ? 5 : 3) : 1);
+        let blessRate = _offlineEquipmentBlessRate(mob);
         let blessed = _offlineBinomial(count, blessRate);
         _offlineGainDirect(id, count - blessed, loot);
         if (blessed > 0) {
@@ -1766,7 +1803,7 @@
                 let cpProfile = _offlineProfile(cpSnapshot.profile);
                 if (cpProfile) {
                     saved.profiles = _offlineSavedProfiles(cpSnapshot.profiles, cpProfile);
-                    saved.profile = saved.profiles.find(row => row.map === cpProfile.map) || cpProfile;
+                    saved.profile = saved.profiles.find(row => _offlineProfileKey(row) === _offlineProfileKey(cpProfile)) || cpProfile;
                 }
                 source = {
                     eligible: cpSnapshot.eligible === true,
@@ -1811,7 +1848,8 @@
 
     function _offlineEnsureSurvivalRuntime(map) {
         map = String(map || '');
-        if (!_offlineSurvivalRuntime || _offlineSurvivalRuntime.map !== map) _offlineResetSurvivalRuntime(map);
+        if (!_offlineSurvivalRuntime || _offlineSurvivalRuntime.map !== map ||
+            _offlineSurvivalRuntime.difficulty !== _offlineCurrentDifficulty()) _offlineResetSurvivalRuntime(map);
         return _offlineSurvivalRuntime;
     }
 
@@ -1957,7 +1995,7 @@
         let st = _offlineEnsureState();
         if (!st) return;
         let previous = _offlineProfileForMap(st, map) || {
-            map: map, mapName: _offlineMapName(map), expPerMin: 0, goldPerMin: 0,
+            map: map, mapName: _offlineMapName(map), difficulty: _offlineCurrentDifficulty(), expPerMin: 0, goldPerMin: 0,
             killsPerMin: 0, petExpPerMin: 0, allyExpPerMin: 0, sampleMs: 0,
             mobs: [], bosses: [], sampleKills: 0, updatedAt: 0
         };

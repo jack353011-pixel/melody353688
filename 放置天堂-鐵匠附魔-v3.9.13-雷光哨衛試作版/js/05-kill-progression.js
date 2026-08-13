@@ -1167,9 +1167,9 @@ function renderIsbaTravel(el) {
         </div>`;
 }
 // 紀錄結算：更新本次紀錄與最高紀錄（更高樓層優先；同樓層比時間短）
-//   席琳的世界 與 一般 兩種狀態各自獨立計算（席琳期間中途無法切換，故以結算當下的狀態歸類）
+//   普通／煉獄／地獄三種狀態各自獨立計算（席琳期間中途無法切換，故以結算當下的狀態歸類）
 function prideRecord(floor) {
-    let key = sherineWorldActive() ? 'prideRankSherine' : 'prideRank';
+    let key = sherineMadActive() ? 'prideRankSherineMad' : (sherineWorldActive() ? 'prideRankSherine' : 'prideRank');
     if (!player[key]) player[key] = { best: null, last: null, isNew: false };
     let r = player[key];
     let ms = state.prideStartMs ? (Date.now() - state.prideStartMs) : 0;
@@ -1252,7 +1252,7 @@ function riftEvacuate() {   // 🌀 主動撤離：與戰死等價（照樣記�
     saveGame();
 }
 function riftRecord(ms) {
-    let key = sherineWorldActive() ? 'riftRankSherine' : 'riftRank';
+    let key = sherineMadActive() ? 'riftRankSherineMad' : (sherineWorldActive() ? 'riftRankSherine' : 'riftRank');
     if (!player[key]) player[key] = { best: null, last: null, isNew: false };
     let r = player[key];
     r.last = { ms: ms };
@@ -1449,15 +1449,16 @@ function pickRiftMob(boss, minLv, maxLv, elapsedSec) {
     return pool[Math.floor(Math.random() * pool.length)];
 }
 function renderRiftEntrance(container) {
-    let rankBlock = (r, sherine) => {
+    let rankBlock = (r, mode) => {
         r = r || { best: null, last: null, isNew: false };
         let lastTxt = r.last ? `停留時間 ${fmtPrideTime(r.last.ms)}` : '尚無紀錄';
         let bestTxt = r.best ? `停留時間 ${fmtPrideTime(r.best.ms)}` : '尚無紀錄';
         let newBadge = (r.isNew && r.best) ? ' <span class="text-yellow-300 font-bold animate-pulse">new</span>' : '';
-        let titleCls = sherine ? 'c-sherine' : 'text-amber-300';
-        let bodyCls = sherine ? 'text-green-300' : 'text-slate-200';
-        let title = sherine ? '排名紀錄（席琳的世界）' : '排名紀錄（一般）';
-        return `<div class="bg-slate-900/70 border ${sherine ? 'border-green-700/60' : 'border-slate-700'} rounded-lg p-3 text-sm leading-relaxed">
+        let sherine = mode !== 'normal', mad = mode === 'mad';
+        let titleCls = mad ? 'text-rose-300' : (sherine ? 'c-sherine' : 'text-amber-300');
+        let bodyCls = mad ? 'text-rose-200' : (sherine ? 'text-green-300' : 'text-slate-200');
+        let title = mad ? '排名紀錄（地獄）' : (sherine ? '排名紀錄（煉獄）' : '排名紀錄（普通）');
+        return `<div class="bg-slate-900/70 border ${mad ? 'border-rose-700/60' : (sherine ? 'border-green-700/60' : 'border-slate-700')} rounded-lg p-3 text-sm leading-relaxed">
             <div class="${titleCls} font-bold mb-1">${title}</div>
             <div class="${bodyCls}">本次紀錄　${lastTxt}</div>
             <div class="${bodyCls}">最高紀錄　${bestTxt}${newBadge}</div>
@@ -1470,9 +1471,10 @@ function renderRiftEntrance(container) {
     box.innerHTML = `
         <button onclick="enterRift()" class="btn w-full py-4 text-xl font-bold bg-violet-800 hover:bg-violet-700 border border-violet-400 text-white shadow-lg">🌀 進入時空裂痕</button>
         <button onclick="claimRiftReward()" class="btn w-full py-4 text-xl font-bold ${pending ? 'bg-amber-700 hover:bg-amber-600 border-amber-400' : 'bg-slate-700 border-slate-500'} text-white shadow-lg">🎁 領取獎勵${pending ? '（可領取）' : '（無）'}</button>
-        ${rankBlock(player.riftRank, false)}
-        ${player.classicMode ? '' : rankBlock(player.riftRankSherine, true)}
-        <div class="text-slate-500 text-xs">進入需消耗 <span class="text-amber-300">1 顆 龜裂之核</span>（目前持有 ${cores}）。停留越久排名越前、獎勵越好；裂痕內無法傳送，離開後須先領取上次獎勵才能再次進入。${player.classicMode ? '' : '一般與席琳的世界排名各自獨立。'}</div>`;
+        ${rankBlock(player.riftRank, 'normal')}
+        ${player.classicMode ? '' : rankBlock(player.riftRankSherine, 'world')}
+        ${player.classicMode ? '' : rankBlock(player.riftRankSherineMad, 'mad')}
+        <div class="text-slate-500 text-xs">進入需消耗 <span class="text-amber-300">1 顆 龜裂之核</span>（目前持有 ${cores}）。停留越久排名越前、獎勵越好；裂痕內無法傳送，離開後須先領取上次獎勵才能再次進入。${player.classicMode ? '' : '普通、煉獄與地獄排名各自獨立。'}</div>`;
     container.appendChild(box);
 }
 

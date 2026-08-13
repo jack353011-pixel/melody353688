@@ -605,7 +605,7 @@ function summonV2AttackOnce(s, d, t, owner) {
                     m.curHp -= pd; if (typeof terrorVisageOnDamage === 'function') terrorVisageOnDamage(m, pd, 'magic'); m.justHit = (pr.ele && pr.ele !== 'none') ? pr.ele : 'magic'; mobWake(m);   // 🌅 巨大骷髏：召喚物技能視為魔法
                     texts.push(`<span class="${getMobColor(m.lv)}">${m.n}</span> ${pd}`);
                     if (pr.slow && Math.random() * 100 < Math.max(0, (100 - (m.mr || 0)) / 2)) { m.st = m.st || newMobStatus(); m.st.slow = Math.max(m.st.slow || 0, 80); }
-                    if (pr.stun && Math.random() * 100 < Math.max(0, (100 - (m.mr || 0)) / 2)) { m.st = m.st || newMobStatus(); m.st.stun = Math.max(m.st.stun || 0, 30); }
+                    if (pr.stun && !m.boss && Math.random() * 100 < Math.max(0, (100 - (m.mr || 0)) / 2)) { m.st = m.st || newMobStatus(); m.st.stun = Math.max(m.st.stun || 0, 30); }
                 });
                 if (texts.length) logCombat(`<span class="text-purple-300">${s.form}</span> 發動 <span class="text-pink-300 font-bold">${pr.name}</span> → ${texts.join('、')}`, 'magic');
                 targets.forEach(m => { if (m.curHp <= 0) { const i = mapState.mobs.findIndex(x => x && x.uid === m.uid); if (i !== -1) killMob(i); } });
