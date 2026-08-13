@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const drops = read('js/01-drops-config.js');
 const kills = read('js/05-kill-progression.js');
+const combatCore = read('js/03-combat-core.js');
 const combat = read('js/04-combat-attack.js');
 const pets = read('js/22-pets.js');
 const summons = read('js/23-summons.js');
@@ -40,6 +41,7 @@ const ctx = vm.createContext({
     sherineWorldActive: () => true,
     sherineMadActive: () => mad,
     isSiegeArea: () => false,
+    logCombat: () => {},
     sherineWorldExpMult: value => value ? 4 : 2.5,
     sherineWorldGoldMult: value => value ? 3 : 2
 });
@@ -74,6 +76,35 @@ ctx.mapState.mobs[0] = { ...baseMob(), _train:true };
 ctx.applySherineBuff(0);
 assert.equal(ctx.mapState.mobs[0]._sherineTraits, undefined, '訓練假人不應取得席琳隨機能力');
 
+mad = false;
+ctx.mapState.mobs[0] = { ...baseMob(), boss:true, atkSpd:1, st:{ stun:30, freeze:30 } };
+ctx.applySherineBuff(0);
+let normalBoss = ctx.mapState.mobs[0];
+assert.deepEqual(Array.from(normalBoss._sherineBossThresholds), [0.5], '煉獄頭目應有一個 50% 裂界門檻');
+assert.equal(normalBoss._sherineTraits, undefined, '席琳頭目不應抽一般怪隨機能力');
+normalBoss._bossResiliencePct = 0.08;
+normalBoss.curHp = normalBoss.hp * 0.5;
+ctx.sherineBossPhaseTick(normalBoss);
+assert.equal(normalBoss._sherineBossPhase, 1, '煉獄頭目應進入第一階段');
+assert.equal(normalBoss.atkSpd, 0.92, '裂界應縮短 8% 攻擊間隔');
+assert.equal(normalBoss._bossResiliencePct, 0.04, '裂界應降低 4 個百分點首領韌性');
+assert.equal(normalBoss.st.stun, 0, '裂界應解除暈眩');
+assert.equal(normalBoss.st.freeze, 0, '裂界應解除冰凍');
+
+mad = true;
+ctx.mapState.mobs[0] = { ...baseMob(), boss:true, atkSpd:1, st:{} };
+ctx.applySherineBuff(0);
+let madBoss = ctx.mapState.mobs[0];
+assert.deepEqual(Array.from(madBoss._sherineBossThresholds), [0.66, 0.33], '地獄頭目應有 66%／33% 兩個裂界門檻');
+madBoss._bossResiliencePct = 0.12;
+madBoss.curHp = madBoss.hp * 0.65;
+ctx.sherineBossPhaseTick(madBoss);
+madBoss.curHp = madBoss.hp * 0.32;
+ctx.sherineBossPhaseTick(madBoss);
+assert.equal(madBoss._sherineBossPhase, 2, '地獄頭目應能進入兩個階段');
+assert.ok(Math.abs(madBoss.atkSpd - 0.8464) < 1e-10, '兩次裂界應累積縮短攻擊間隔');
+assert.ok(Math.abs(madBoss._bossResiliencePct - 0.04) < 1e-10, '兩次裂界應累積降低 8 個百分點首領韌性');
+
 let renewal = { _sherine:true, hp:1000, curHp:500, _sherineTraits:['renewal'], st:{} };
 ctx.sherineMobTraitTick(renewal);
 assert.equal(renewal.curHp, 530, '再生能力每五秒應恢復 3% HP');
@@ -86,11 +117,22 @@ ctx.sherineMobTraitTick(phase);
 assert.equal(phase.ac, -28, '物理相位應降低 8 AC');
 assert.equal(phase.mr, 100, '物理相位應還原 MR');
 
+const resilienceSection = combatCore.match(/function activateBossResilience\(mob\) \{[\s\S]*?\n\}\n\/\/ 取得最近一次/);
+assert.ok(resilienceSection, '找不到首領韌性統一扣血層');
+const resilienceCtx = vm.createContext({ state:{ ticks:77 }, BOSS_RESILIENCE_CAP:0.15 });
+vm.runInContext(resilienceSection[0].replace(/\n\/\/ 取得最近一次$/, ''), resilienceCtx);
+let damagedBoss = { curHp:100, _bossResiliencePct:0.08 };
+resilienceCtx.activateBossResilience(damagedBoss);
+damagedBoss.curHp -= 10;   // 模擬任意傷害來源經過統一 curHp 扣血層
+assert.equal(damagedBoss._lastDamageTick, 77, '任意傷害應記錄席琳頭目回血抑制時間');
+
 const damagePaths = [combat, pets, summons, guards].join('\n');
 assert.doesNotMatch(damagePaths, /_sherineMad\s*\?\s*3\s*:\s*2/, '仍有單位沿用舊席琳傷害倍率');
 assert.match(damagePaths, /sherineEnemyDamageMult\(mob\)/, '戰鬥路徑未使用共用席琳傷害倍率');
 assert.match(kills, /mob\.curHp <= 0[\s\S]*sherineMobHasTrait\(mob, 'lastStand'\)/, '不屈能力尚未接入死亡結算');
 assert.match(status, /m\._sherineTenacityUsed[\s\S]*dur = Math\.max\(10, Math\.floor\(dur \/ 2\)\)/, '席琳韌性尚未接入控制時間');
+assert.match(combatCore, /mob\._lastDamageTick = state\.ticks/, '頭目受到任意傷害時未記錄回血抑制時間');
+assert.match(combatCore, /m\._sherine \? m\._lastDamageTick : m\._lastPhysicalHitTick/, '席琳頭目回血仍只接受物理傷害抑制');
 assert.match(offline, /function _offlineSherineCrystalCount/, '離線結算缺少結晶保底');
 assert.match(offline, /mob\.sherineMad \? 40 : 100/, '離線結晶保底門檻錯誤');
 assert.match(drops, /sherineCrystalPity: \{ world:0, mad:0 \}/, '存檔預設缺少結晶保底進度');
@@ -98,5 +140,7 @@ assert.match(world, /頭目累積 100 次未掉落時保底/, '煉獄介面未�
 assert.match(world, /頭目 40 次保底/, '地獄介面未顯示保底');
 assert.match(world, /目前保底進度 \$\{worldPity\}\/100/, '煉獄介面未顯示目前保底進度');
 assert.match(world, /目前保底進度 \$\{madPity\}\/40/, '地獄介面未顯示目前保底進度');
+assert.match(world, /50% HP 進入一次裂界階段/, '煉獄介面未顯示頭目裂界門檻');
+assert.match(world, /66%／33% HP 各進入一次裂界階段/, '地獄介面未顯示頭目裂界門檻');
 
 console.log('席琳難度平衡測試通過');

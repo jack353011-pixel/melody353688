@@ -1323,10 +1323,12 @@ function applySherineBuff(idx) {
         _m._sherine = true;   // 傷害×[1.7/2.6]、掉落×[1.5/2.25]；祝福率與結晶另走獨立規則
         if (_mad) _m._sherineMad = true;   // 🔮 瘋狂旗標：供傷害／掉落／祝福率／席琳結晶倍率分流（套裝效果已改由遺骸承載）
         sherineAssignMobTraits(_m, _mad);
+        sherineAssignBossPhases(_m, _mad);
     }
 }
 
 const SHERINE_MOB_TRAITS = ['tenacity', 'renewal', 'lastStand', 'phaseWard'];
+const SHERINE_BOSS_HARD_CC = ['freeze', 'stun', 'stone', 'sleep', 'paralyze'];
 function sherineMobHasTrait(mob, trait) { return !!(mob && Array.isArray(mob._sherineTraits) && mob._sherineTraits.includes(trait)); }
 function sherineAssignMobTraits(mob, mad) {
     if (!mob || mob.boss || mob.race === '建築' || mob.noAttack || mob._train) return;
@@ -1355,6 +1357,29 @@ function sherineMobTraitTick(mob) {
         mob.ac = mob._sherinePhaseBaseAc + (mob._sherinePhaseMagic ? 0 : -8);
         mob.mr = mob._sherinePhaseBaseMr + (mob._sherinePhaseMagic ? 30 : 0);
     }
+}
+// 👑 席琳頭目採階段機制取代額外數值膨脹：進階時攻擊間隔縮短，但首領韌性同步下降，玩家仍有突破窗口。
+function sherineAssignBossPhases(mob, mad) {
+    if (!mob || !mob.boss || mob.siegeEnemy || mob.race === '建築' || mob.noAttack || mob._train) return;
+    mob._sherineBossThresholds = mad ? [0.66, 0.33] : [0.50];
+    mob._sherineBossPhase = 0;
+}
+function sherineBossPhaseTick(mob) {
+    if (!mob || !mob._sherine || !mob.boss || mob.curHp <= 0 || !(mob.hp > 0) || !Array.isArray(mob._sherineBossThresholds)) return;
+    let advanced = 0;
+    while (mob._sherineBossPhase < mob._sherineBossThresholds.length
+        && mob.curHp / mob.hp <= mob._sherineBossThresholds[mob._sherineBossPhase]) {
+        mob._sherineBossPhase++;
+        advanced++;
+    }
+    if (!advanced) return;
+    if (mob.st) SHERINE_BOSS_HARD_CC.forEach(k => { if ((mob.st[k] || 0) > 0) mob.st[k] = 0; });
+    let speedFactor = Math.pow(0.92, advanced);   // 每階段攻擊間隔縮短 8%，不增加單次傷害
+    mob.atkSpd = Math.max(0.1, (Number(mob.atkSpd) || 0.67) * speedFactor);
+    if (Number.isFinite(mob._baseAtkSpd)) mob._baseAtkSpd = Math.max(0.1, mob._baseAtkSpd * speedFactor);
+    if (Number.isFinite(mob._atkCd)) mob._atkCd = Math.min(mob._atkCd, Math.max(1, Math.floor(mob.atkSpd * 10)));
+    if (Number.isFinite(mob._bossResiliencePct)) mob._bossResiliencePct = Math.max(0, mob._bossResiliencePct - 0.04 * advanced);
+    logCombat(`<span class="c-sherine font-bold">【席琳裂界 ${mob._sherineBossPhase}/${mob._sherineBossThresholds.length}】</span>${mob.n} 掙脫硬控並加快攻勢，但首領韌性下降。`, 'enemy');
 }
 // 🔮 席琳的恩賜：席琳的世界中每次刷新 1% 機率讓場上一隻怪獲得恩賜（血盟除外）
 //  一般席琳＝原版：每 3 分鐘最多一次、場上同時僅一隻、頭目(王)不被祝福；🔥 瘋狂席琳：無 3 分鐘冷卻、無「同時一隻」限制、頭目(王)亦可被祝福

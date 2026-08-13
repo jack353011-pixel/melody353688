@@ -795,13 +795,16 @@ function tick() {
         // 🌅 三段變身頭目（玉藻→九尾→殺生石）：HP 低於門檻即強制變身、原槽位換下一階滿血（被一擊打到 0 的情況由 killMob 頂端攔截·js/05 doMobTransform）
         if (m.transformTo && m.curHp > 0 && !m._dead && m.curHp < m.hp * (m.transformHpPct || 0.5)) { doMobTransform(i); continue; }
 
+        // 👑 席琳頭目跨越生命門檻時先進階並解除硬控；一般怪仍走下方隨機能力。
+        if (typeof sherineBossPhaseTick === 'function') sherineBossPhaseTick(m);
         // --- 異常狀態處理（倒數、中毒 DoT），死亡則跳過 ---
         if (processMobStatusTick(m, i)) continue;
         if (typeof sherineMobTraitTick === 'function') sherineMobTraitTick(m);
-        // 👑 戰鬥頭目：每 5 秒恢復 HP；近 5 秒曾被物理命中回 0.5%，否則回 2.5%。
+        // 👑 戰鬥頭目：每 5 秒恢復 HP；一般世界沿用物理命中判定，席琳世界改為任何傷害皆可壓低回血，避免偏袒物理流派。
         if (m.boss && !m.siegeEnemy && m.race !== '建築' && state.ticks % 50 === 0 && m.curHp > 0 && m.curHp < m.hp) {
-            let recentPhysicalHit = m._lastPhysicalHitTick != null && state.ticks - m._lastPhysicalHitTick <= 50;
-            let regenPct = recentPhysicalHit ? 0.005 : 0.025;
+            let pressureTick = m._sherine ? m._lastDamageTick : m._lastPhysicalHitTick;
+            let recentlyPressured = pressureTick != null && state.ticks - pressureTick <= 50;
+            let regenPct = recentlyPressured ? 0.005 : 0.025;
             if (m.st && (m.st.muddywater || 0) > 0) regenPct *= 0.5;   // 🌊 污濁之水：狀態維持中頭目 HP 自然恢復量減半
             m.curHp = Math.min(m.hp, m.curHp + Math.max(1, Math.floor(m.hp * regenPct)));
             if (!state.ff) renderMobs();
@@ -1979,6 +1982,7 @@ function activateBossResilience(mob) {
                 storedHp -= dealt;
                 mob._lastRawDamage = attempted;
                 mob._lastDamageTaken = dealt;
+                if (typeof state !== 'undefined' && state) mob._lastDamageTick = state.ticks;   // 席琳頭目回血抑制：物理／魔法／召喚／DoT 共用
                 return;
             }
             storedHp = next;

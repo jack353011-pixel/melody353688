@@ -1327,13 +1327,13 @@ function renderSherinePray(div) {
             </div>
             <div class="bg-slate-800/60 border ${on ? 'border-red-700' : 'border-slate-600'} rounded p-3 text-sm leading-relaxed">
                 <div class="font-bold mb-1 ${on ? 'c-sherine' : 'text-slate-200'}">席琳的世界（煉獄難度・Lv${SHERINE_WORLD_LEVEL}）：目前 ${on ? '<span class="text-red-300">開啟</span>' : '<span class="text-slate-400">關閉</span>'}</div>
-                <div class="text-slate-200 text-xs">怪物 HP×2.5、AC 降低（一般怪−10、頭目−20）、MR＋25%、命中×1.25、傷害×1.7；一般怪獲得 1 項席琳能力。<br>經驗×2.5、金錢×2、掉落×1.5；一般怪祝福率 3%、頭目固定 20%。頭目累積 100 次未掉落時保底<span class="c-sherine font-bold">席琳結晶</span>；目前保底進度 ${worldPity}/100。</div>
+                <div class="text-slate-200 text-xs">怪物 HP×2.5、AC 降低（一般怪−10、頭目−20）、MR＋25%、命中×1.25、傷害×1.7；一般怪獲得 1 項席琳能力，頭目在 50% HP 進入一次裂界階段。<br>經驗×2.5、金錢×2、掉落×1.5；一般怪祝福率 3%、頭目固定 20%。頭目累積 100 次未掉落時保底<span class="c-sherine font-bold">席琳結晶</span>；目前保底進度 ${worldPity}/100。</div>
             </div>
             <button class="btn py-3 text-base font-bold ${worldDisabled ? 'bg-slate-600 border-slate-500 opacity-60 cursor-not-allowed' : (on ? 'bg-slate-700 hover:bg-slate-600 border-slate-500' : 'bg-red-800 hover:bg-red-700 border-red-600')}"
                 ${worldDisabled ? 'disabled' : ''} onclick="toggleSherineWorld()">${!safeOk ? '只能在安全區切換' : (!on && !worldLvOk ? `等級不足（需 Lv${SHERINE_WORLD_LEVEL}）` : (on ? '🙏 返回普通世界' : '🙏 進入席琳的世界'))}</button>
             <div class="bg-slate-900/70 border ${mad ? 'border-rose-600' : 'border-slate-700'} rounded p-3 text-sm leading-relaxed">
                 <div class="font-bold mb-1 ${mad ? 'c-sherine' : 'text-rose-300'}">🔥 瘋狂的席琳世界（地獄難度・Lv${SHERINE_MAD_LEVEL}）：目前 ${mad ? '<span class="text-rose-300">開啟</span>' : '<span class="text-slate-400">關閉</span>'}</div>
-                <div class="text-slate-200 text-xs">怪物 HP×5、AC 降低（一般怪−10、頭目−20）、MR＋50%（最多額外＋150）、命中×1.6、傷害×2.6；一般怪獲得 2 項席琳能力。<br>經驗×4、金錢×3、掉落×2.25；一般怪祝福率 5%、頭目固定 30%。結晶率為煉獄 3 倍，頭目 40 次保底；目前保底進度 ${madPity}/40。</div>
+                <div class="text-slate-200 text-xs">怪物 HP×5、AC 降低（一般怪−10、頭目−20）、MR＋50%（最多額外＋150）、命中×1.6、傷害×2.6；一般怪獲得 2 項席琳能力，頭目在 66%／33% HP 各進入一次裂界階段。<br>經驗×4、金錢×3、掉落×2.25；一般怪祝福率 5%、頭目固定 30%。結晶率為煉獄 3 倍，頭目 40 次保底；目前保底進度 ${madPity}/40。</div>
             </div>
             <button class="btn py-3 text-base font-bold ${madDisabled ? 'bg-slate-600 border-slate-500 opacity-60 cursor-not-allowed' : (mad ? 'bg-slate-700 hover:bg-slate-600 border-slate-500' : 'bg-rose-900 hover:bg-rose-800 border-rose-600')}"
                 ${madDisabled ? 'disabled' : ''} onclick="toggleSherineMad()">${!safeOk ? '只能在安全區切換' : (!mad && !madLvOk ? `等級不足（需 Lv${SHERINE_MAD_LEVEL}）` : (mad ? '🙏 返回普通世界' : '🔥 進入瘋狂的席琳世界'))}</button>
