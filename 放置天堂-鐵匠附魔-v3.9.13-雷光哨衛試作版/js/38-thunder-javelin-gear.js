@@ -10,8 +10,7 @@ DB.items[W]={
  d:'三重矢延伸：第三箭命中後向其他敵人跳出基礎最多4次雷電，每次傷害衰減20%。全身妖精防具與飾品可出現專用強化詞綴。基礎冷卻5秒、最低2.5秒；仍消耗箭矢，原本三重矢完全保留。林德拜爾 5% 掉落。'
 };
 function weapon(){
- let i=player&&player.eq&&player.eq.wpn,d=i&&DB.items[i.id];
- return d&&d.core==='thunderJavelin'?d:null;
+ return typeof buildFlowSource==='function'?buildFlowSource(player,'thunderJavelin'):null;
 }
 function live(){
  return mapState&&Array.isArray(mapState.mobs)?mapState.mobs.filter(m=>m&&m.curHp>0&&!m._dead):[];

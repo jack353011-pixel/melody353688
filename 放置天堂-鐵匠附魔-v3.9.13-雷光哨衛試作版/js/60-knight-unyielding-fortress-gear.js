@@ -4,8 +4,8 @@
 const SK='sk_reduction_armor',ARMOR='amr_unyielding_fortress';
 DB.items[ARMOR]={n:'不屈鋼心鎧',img:'assets/icons/armors/不動的鋼鐵堅壁.png',legend:true,type:'arm',slot:'armor',ac:10,dr:5,con:3,mhp:80,req:'knight',reqLv:55,safe:4,p:360000,gachaWeight:5,core:'unyieldingFortress',d:'騎士專屬盔甲。增幅防禦延伸「不屈堡壘」：姿態期間承受5次直接傷害後，獲得12%最大生命護盾並釋放全體物理震波；8秒內無法再次發動。效果受體質、本職技能增幅與專用詞綴強化。古代巨人5%掉落。'};
 if(typeof MOB_DROPS==='object'){let rows=MOB_DROPS['古代巨人']||(MOB_DROPS['古代巨人']=[]);if(!rows.some(r=>r&&r[0]===ARMOR))rows.push([ARMOR,5])}
-function armor(){let it=player&&player.eq&&player.eq.armor,d=it&&DB.items[it.id];return it&&it.id===ARMOR&&d&&d.core==='unyieldingFortress'?d:null}
-function support(prop){let total=0;if(!player||!player.eq)return total;Object.values(player.eq).forEach(it=>{let d=it&&DB.items[it.id];total+=Math.max(0,Number(d&&d[prop])||0)});return total}
+function armor(){return typeof buildFlowSource==='function'?buildFlowSource(player,'unyieldingFortress'):null}
+function support(prop){return typeof buildFlowSupportValue==='function'?buildFlowSupportValue(player,'unyieldingFortress',prop):0}
 function bonus(){let t=typeof d2rEquipTotals==='function'?d2rEquipTotals(player):{};return{dmg:Math.min(100,Math.min(80,Number(t.ufd)||0)+support('unyieldingDamagePct')),fast:Math.min(3,Math.min(2,Math.floor(Number(t.ufs)||0))+Math.floor(support('unyieldingHitsReduced'))),guard:Math.min(23,Math.min(18,Number(t.ufg)||0)+support('unyieldingShieldPct')),cd:Math.min(70,Math.min(50,Number(t.ufc)||0)+support('unyieldingCooldownPct'))} }
 function ensure(){if(!player)return;if(!Number.isFinite(player.unyieldingStacks368))player.unyieldingStacks368=0;if(!Number.isFinite(player.unyieldingCd368))player.unyieldingCd368=0}
 function active(){return !!(player&&player.cls==='knight'&&!player.dead&&armor()&&player.buffs&&(Number(player.buffs[SK])||0)>0)}

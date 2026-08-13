@@ -4,14 +4,13 @@
 const SK='sk_dark_fang',WPN='wpn_lightning_sentry_claw';
 DB.items[WPN]={
  n:'雷光哨衛鋼爪',img:'assets/icons/weapons/惡魔鋼爪.png',legend:true,
- type:'wpn',w2h:true,dmgS:24,dmgL:20,hit:4,dmgBonus:6,spd:.9,eff:'combo',comboRate:33,
+ type:'wpn',w2h:true,dmgS:24,dmgL:20,hit:4,dmgBonus:6,spd:.9,eff:'combo',comboRate:33,ignHardSkin:true,
  req:'dark',reqLv:60,safe:6,p:340000,gachaWeight:5,core:'lightningSentry',
  d:'黑暗妖精專屬雙手鋼爪。暗影之牙延伸「雷光哨衛」：原本額外傷害增益完整保留；成功施放後部署可見哨衛 6 秒，每秒發射基礎 2 道風雷電束。基礎冷卻 12 秒、最低 6 秒。全身黑暗妖精防具與飾品可出現專用強化詞綴。闇精靈王 5% 掉落。'
 };
 
 function weapon(){
- let item=player&&player.eq&&player.eq.wpn,def=item&&DB.items[item.id];
- return item&&item.id===WPN&&def&&def.core==='lightningSentry'?def:null;
+ return typeof buildFlowSource==='function'?buildFlowSource(player,'lightningSentry'):null;
 }
 function bonus(){
  let total=typeof d2rEquipTotals==='function'?d2rEquipTotals(player):{};
@@ -121,7 +120,7 @@ function deploy(){
  ensure();if(!weapon()||player.cls!=='dark'||player.dead||player.lightningSentryCd313>0)return false;
  let b=bonus();player.lightningSentryCd313=Math.max(60,Math.round(120*(1-b.trc/100)));
  player.lightningSentryActive313=duration();player.lightningSentryNext313=1;
- if(typeof logCombat==='function')logCombat('<span class="text-cyan-200 font-bold">【雷光哨衛鋼爪】</span>暗影之牙喚醒兩座雷光哨衛。','player-special');
+ if(typeof logCombat==='function')logCombat('<span class="text-cyan-200 font-bold">【雷光哨衛流派】</span>暗影之牙喚醒兩座雷光哨衛。','player-special');
  badge();return true;
 }
 

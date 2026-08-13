@@ -83,12 +83,92 @@ function playerQualificationTags(owner) {
 }
 function playerCapabilityTags(owner) { return playerQualificationTags(owner); }   // 舊呼叫相容；不再含任何裝備 Tag
 
+// 核心裝不是流派入場券：原技能＋相符裝備種類即可產生流派 Tag；指定核心裝只提供 10% 原技能共鳴與自身裝備能力。
+// gear 僅描述廣義武器／部位，不得填入物品 ID。配套裝備統一用 buildFlowSupportValue 讀取流派狀態。
+const BUILD_FLOW_RULES = Object.freeze({
+    hydra:{ skills:['sk_fireball'], slot:'wpn', gear:'magic', tag:'流派:九頭蛇' },
+    static:{ skills:['sk_aurora'], slot:'wpn', gear:'magic', tag:'流派:靜電立場', group:'奧術雷系' },
+    orb:{ skills:['sk_icearrow'], slot:'wpn', gear:'magic', tag:'流派:冰封球' },
+    chain:{ skills:['sk_aurora'], slot:'wpn', gear:'magic', tag:'流派:連鎖雷光', group:'奧術雷系' },
+    meteor:{ skills:['sk_meteor'], slot:'wpn', gear:'magic', tag:'流派:隕星' },
+    thunderJavelin:{ skills:['sk_elf_triple'], slot:'wpn', gear:'launcher', tag:'流派:雷霆標槍' },
+    whirlwind:{ skills:['sk_warrior_roar'], slot:'wpn', gear:'axe', tag:'流派:炫風斬' },
+    leap:{ skills:['sk_warrior_outlaw'], slot:'boots', gear:'slot', tag:'流派:躍擊' },
+    blessedHammer:{ skills:['sk_royal_callally'], slot:'shield', gear:'slot', tag:'流派:祝福之鎚' },
+    shadowClone:{ skills:['sk_dark_stealth'], slot:'cloak', gear:'slot', tag:'流派:暗影分身' },
+    vanderShockwave:{ skills:['sk_shock_stun'], slot:'wpn', gear:'sword', tag:'流派:范德震地' },
+    frostDragonChase:{ skills:['sk_dragon_slaughter'], slot:'wpn', gear:'chainSword', tag:'流派:冰龍追擊' },
+    mindEcho:{ skills:['sk_illu_mindbreak'], slot:'wpn', gear:'qigu', tag:'流派:心靈共振' },
+    riftBurst:{ skills:['sk_illu_crush'], slot:'wpn', gear:'qigu', tag:'流派:裂界衝擊' },
+    multiArrowRain:{ skills:['sk_elf_triple'], slot:'wpn', gear:'bow', tag:'流派:多重箭雨' },
+    lightningSentry:{ skills:['sk_dark_fang'], slot:'wpn', gear:'claw', tag:'流派:雷光哨衛' },
+    royalCommand:{ skills:['sk_royal_burnweapon'], slot:'helm', gear:'slot', tag:'流派:王者號令' },
+    shieldCounter:{ skills:['sk_solid_shield'], slot:'shield', gear:'slot', tag:'流派:盾反壁壘' },
+    fireDragonForm:{ skills:['sk_dragon_awaken_baraka'], slot:'armor', gear:'slot', tag:'流派:火龍化身' },
+    royalValorBlade:{ skills:['sk_royal_bravewill'], slot:'wpn', gear:'sword', tag:'流派:王者劍氣' },
+    unyieldingFortress:{ skills:['sk_reduction_armor'], slot:'armor', gear:'slot', tag:'流派:不屈堡壘' },
+    thunderDragonStorm:{ skills:['sk_dragon_deathlightning'], slot:'wpn', gear:'chainSword', tag:'流派:雷龍風暴' }
+});
+function buildFlowSkillKnown(owner, rule) {
+    let learned = new Set(tagCoreList(owner && owner.skills));
+    return !!(rule && rule.skills && rule.skills.some(id => learned.has(id)));
+}
+function buildFlowGearMatches(def, kind, itemId) {
+    if (!def) return false;
+    let family = '';
+    try { family = typeof atkSpdFamily === 'function' ? (atkSpdFamily(itemId || '') || '') : ''; } catch (e) {}
+    if (kind === 'slot') return true;
+    if (kind === 'magic') return !!(def.isWand || def.qigu || def.magic || def.mdmg || /魔杖|法杖/.test(def.n || ''));
+    if (kind === 'launcher') return !!(def.ranged && (def.animFam === 'gauntlet' || /鐵手甲|標槍/.test(def.n || '')));
+    if (kind === 'bow') return !!(def.isBow && def.animFam !== 'gauntlet');
+    if (kind === 'axe') return /斧/.test(family) || /斧/.test(def.n || '');
+    if (kind === 'sword') return !!(def.chainsword !== true && !/鎖鏈劍/.test(def.n || '') && (/劍/.test(family) || /劍/.test(def.n || '')));
+    if (kind === 'chainSword') return !!(def.chainsword || family === '鎖鏈劍' || /鎖鏈劍/.test(def.n || ''));
+    if (kind === 'qigu') return !!(def.qigu || family === '奇古獸');
+    if (kind === 'claw') return !!(family === '鋼爪' || /鋼爪/.test(def.n || ''));
+    return false;
+}
+function buildFlowEquippedCore(owner, buildId) {
+    if (!owner || !owner.eq) return null;
+    for (let slot in owner.eq) {
+        let item = owner.eq[slot], def = item && typeof DB !== 'undefined' && DB.items && DB.items[item.id];
+        if (def && def.core === buildId) return { item, def, slot };
+    }
+    return null;
+}
+function buildFlowAccess(owner, buildId) {
+    owner = owner || (typeof player !== 'undefined' ? player : null);
+    let rule = BUILD_FLOW_RULES[buildId], core = buildFlowEquippedCore(owner, buildId);
+    if (!owner || !rule || !buildFlowSkillKnown(owner, rule)) return { active:false, buildId, rule, core:null, item:null, def:null, tag:rule && rule.tag };
+    let item = owner.eq && owner.eq[rule.slot], def = item && typeof DB !== 'undefined' && DB.items && DB.items[item.id];
+    let active = !!(def && buildFlowGearMatches(def, rule.gear, item && item.id));
+    return { active, buildId, rule, core, item:active?item:null, def:active?def:null, tag:rule.tag };
+}
+function buildFlowSource(owner, buildId) {
+    let state = buildFlowAccess(owner, buildId);
+    return state.active ? ((state.core && state.core.def) || state.def) : null;
+}
+function buildFlowCoreEquipped(owner, buildId) { return !!buildFlowEquippedCore(owner, buildId); }
+function buildFlowSupportValue(owner, buildId, prop) {
+    let state = buildFlowAccess(owner, buildId), total = 0;
+    if (!state.active || !owner || !owner.eq) return 0;
+    Object.values(owner.eq).forEach(item => {
+        let def = item && typeof DB !== 'undefined' && DB.items && DB.items[item.id], value = Number(def && def[prop]);
+        if (Number.isFinite(value) && value > 0) total += value;
+    });
+    return total;
+}
+
 // 流派 Tag：只描述「擅長什麼」。裝備、技能與天賦可授予流派標籤，但不得拿它判定能否穿戴／學習／進圖。
 function characterAffinityTagSnapshot(owner) {
     owner = owner || (typeof player !== 'undefined' ? player : null);
     if (!owner) return createTagSnapshot([]);
     let entries = [];
     tagCoreList(owner.affinityTags || owner.buildTags).forEach(tag => entries.push({ tag, scope:'角色流派', layer:'角色流派', source:'character-affinity' }));
+    Object.keys(BUILD_FLOW_RULES).forEach(buildId => {
+        let flow = buildFlowAccess(owner, buildId);
+        if (flow.active) entries.push({ tag:flow.tag, scope:'角色流派', layer:'技能與裝備種類', source:`build-flow:${buildId}`, itemId:flow.item && flow.item.id, slot:flow.rule.slot });
+    });
 
     if (owner.eq && typeof DB !== 'undefined' && DB.items) Object.entries(owner.eq).forEach(([slot, item]) => {
         let def = item && DB.items[item.id]; if (!def) return;

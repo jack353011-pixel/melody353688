@@ -1537,7 +1537,7 @@ function d2rEligibleAffixCodes(def, qualityIndex) {
     if(qualityIndex>=2&&(magicWpn||(def&&def.type==='arm'&&['gloves','cloak','tshirt'].includes(slot))||(def&&def.type==='acc'&&['ring','ear','amulet'].includes(slot))))pool.push('fcr');
     if(qualityIndex>=2&&((def&&def.type==='arm'&&['armor','helm','shield','boots'].includes(slot))||(def&&def.type==='acc'&&['belt','amulet'].includes(slot))))pool.push('fhr');
     if(qualityIndex>=4)pool.push('sp','fh');
-    // 技能延伸詞綴只出現在法師可用防具與飾品；核心法杖本身負責啟動流派。
+    // 技能延伸詞綴只出現在法師可用防具與飾品；原技能＋相符武器種類負責啟動流派，核心法杖僅作特化。
     let req=String(def&&def.req||'');
     let skillGear=def&&def.type!=='wpn'&&((def.type==='arm'&&req.split(',').includes('mage'))||def.type==='acc');
     if(qualityIndex>=2&&skillGear)pool.push('hy','hd','st','os','cb','mcx','gd','scd');
@@ -2408,6 +2408,13 @@ function classSkillEquipMult(sk, owner, skId) {
     for (let k in owner.eq) {
         let e = owner.eq[k], def = e && DB.items[e.id], value = Number(def && def.classSkillMult);
         if (Number.isFinite(value) && value > 0) mult *= value;
+    }
+    // 核心裝不再解鎖流派；若已靠原技能＋相符裝備種類入場，指定核心裝只讓該原技能共鳴 +10%。
+    let resolvedId = skId;
+    if (!resolvedId && typeof DB !== 'undefined' && DB.skills) resolvedId = Object.keys(DB.skills).find(id => DB.skills[id] === sk);
+    if (resolvedId && typeof BUILD_FLOW_RULES !== 'undefined') {
+        let hasCore = Object.keys(BUILD_FLOW_RULES).some(buildId => BUILD_FLOW_RULES[buildId].skills.includes(resolvedId) && buildFlowCoreEquipped(owner, buildId));
+        if (hasCore) mult *= 1.10;
     }
     return mult;
 }

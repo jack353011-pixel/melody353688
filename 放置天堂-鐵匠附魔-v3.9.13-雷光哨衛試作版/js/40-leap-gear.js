@@ -3,7 +3,7 @@
 'use strict';
 const SK='sk_warrior_outlaw',B='bot_leap_storm';
 DB.items[B]={n:'震地戰靴',img:'assets/icons/armors/勇氣長靴.png',type:'arm',slot:'boots',ac:4,req:'warrior',safe:4,p:180000,gachaWeight:5,core:'leap',d:'亡命之徒延伸：消耗25怒氣躍入敵群，造成全體物理傷害並暈眩1秒。基礎冷卻8秒；原本亡命之徒效果完全保留。曼波兔5%掉落。'};
-function boots(){let i=player&&player.eq&&player.eq.boots,d=i&&DB.items[i.id];return d&&d.core==='leap'?d:null}
+function boots(){return typeof buildFlowSource==='function'?buildFlowSource(player,'leap'):null}
 function bonus(){let t=typeof d2rEquipTotals==='function'?d2rEquipTotals(player):{};return{ld:Math.min(80,+t.ld||0),ls:Math.min(60,+t.ls||0),lc:Math.min(40,+t.lc||0),lr:Math.min(40,+t.lr||0)}}
 function ensure(){if(!player)return;if(!Number.isFinite(player.whirlRage))player.whirlRage=0;if(!Number.isFinite(player.leapCd88))player.leapCd88=0}
 function host(){let h=document.getElementById('battle-view')||document.getElementById('game-screen');if(h&&getComputedStyle(h).position==='static')h.style.position='relative';return h}

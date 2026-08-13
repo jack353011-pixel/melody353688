@@ -9,8 +9,7 @@ DB.items[CLOAK]={
  d:'暗隱術延伸：戰鬥中召喚可見暗影分身6秒，每秒模仿一次近戰攻擊。基礎冷卻14秒、最低7秒；原本暗隱術的100%物理閃避完全保留。暗殺軍王史雷佛5%掉落。'
 };
 function cloak(){
- let item=player&&player.eq&&player.eq.cloak,def=item&&DB.items[item.id];
- return def&&def.core==='shadowClone'?def:null;
+ return typeof buildFlowSource==='function'?buildFlowSource(player,'shadowClone'):null;
 }
 function bonus(){
  let total=typeof d2rEquipTotals==='function'?d2rEquipTotals(player):{};
@@ -105,7 +104,7 @@ function trigger(){
  let b=bonus();
  player.shadowCloneCd93=Math.max(70,Math.round(140*(1-b.shc/100)));
  player.shadowClone93={left:Math.round(60*(1+b.sht/100)),next:1,count:1+b.shn,hit:0,anim:0};
- logCombat('<span class="text-fuchsia-300 font-bold">【暗影幻身斗篷】</span>你的暗隱術分裂出戰鬥幻影！','player-special');
+ logCombat('<span class="text-fuchsia-300 font-bold">【暗影分身流派】</span>你的暗隱術分裂出戰鬥幻影！','player-special');
  visual();
  return true;
 }

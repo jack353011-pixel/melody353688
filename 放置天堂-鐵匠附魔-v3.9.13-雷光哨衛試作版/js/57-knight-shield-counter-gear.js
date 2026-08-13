@@ -4,7 +4,7 @@
 const SK='sk_solid_shield',SHIELD='shd_mirror_bulwark';
 DB.items[SHIELD]={n:'鏡鋼壁壘',img:'assets/icons/armors/鋼鐵盾牌.png',legend:true,type:'arm',slot:'shield',ac:7,block:70,dr:4,con:2,req:'knight',reqLv:50,safe:4,p:320000,gachaWeight:5,core:'shieldCounter',d:'騎士專屬盾牌。堅固防護延伸「盾反壁壘」：原本遠距離迴避完整保留；姿態期間受到直接傷害時，有30%機率再格擋50%傷害並立刻反擊施傷者。反擊受體質、等級與專用詞綴強化。拉斯塔巴德守門人 5% 掉落。'};
 if(typeof MOB_DROPS==='object'){let rows=MOB_DROPS['拉斯塔巴德守門人']||(MOB_DROPS['拉斯塔巴德守門人']=[]);if(!rows.some(r=>r&&r[0]===SHIELD))rows.push([SHIELD,5])}
-function shield(){let it=player&&player.eq&&player.eq.shield,d=it&&DB.items[it.id];return it&&it.id===SHIELD&&d&&d.core==='shieldCounter'?d:null}
+function shield(){return typeof buildFlowSource==='function'?buildFlowSource(player,'shieldCounter'):null}
 function active(){return !!(player&&player.cls==='knight'&&!player.dead&&shield()&&player.buffs&&(Number(player.buffs[SK])||0)>0)}
 function bonus(){let t=typeof d2rEquipTotals==='function'?d2rEquipTotals(player):{};return{dmg:Math.min(80,Number(t.srd)||0),block:Math.min(25,Number(t.srb)||0),guard:Math.min(25,Number(t.srg)||0),cd:Math.min(50,Number(t.src)||0)}}
 function ensure(){if(player&&!Number.isFinite(player.shieldCounterCd314))player.shieldCounterCd314=0}

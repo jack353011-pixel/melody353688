@@ -645,6 +645,7 @@ const WEAPON_TAGS = {
     wpn_2hsword: ['雙手劍'], wpn_dragonslayer: ['雙手劍'], wpn_official_2h: ['雙手劍'],   // 🔧 雙手劍類型標註
     // 🔧 重擊特效武器標註為「雙手鈍器」
     wpn_battleaxe: ['雙手鈍器'], wpn_19: ['雙手鈍器'], wpn_23: ['雙手鈍器'], wpn_giantaxe: ['雙手鈍器'], wpn_berserker: ['雙手鈍器'], wpn_silveraxe: ['雙手鈍器'], wpn_taurus_axe: ['雙手鈍器'],   // 🔧 牛人斧頭：補上漏標的雙手鈍器 tag（eff:crush 但原無 tag）
+    wpn_whirlwind_axe: ['雙手鈍器'],   // 🌪️ 風暴巨斧：炫風斬核心雙手鈍器
     // 🔧 黑暗妖精武器：鋼爪 / 雙刀 / 匕首
     wpn_claw_bronze:['鋼爪'], wpn_claw_steel:['鋼爪'], wpn_claw_shadow:['鋼爪'], wpn_claw_silver:['鋼爪'], wpn_claw_dark:['鋼爪'], wpn_claw_gloom:['鋼爪'], wpn_claw_damascus:['鋼爪'], wpn_claw_abyss:['鋼爪'],
     wpn_baranka_claw:['鋼爪'], wpn_baranka_steelclaw:['鋼爪'],   // 🔧 魔獸軍王雙爪（鋼爪類）
@@ -671,6 +672,8 @@ const WEAPON_TAGS = {
     wpn_ancient_darkelf_sword:['單手劍'],   // 🏛️ 古代黑暗妖精之劍：反擊(單手劍)
     wpn_demon_sword_hidden:['單手劍'],   // 👹 隱藏的魔族之劍：反擊(單手劍)
     wpn_demon_claw_hidden:['鋼爪'],   // 👹 隱藏的魔族鋼爪：鋼爪標籤(雙擊33預設＋貫穿＋黑暗妖精可裝)
+    wpn_lightning_sentry_claw:['鋼爪'],   // ⚡ 雷光哨衛鋼爪：黑暗妖精裝備資格＋鋼爪原生機制
+    wpn_royal_valor_blade:['單手劍'],   // 👑 王者榮耀之劍：單手劍反擊機制
     // 🏴‍☠️ 海賊島武器：血紅慾望短劍(匕首/出血)、榮耀之劍/短刀/海賊彎刀(單手劍/反擊)、深淵雙刀(雙刀/雙擊)
     wpn_pirate_dagger:['匕首'], wpn_glory_sword:['單手劍'], wpn_pirate_shortblade:['單手劍'], wpn_pirate_cutlass:['單手劍'], wpn_abyss_dualblade:['雙刀'],
     // ⚡ 元素施放傳說武器：雷神之鎚／歐西斯衝撞錘(單手鈍器·鈍擊)・馬普勒的懲罰(雙手鈍器·重擊)・帕格里奧之怒／伊娃的責罵(單手劍·反擊)
@@ -866,10 +869,13 @@ function weaponSkillTagProfile(itemOrId) {
     if (d.hellfireProc) { add('傷害觸發', 'mechanic', 86); addEle('fire', 88); source('地獄火焰（傷害觸發）'); }
 
     const coreNames = {
-        vanderShockwave:'范德震地', frostDragonChase:'冰龍追擊', mindEcho:'心靈共振',
-        riftBurst:'裂界衝擊', multiArrowRain:'多重箭雨', thunderJavelin:'雷霆標槍'
+        hydra:'九頭蛇',static:'靜電立場',orb:'冰封球',chain:'連鎖雷光',meteor:'隕星',thunderJavelin:'雷霆標槍',
+        whirlwind:'炫風斬',leap:'躍擊',blessedHammer:'祝福之鎚',shadowClone:'暗影分身',
+        vanderShockwave:'范德震地',frostDragonChase:'冰龍追擊',mindEcho:'心靈共振',riftBurst:'裂界衝擊',multiArrowRain:'多重箭雨',lightningSentry:'雷光哨衛',
+        royalCommand:'王者號令',shieldCounter:'盾反壁壘',fireDragonForm:'火龍化身',royalValorBlade:'王者劍氣',
+        unyieldingFortress:'不屈堡壘',thunderDragonStorm:'雷龍風暴'
     };
-    if (d.core) { add('技能延伸', 'mechanic', 96); source(`${coreNames[d.core] || d.core}（武器核心）`); }
+    if (d.core) { add('核心特化', 'mechanic', 96); source(`${coreNames[d.core] || d.core}（流派核心特化）`); }
 
     let values = [...entries.values()];
     const top = category => values.filter(x => x.category === category).sort((a,b) => b.priority - a.priority || a.label.localeCompare(b.label))[0];
@@ -1206,6 +1212,10 @@ function buildItemDescHTML(item) {
     let d = DB.items[item.id];
     if(!d) return '';
     let _detail = [], _lore = tooltipItemDescription(d, item.id), desc = '', _compactHead = '';
+    if (d.core) {
+        let _flow = typeof BUILD_FLOW_RULES !== 'undefined' && BUILD_FLOW_RULES[d.core], _tag = _flow && _flow.tag ? `「${_flow.tag}」` : '對應流派';
+        _detail.push(`<span class="text-cyan-300">核心特化：${_tag}不需此裝備即可入場；裝備本核心時，對應原技能及延伸傷害共鳴 +10%。</span>`);
+    }
     if (_lore) _detail.push(`<span class="text-slate-300">${_lore}</span>`);
     let _d2rows = typeof d2rAffixRows === 'function' ? d2rAffixRows(item) : [];
     let _socketMax = typeof equipSocketMax === 'function' ? equipSocketMax(item) : 0;

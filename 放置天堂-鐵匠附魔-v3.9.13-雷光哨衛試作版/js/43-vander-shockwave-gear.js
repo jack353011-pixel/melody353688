@@ -10,8 +10,7 @@ if(base){
  }
 }
 function sword(){
- let item=player&&player.eq&&player.eq.wpn,def=item&&DB.items[item.id];
- return item&&item.id===WPN&&def&&def.core==='vanderShockwave'?def:null;
+ return typeof buildFlowSource==='function'?buildFlowSource(player,'vanderShockwave'):null;
 }
 function bonus(){
  let total=typeof d2rEquipTotals==='function'?d2rEquipTotals(player):{};

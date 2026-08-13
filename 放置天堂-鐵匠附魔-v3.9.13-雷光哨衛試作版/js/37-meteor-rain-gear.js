@@ -3,7 +3,7 @@
 'use strict';
 const SK='sk_meteor',W='wpn_meteor_rain_staff_test';
 DB.items[W]={n:'隕星法杖',img:'assets/icons/weapons/d2r-gear/meteor-staff.png',type:'wpn',isWand:true,dmgS:6,dmgL:6,mdmg:4,spd:1,req:'mage',safe:6,p:150000,gachaWeight:5,core:'meteor',cdr:25,d:'流星雨延伸：追加5顆可見小隕石，結束後留下4秒燃燒地面。基礎冷卻12秒、最低4秒；原技能完全不變，核心能力固定保留。不死鳥 5% 掉落。'};
-function mw(){let i=player&&player.eq&&player.eq.wpn,d=i&&DB.items[i.id];return d&&d.core==='meteor'?d:null}
+function mw(){return typeof buildFlowSource==='function'?buildFlowSource(player,'meteor'):null}
 function ext(){let t=typeof d2rEquipTotals==='function'?d2rEquipTotals(player):{};return{mcx:Math.min(3,Math.floor(+t.mcx||0)),gd:Math.min(60,+t.gd||0),scd:Math.min(30,+t.scd||0)}}
 function ensure(){
  if(!player||player.cls!=='mage')return;
@@ -23,7 +23,7 @@ function fallFx(t){let h=host();if(!h)return;css();let e=document.createElement(
 function groundFx(){let h=host();if(!h)return;css();let e=document.getElementById('meteor-ground81');if(player&&player.meteorGround&&player.meteorGround.left>0){if(!e){e=document.createElement('div');e.id='meteor-ground81';e.innerHTML='<b>🔥 燃燒地面</b>';h.appendChild(e)}}else if(e)e.remove()}
 function impact(){let t=tgt();fallFx(t);if(!t)return;let d=dmg(t,[3,12],1);t.curHp-=d;t.justHit='fire';t._spellHurt=true;kill(t);logCombat('<span class="text-orange-300 font-bold">【小隕石】</span>'+t.n+' 受到 '+d+' 點傷害。','magic','summon');try{if(typeof renderMobs==='function')renderMobs()}catch(e){}}
 function burn(){let rows=[];live().forEach(t=>{let d=dmg(t,[1,6],.45);t.curHp-=d;t.justHit='fire';t._spellHurt=true;kill(t);rows.push(t.n+' '+d)});if(rows.length)logCombat('<span class="text-orange-300">【燃燒地面】</span>'+rows.join('、'),'dot','summon')}
-function trigger(){ensure();let w=mw();if(!w||player.dead||player.meteorGearCd>0)return;let x=ext();player.meteorGearCd=Math.max(40,Math.ceil(12000/(100+(w.cdr||0)+x.scd)));player.meteorRain={left:30+6*x.mcx,next:2,count:5+x.mcx,ground:Math.round(40*(1+x.gd/100))};logCombat('<span class="text-orange-300 font-bold">【隕星法杖】</span>天空開始墜落小隕石！','magic','summon')}
+function trigger(){ensure();let w=mw();if(!w||player.dead||player.meteorGearCd>0)return;let x=ext();player.meteorGearCd=Math.max(40,Math.ceil(12000/(100+(w.cdr||0)+x.scd)));player.meteorRain={left:30+6*x.mcx,next:2,count:5+x.mcx,ground:Math.round(40*(1+x.gd/100))};logCombat('<span class="text-orange-300 font-bold">【隕星流派】</span>天空開始墜落小隕石！','magic','summon')}
 let om=window.manualCast;window.manualCast=function(id){if(id!==SK)return om.apply(this,arguments);let mp=player.mp,c=player.manualCd[id]||0,r=om.apply(this,arguments);if(player.mp<mp||(player.manualCd[id]||0)>c)trigger();return r};
 let oi=window.castSkillInner;window.castSkillInner=function(id){let r=oi.apply(this,arguments);if(r&&id===SK)trigger();return r};if(typeof castSkillInner==='function')castSkillInner=window.castSkillInner;
 let ot=window.tick;window.tick=function(){let r=ot.apply(this,arguments);ensure();if(player&&player.meteorGearCd>0)player.meteorGearCd--;if(player&&player.meteorRain){let m=player.meteorRain;m.left--;m.next--;if(m.next<=0&&m.count>0){impact();m.count--;m.next=6}if(m.left<=0||m.count<=0){let ground=m.ground||40;player.meteorRain=null;player.meteorGround={left:ground,next:10};groundFx()}}if(player&&player.meteorGround){let g=player.meteorGround;g.left--;g.next--;if(g.next<=0&&g.left>0){burn();g.next=10}if(g.left<=0){player.meteorGround=null;groundFx()}}groundFx();return r};
