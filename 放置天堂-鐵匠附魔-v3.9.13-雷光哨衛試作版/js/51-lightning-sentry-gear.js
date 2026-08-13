@@ -125,6 +125,20 @@ function deploy(){
  badge();return true;
 }
 
+// 🛡️ 觸發保險：正常路徑仍以 castSkillInner hook 為主；這裡只偵測暗影之牙由 0→生效的瞬間。
+// 若主 hook 已成功部署，deploy() 會因冷卻已啟動而直接返回，不會重複部署／重複訊息。
+// 角色物件切換或讀檔時先把當前 buff 當基準，避免把既有 buff 誤判成新施放。
+let _fangOwner313=null,_fangPrev313=0;
+function fangEdgeFallback(){
+ if(typeof player==='undefined'||!player){_fangOwner313=null;_fangPrev313=0;return false}
+ let now=Number(player.buffs&&player.buffs[SK])||0;
+ if(_fangOwner313!==player){_fangOwner313=player;_fangPrev313=now;return false}
+ let rose=_fangPrev313<=0&&now>0;
+ _fangPrev313=now;
+ if(!rose||!weapon()||player.cls!=='dark'||player.dead||player.lightningSentryCd313>0)return false;
+ return deploy();
+}
+
 let oldManual=window.manualCast;
 window.manualCast=function(id){
  if(typeof oldManual!=='function')return false;
@@ -141,6 +155,7 @@ if(typeof castSkillInner==='function')castSkillInner=window.castSkillInner;
 let oldTick=window.tick;
 window.tick=function(){
  let result=typeof oldTick==='function'?oldTick.apply(this,arguments):undefined;ensure();
+ fangEdgeFallback();
  if(player.lightningSentryCd313>0)player.lightningSentryCd313--;
  if(!weapon()||player.cls!=='dark'||player.dead){player.lightningSentryActive313=0;player.lightningSentryNext313=0}
  else if(player.lightningSentryActive313>0){
