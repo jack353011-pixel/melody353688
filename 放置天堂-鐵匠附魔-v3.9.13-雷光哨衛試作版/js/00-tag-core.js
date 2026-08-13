@@ -149,12 +149,50 @@ function buildFlowSource(owner, buildId) {
     return state.active ? ((state.core && state.core.def) || state.def) : null;
 }
 function buildFlowCoreEquipped(owner, buildId) { return !!buildFlowEquippedCore(owner, buildId); }
+const BUILD_FLOW_SUPPORT_LIMIT = 2;
+function buildFlowSupportEquipped(owner, buildId) {
+    if (!owner || !owner.eq || typeof DB === 'undefined' || !DB.items) return [];
+    return Object.entries(owner.eq).map(([slot, item]) => {
+        let def = item && DB.items[item.id];
+        return def && def.flowSupport === buildId ? { slot, item, def } : null;
+    }).filter(Boolean);
+}
+function buildFlowFocusIds(owner, buildId) {
+    owner = owner || (typeof player !== 'undefined' ? player : null);
+    if (!owner || !buildId) return [];
+    if (!owner.buildFlowFocus || typeof owner.buildFlowFocus !== 'object') owner.buildFlowFocus = {};
+    if (!owner.buildFlowFocusManual || typeof owner.buildFlowFocusManual !== 'object') owner.buildFlowFocusManual = {};
+    let selected = tagCoreList(owner.buildFlowFocus[buildId]).filter((id, index, rows) => rows.indexOf(id) === index).slice(0, BUILD_FLOW_SUPPORT_LIMIT);
+    // 舊角色還沒選過專精時，依現有裝備欄順序自動取前兩項；一旦玩家手動調整就不再代選。
+    if (!owner.buildFlowFocusManual[buildId]) selected = buildFlowSupportEquipped(owner, buildId).map(row => row.item.id).slice(0, BUILD_FLOW_SUPPORT_LIMIT);
+    owner.buildFlowFocus[buildId] = selected;
+    return selected.slice();
+}
+function buildFlowSupportStatus(owner, buildId, itemId) {
+    let selected = buildFlowFocusIds(owner, buildId).includes(itemId);
+    let equipped = buildFlowSupportEquipped(owner, buildId).some(row => row.item.id === itemId);
+    return { selected, equipped, active:selected && equipped, limit:BUILD_FLOW_SUPPORT_LIMIT };
+}
+function toggleBuildFlowSupport(owner, buildId, itemId) {
+    owner = owner || (typeof player !== 'undefined' ? player : null);
+    let def = typeof DB !== 'undefined' && DB.items && DB.items[itemId];
+    if (!owner || !def || def.flowSupport !== buildId || !buildFlowSupportEquipped(owner, buildId).some(row => row.item.id === itemId)) return { ok:false, selected:false, replaced:null };
+    let selected = buildFlowFocusIds(owner, buildId), index = selected.indexOf(itemId), replaced = null;
+    if (index >= 0) selected.splice(index, 1);
+    else {
+        if (selected.length >= BUILD_FLOW_SUPPORT_LIMIT) replaced = selected.shift();
+        selected.push(itemId);
+    }
+    owner.buildFlowFocus[buildId] = selected;
+    owner.buildFlowFocusManual[buildId] = true;
+    return { ok:true, selected:selected.includes(itemId), replaced, ids:selected.slice() };
+}
 function buildFlowSupportValue(owner, buildId, prop) {
-    let state = buildFlowAccess(owner, buildId), total = 0;
+    let state = buildFlowAccess(owner, buildId), total = 0, focus = new Set(buildFlowFocusIds(owner, buildId));
     if (!state.active || !owner || !owner.eq) return 0;
     Object.values(owner.eq).forEach(item => {
         let def = item && typeof DB !== 'undefined' && DB.items && DB.items[item.id], value = Number(def && def[prop]);
-        if (Number.isFinite(value) && value > 0) total += value;
+        if (def && def.flowSupport === buildId && focus.has(item.id) && Number.isFinite(value) && value > 0) total += value;
     });
     return total;
 }

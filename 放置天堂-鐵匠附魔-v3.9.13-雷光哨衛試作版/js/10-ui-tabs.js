@@ -1216,6 +1216,11 @@ function buildItemDescHTML(item) {
         let _flow = typeof BUILD_FLOW_RULES !== 'undefined' && BUILD_FLOW_RULES[d.core], _tag = _flow && _flow.tag ? `「${_flow.tag}」` : '對應流派';
         _detail.push(`<span class="text-cyan-300">核心特化：${_tag}不需此裝備即可入場；裝備本核心時，對應原技能及延伸傷害共鳴 +10%。</span>`);
     }
+    if (d.flowSupport && typeof buildFlowSupportStatus === 'function') {
+        let _support = buildFlowSupportStatus(player, d.flowSupport, item.id), _flow = typeof BUILD_FLOW_RULES !== 'undefined' && BUILD_FLOW_RULES[d.flowSupport];
+        let _tag = _flow && _flow.tag ? `「${_flow.tag}」` : '對應流派', _state = _support.active ? '已啟用' : (_support.selected ? '已指定，穿戴時啟用' : '未啟用');
+        _detail.push(`<span class="${_support.active ? 'text-emerald-300' : 'text-slate-400'}">主要專精：${_tag}・${d.flowSupportLabel || d.n}－${_state}（同流派最多 ${_support.limit} 項）。未啟用時仍保留基本屬性、詞綴、孔洞與寶石。</span>`);
+    }
     if (_lore) _detail.push(`<span class="text-slate-300">${_lore}</span>`);
     let _d2rows = typeof d2rAffixRows === 'function' ? d2rAffixRows(item) : [];
     let _socketMax = typeof equipSocketMax === 'function' ? equipSocketMax(item) : 0;
@@ -1674,6 +1679,10 @@ function openModal(item, isEq, slot) {
     
     let act = '';
     if (isEq) {
+        if (d.flowSupport && typeof buildFlowSupportStatus === 'function') {
+            let _support = buildFlowSupportStatus(player, d.flowSupport, item.id), _supportLabel = _support.selected ? '取消主要專精' : '設為主要專精';
+            act += `<button class="col-span-2 w-full btn ${_support.selected ? 'border-emerald-600 bg-emerald-900 hover:bg-emerald-800 text-emerald-100' : 'border-cyan-700 bg-cyan-950 hover:bg-cyan-900 text-cyan-100'} py-3 text-lg font-bold" onclick="toggleBuildFlowSupportFromModal('${d.flowSupport}','${item.id}','${slot}')">${_support.selected ? '✓ ' : '✦ '}${_supportLabel}（最多 ${_support.limit} 項）</button>`;
+        }
         // 🔧 詛咒裝備無法卸下：按鈕變灰並禁用
         if (item.bless === 'cursed') {
             act += `<button class="col-span-2 w-full btn border-slate-600 bg-slate-700 text-slate-400 py-3 text-lg font-bold cursor-not-allowed" disabled title="被詛咒的裝備無法卸下，需先解除詛咒">🔒 詛咒中・無法卸除</button>`;
@@ -1742,6 +1751,21 @@ function openModal(item, isEq, slot) {
     }
 
     document.getElementById('item-modal').classList.remove('hidden');
+}
+
+function toggleBuildFlowSupportFromModal(buildId, itemId, slot) {
+    if (typeof toggleBuildFlowSupport !== 'function') return;
+    let result = toggleBuildFlowSupport(player, buildId, itemId);
+    if (!result.ok) { if (typeof logSys === 'function') logSys('<span class="text-red-400">無法切換此主要專精：裝備可能已卸下。</span>'); return; }
+    let def = DB.items[itemId], replaced = result.replaced && DB.items[result.replaced];
+    if (typeof logSys === 'function') logSys(result.selected
+        ? `<span class="text-emerald-300 font-bold">已啟用主要專精：${def.flowSupportLabel || def.n}。</span>${replaced ? `專精上限為 ${BUILD_FLOW_SUPPORT_LIMIT} 項，已取代 ${replaced.flowSupportLabel || replaced.n}。` : ''}`
+        : `<span class="text-slate-300">已取消主要專精：${def.flowSupportLabel || def.n}。</span>`);
+    if (typeof calcStats === 'function') calcStats();
+    if (typeof renderTabs === 'function') renderTabs();
+    if (typeof saveGame === 'function') saveGame();
+    let equipped = player.eq && player.eq[slot];
+    if (equipped && equipped.id === itemId) openModal(equipped, true, slot); else closeModal();
 }
 // 👇 新增功能：返回裝備視窗
 function returnToItemModal(uid, isEq) {

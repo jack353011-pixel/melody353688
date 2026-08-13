@@ -25,7 +25,10 @@ const result = vm.runInContext(`(() => {
     DB.items.test_flow_core_sword={n:'測試核心劍',type:'wpn',core:'royalValorBlade'};
     DB.items.test_flow_chain={n:'測試鎖鏈劍',type:'wpn',chainsword:true};
     DB.items.test_flow_armor={n:'測試盔甲',type:'arm',slot:'armor'};
-    DB.items.test_flow_support={n:'測試披風',type:'arm',slot:'cloak',royalValorDamagePct:20};
+    DB.items.test_flow_support={n:'測試披風',type:'arm',slot:'cloak',royalValorDamagePct:20,flowSupport:'royalValorBlade'};
+    DB.items.test_flow_support_helm={n:'測試王冠',type:'arm',slot:'helm',royalValorChance:10,flowSupport:'royalValorBlade'};
+    DB.items.test_flow_support_gloves={n:'測試護手',type:'arm',slot:'gloves',royalValorExtraWaves:1,flowSupport:'royalValorBlade'};
+    DB.items.test_flow_support_amulet={n:'測試項鍊',type:'acc',slot:'amulet',royalValorCooldownPct:20,flowSupport:'royalValorBlade'};
     DB.items.test_flow_magic={n:'測試法杖',type:'wpn',isWand:true,mdmg:1};
     DB.items.test_flow_axe={n:'測試巨斧',type:'wpn'};
     DB.items.test_flow_bow={n:'測試獵弓',type:'wpn',isBow:true,ranged:true};
@@ -38,6 +41,7 @@ const result = vm.runInContext(`(() => {
     DB.items.test_flow_helm={n:'測試頭盔',type:'arm',slot:'helm'};
     const owner=(skills,eq)=>({skills,eq});
     const royal=owner(['sk_royal_bravewill'],{wpn:{id:'test_flow_sword'},cloak:{id:'test_flow_support'}});
+    const royalFull=owner(['sk_royal_bravewill'],{wpn:{id:'test_flow_sword'},helm:{id:'test_flow_support_helm'},cloak:{id:'test_flow_support'},gloves:{id:'test_flow_support_gloves'},amulet:{id:'test_flow_support_amulet'}});
     const noSkill=owner([],{wpn:{id:'test_flow_core_sword'}});
     const core=owner(['sk_royal_bravewill'],{wpn:{id:'test_flow_core_sword'}});
     const dragon=owner(['sk_dragon_deathlightning'],{wpn:{id:'test_flow_chain'}});
@@ -51,6 +55,11 @@ const result = vm.runInContext(`(() => {
       const itemId=rule.gear==='slot'?slotItems[rule.slot]:kindItems[rule.gear];
       return {id,active:buildFlowAccess(owner([rule.skills[0]],{[rule.slot]:{id:itemId}}),id).active,noSkill:buildFlowAccess(owner([],{[rule.slot]:{id:itemId}}),id).active};
     });
+    const initialFocus=buildFlowFocusIds(royalFull,'royalValorBlade');
+    const initialChance=buildFlowSupportValue(royalFull,'royalValorBlade','royalValorChance');
+    const initialDamage=buildFlowSupportValue(royalFull,'royalValorBlade','royalValorDamagePct');
+    const initialWaves=buildFlowSupportValue(royalFull,'royalValorBlade','royalValorExtraWaves');
+    const switched=toggleBuildFlowSupport(royalFull,'royalValorBlade','test_flow_support_gloves');
     return {
       ruleCount:everyRule.length,
       inactiveRuleCount:everyRule.filter(x=>!x.active).length,
@@ -58,6 +67,14 @@ const result = vm.runInContext(`(() => {
       royalActive:buildFlowAccess(royal,'royalValorBlade').active,
       royalTag:characterAffinityTagSnapshot(royal).has('流派:王者劍氣'),
       royalSupport:buildFlowSupportValue(royal,'royalValorBlade','royalValorDamagePct'),
+      initialFocusCount:initialFocus.length,
+      initialChance,initialDamage,initialWaves,
+      switchedSelected:switched.selected,
+      switchedReplaced:switched.replaced,
+      switchedFocusCount:buildFlowFocusIds(royalFull,'royalValorBlade').length,
+      switchedChance:buildFlowSupportValue(royalFull,'royalValorBlade','royalValorChance'),
+      switchedDamage:buildFlowSupportValue(royalFull,'royalValorBlade','royalValorDamagePct'),
+      switchedWaves:buildFlowSupportValue(royalFull,'royalValorBlade','royalValorExtraWaves'),
       coreWithoutSkill:buildFlowAccess(noSkill,'royalValorBlade').active,
       coreDetected:buildFlowCoreEquipped(core,'royalValorBlade'),
       dragonActive:buildFlowAccess(dragon,'thunderDragonStorm').active,
@@ -76,6 +93,16 @@ assert.equal(result.noSkillActiveCount, 0, '任何流派都不得繞過原技能
 assert.equal(result.royalActive, true, '普通單手劍＋勇猛意志應可進入王者劍氣流派');
 assert.equal(result.royalTag, true, '流派入口應產生隱藏 Tag');
 assert.equal(result.royalSupport, 20, '配套裝備應讀取流派狀態後生效');
+assert.equal(result.initialFocusCount, 2, '舊存檔全裝時應自動只啟用前兩項主要專精');
+assert.equal(result.initialChance, 10, '自動專精的第一項應生效');
+assert.equal(result.initialDamage, 20, '自動專精的第二項應生效');
+assert.equal(result.initialWaves, 0, '第三項配套不得在未專精時生效');
+assert.equal(result.switchedSelected, true, '玩家應能手動改選主要專精');
+assert.equal(result.switchedReplaced, 'test_flow_support_helm', '選滿後改選應取代最早的專精');
+assert.equal(result.switchedFocusCount, 2, '手動切換後仍不得超過兩項專精');
+assert.equal(result.switchedChance, 0, '被取代的專精應立即停止生效');
+assert.equal(result.switchedDamage, 20, '未被取代的專精應繼續生效');
+assert.equal(result.switchedWaves, 1, '新選專精應立即生效');
 assert.equal(result.coreWithoutSkill, false, '核心裝不得繞過原技能資格');
 assert.equal(result.coreDetected, true, '指定核心仍應被辨識為特化裝');
 assert.equal(result.dragonActive, true, '任意鎖鏈劍＋奪命之雷應可進入雷龍風暴');
@@ -102,6 +129,9 @@ const mageSource=fs.readFileSync(path.join(root,'js/36-d2r-gear-pack.js'),'utf8'
 assert.match(mageSource,/arcaneLightningNext79/, '法師無核心時缺少靜電／連鎖輪替');
 const supportSource=fs.readFileSync(path.join(root,'js/62-three-build-support-gear.js'),'utf8');
 assert.doesNotMatch(supportSource,/沒有核心(?:武器|盔甲)時不會啟動技能/, '配套說明仍把核心裝當入場券');
+assert.equal((supportSource.match(/flowSupport:/g)||[]).length, 12, '三組配套的 12 件裝備都應接入主要專精規則');
+assert.match(supportSource,/最多啟用 2 項主要專精/, '配套說明應明示兩項主要專精上限');
+assert.match(uiSource,/toggleBuildFlowSupportFromModal/, '裝備視窗缺少主要專精切換入口');
 const dropsSource=fs.readFileSync(path.join(root,'js/01-drops-config.js'),'utf8');
 assert.match(dropsSource,/buildFlowCoreEquipped\(owner, buildId\)/, '核心裝 10% 原技能共鳴尚未接入技能倍率');
 
