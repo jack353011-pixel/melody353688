@@ -106,6 +106,10 @@ const BUILD_FLOW_RULES = Object.freeze({
     painMirror:{ skills:['sk_illu_pain'], slot:'armor', gear:'slot', tag:'流派:痛覺鏡界' },
     multiArrowRain:{ skills:['sk_elf_triple'], slot:'wpn', gear:'bow', tag:'流派:多重箭雨' },
     lightningSentry:{ skills:['sk_dark_fang'], slot:'wpn', gear:'claw', tag:'流派:雷光哨衛' },
+    venomTwinblades:{ skills:['sk_dark_poison'], slot:'wpn', gear:'dualBlade', tag:'流派:蝕毒雙刃' },
+    darkstoneAmbush:{ skills:['sk_dark_refine'], slot:'wpn', gear:'dagger', tag:'流派:魔石伏擊' },
+    flameSwordDance:{ skills:['sk_elf_flamesoul'], slot:'wpn', gear:'sword', tag:'流派:火勢劍舞' },
+    spiritCommand:{ skills:['sk_elf_summon2'], slot:'wpn', gear:'magic', tag:'流派:精靈號令' },
     royalCommand:{ skills:['sk_royal_burnweapon'], slot:'helm', gear:'slot', tag:'流派:王者號令' },
     shieldCounter:{ skills:['sk_solid_shield'], slot:'shield', gear:'slot', tag:'流派:盾反壁壘' },
     fireDragonForm:{ skills:['sk_dragon_awaken_baraka'], slot:'armor', gear:'slot', tag:'流派:火龍化身' },
@@ -130,6 +134,8 @@ function buildFlowGearMatches(def, kind, itemId) {
     if (kind === 'chainSword') return !!(def.chainsword || family === '鎖鏈劍' || /鎖鏈劍/.test(def.n || ''));
     if (kind === 'qigu') return !!(def.qigu || family === '奇古獸');
     if (kind === 'claw') return !!(family === '鋼爪' || /鋼爪/.test(def.n || ''));
+    if (kind === 'dualBlade') return !!(family === '雙刀' || /雙刀|雙刃/.test(def.n || ''));
+    if (kind === 'dagger') return !!(family === '匕首' || /匕首|短劍|短刀/.test(def.n || ''));
     if (kind === 'heavyArmor') return !!(def.slot === 'armor' && (def.heavyArmor || /重裝|重鎧|板甲|鎖甲|金屬盔甲|鋼鐵|冥皇鎧甲|巴風特盔甲|安塔瑞斯的力量/.test(def.n || '')));
     return false;
 }

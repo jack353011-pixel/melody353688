@@ -36,6 +36,8 @@ const result = vm.runInContext(`(() => {
     DB.items.test_flow_launcher={n:'測試鐵手甲',type:'wpn',isBow:true,ranged:true,animFam:'gauntlet'};
     DB.items.test_flow_claw={n:'測試鋼爪',type:'wpn'};
     DB.items.test_flow_qigu={n:'測試奇古獸',type:'wpn',qigu:true};
+    DB.items.test_flow_dual={n:'測試雙刀',type:'wpn',w2h:true,eff:'combo'};
+    DB.items.test_flow_dagger={n:'測試短劍',type:'wpn'};
     DB.items.test_flow_boots={n:'測試戰靴',type:'arm',slot:'boots'};
     DB.items.test_flow_shield={n:'測試盾牌',type:'arm',slot:'shield'};
     DB.items.test_flow_cloak={n:'測試披風',type:'arm',slot:'cloak'};
@@ -50,7 +52,7 @@ const result = vm.runInContext(`(() => {
     const archer=owner(['sk_elf_triple'],{wpn:{id:'test_flow_bow'}});
     const launcher=owner(['sk_elf_triple'],{wpn:{id:'test_flow_launcher'}});
     const dark=owner(['sk_dark_fang'],{wpn:{id:'test_flow_claw'}});
-    const kindItems={magic:'test_flow_magic',launcher:'test_flow_launcher',bow:'test_flow_bow',axe:'test_flow_axe',sword:'test_flow_sword',chainSword:'test_flow_chain',qigu:'test_flow_qigu',claw:'test_flow_claw',heavyArmor:'test_flow_heavy'};
+    const kindItems={magic:'test_flow_magic',launcher:'test_flow_launcher',bow:'test_flow_bow',axe:'test_flow_axe',sword:'test_flow_sword',chainSword:'test_flow_chain',qigu:'test_flow_qigu',claw:'test_flow_claw',dualBlade:'test_flow_dual',dagger:'test_flow_dagger',heavyArmor:'test_flow_heavy'};
     const slotItems={wpn:'test_flow_sword',boots:'test_flow_boots',shield:'test_flow_shield',cloak:'test_flow_cloak',helm:'test_flow_helm',armor:'test_flow_armor'};
     const everyRule=Object.entries(BUILD_FLOW_RULES).map(([id,rule])=>{
       const itemId=rule.gear==='slot'?slotItems[rule.slot]:kindItems[rule.gear];
@@ -88,7 +90,7 @@ const result = vm.runInContext(`(() => {
     };
 })()`, context);
 
-assert.equal(result.ruleCount, 26, '共用流派表應完整登記 26 個流派');
+assert.equal(result.ruleCount, 30, '共用流派表應完整登記 30 個流派');
 assert.equal(result.inactiveRuleCount, 0, '有原技能與相符裝備時，每個流派都應可入場');
 assert.equal(result.noSkillActiveCount, 0, '任何流派都不得繞過原技能資格');
 assert.equal(result.royalActive, true, '普通單手劍＋勇猛意志應可進入王者劍氣流派');
@@ -119,7 +121,7 @@ const sourceFiles = [
  'js/41-blessed-hammer-gear.js','js/42-shadow-clone-gear.js','js/43-vander-shockwave-gear.js','js/44-frost-dragon-chase-gear.js',
  'js/45-mind-echo-gear.js','js/46-rift-burst-gear.js','js/47-multi-arrow-rain-gear.js','js/48-charged-strike-gear.js',
  'js/51-lightning-sentry-gear.js','js/56-royal-command-gear.js','js/57-knight-shield-counter-gear.js','js/58-fire-dragon-form-gear.js',
- 'js/59-royal-valor-blade-gear.js','js/60-knight-unyielding-fortress-gear.js','js/61-thunder-dragon-storm-gear.js','js/63-warrior-illusion-flows.js'
+ 'js/59-royal-valor-blade-gear.js','js/60-knight-unyielding-fortress-gear.js','js/61-thunder-dragon-storm-gear.js','js/63-warrior-illusion-flows.js','js/65-dark-elf-elf-flows.js'
 ];
 sourceFiles.forEach(file => {
     const source=fs.readFileSync(path.join(root,file),'utf8');

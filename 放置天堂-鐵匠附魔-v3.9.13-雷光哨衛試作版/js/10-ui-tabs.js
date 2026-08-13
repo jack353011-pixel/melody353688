@@ -673,6 +673,7 @@ const WEAPON_TAGS = {
     wpn_demon_sword_hidden:['單手劍'],   // 👹 隱藏的魔族之劍：反擊(單手劍)
     wpn_demon_claw_hidden:['鋼爪'],   // 👹 隱藏的魔族鋼爪：鋼爪標籤(雙擊33預設＋貫穿＋黑暗妖精可裝)
     wpn_lightning_sentry_claw:['鋼爪'],   // ⚡ 雷光哨衛鋼爪：黑暗妖精裝備資格＋鋼爪原生機制
+    wpn_corroded_moon_dual:['雙刀'],   // 🌑 蝕月雙刃：明確沿用雙刀攻速／雙擊原型，避免「雙刃」名稱掉入雙手劍後備
     wpn_royal_valor_blade:['單手劍'],   // 👑 王者榮耀之劍：單手劍反擊機制
     // 🏴‍☠️ 海賊島武器：血紅慾望短劍(匕首/出血)、榮耀之劍/短刀/海賊彎刀(單手劍/反擊)、深淵雙刀(雙刀/雙擊)
     wpn_pirate_dagger:['匕首'], wpn_glory_sword:['單手劍'], wpn_pirate_shortblade:['單手劍'], wpn_pirate_cutlass:['單手劍'], wpn_abyss_dualblade:['雙刀'],
@@ -874,7 +875,8 @@ function weaponSkillTagProfile(itemOrId) {
         vanderShockwave:'范德震地',frostDragonChase:'冰龍追擊',mindEcho:'心靈共振',riftBurst:'裂界衝擊',multiArrowRain:'多重箭雨',lightningSentry:'雷光哨衛',
         royalCommand:'王者號令',shieldCounter:'盾反壁壘',fireDragonForm:'火龍化身',royalValorBlade:'王者劍氣',
         unyieldingFortress:'不屈堡壘',thunderDragonStorm:'雷龍風暴',bloodAxeHunt:'血斧追獵',titanWall:'泰坦逆壁',
-        cubeResonance:'立方共鳴',painMirror:'痛覺鏡界'
+        cubeResonance:'立方共鳴',painMirror:'痛覺鏡界',venomTwinblades:'蝕毒雙刃',darkstoneAmbush:'魔石伏擊',
+        flameSwordDance:'火勢劍舞',spiritCommand:'精靈號令'
     };
     if (d.core) { add('核心特化', 'mechanic', 96); source(`${coreNames[d.core] || d.core}（流派核心特化）`); }
 
@@ -1215,7 +1217,7 @@ function buildItemDescHTML(item) {
     let _detail = [], _lore = tooltipItemDescription(d, item.id), desc = '', _compactHead = '';
     if (d.core) {
         let _flow = typeof BUILD_FLOW_RULES !== 'undefined' && BUILD_FLOW_RULES[d.core], _tag = _flow && _flow.tag ? `「${_flow.tag}」` : '對應流派';
-        _detail.push(`<span class="text-cyan-300">核心特化：${_tag}不需此裝備即可入場；裝備本核心時，對應原技能及延伸傷害共鳴 +10%。</span>`);
+        _detail.push(`<span class="text-cyan-300">核心特化：${_tag}不需此裝備即可入場；${d.coreMechanicOnly?'裝備本核心時，只強化物品敘述中的機制，不新增純傷害倍率。':'裝備本核心時，對應原技能及延伸傷害共鳴 +10%。'}</span>`);
     }
     if (d.flowSupport && typeof buildFlowSupportStatus === 'function') {
         let _support = buildFlowSupportStatus(player, d.flowSupport, item.id), _flow = typeof BUILD_FLOW_RULES !== 'undefined' && BUILD_FLOW_RULES[d.flowSupport];
