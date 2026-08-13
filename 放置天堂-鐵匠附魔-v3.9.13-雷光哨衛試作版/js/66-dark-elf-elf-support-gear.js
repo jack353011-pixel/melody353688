@@ -25,6 +25,12 @@ Object.assign(DB.items,{
  bot_spirit_gust:{n:'風火傳勢長靴',img:'assets/icons/armors/神意長靴.png',legend:true,type:'arm',slot:'boots',ac:4,cha:1,er:3,resWind:10,safe:4,p:250000,gachaWeight:5,spiritAttackDelayTicks:3,flowSupport:'spiritCommand',flowSupportLabel:'風火擾勢',d:'精靈號令配套。設為主要專精時，火靈／風靈主動號令對敵方物理行動的推遲增加0.3秒；不額外生成召喚物或傷害倍率。同流派最多啟用2項。四大精靈王共用2%掉落。'}
 });
 
+// 配套維持全職業可穿，只用等級防止低等抽到傳說裝後過早取得完整機制。
+['hlm_venom_relay','clk_venom_route','glv_venom_pressure','bot_venom_pursuit',
+ 'hlm_darkstone_delay','clk_darkstone_return','glv_darkstone_frugal','bot_darkstone_muffle'].forEach(id=>Object.assign(DB.items[id],{req:'all',reqLv:45}));
+['hlm_flame_rhythm','clk_flame_hold','glv_flame_press','bot_flame_guard',
+ 'hlm_spirit_relay','clk_spirit_tide','glv_spirit_ridge','bot_spirit_gust'].forEach(id=>Object.assign(DB.items[id],{req:'all',reqLv:50}));
+
 function addDrops(mob,ids,rate){
  if(typeof MOB_DROPS!=='object')return;let rows=MOB_DROPS[mob]||(MOB_DROPS[mob]=[]);
  ids.forEach(id=>{if(!rows.some(row=>row&&row[0]===id))rows.push([id,rate])});

@@ -86,7 +86,11 @@ const result = vm.runInContext(`(() => {
       bowJavelin:buildFlowAccess(archer,'thunderJavelin').active,
       launcherRain:buildFlowAccess(launcher,'multiArrowRain').active,
       launcherJavelin:buildFlowAccess(launcher,'thunderJavelin').active,
-      sentryActive:buildFlowAccess(dark,'lightningSentry').active
+      sentryActive:buildFlowAccess(dark,'lightningSentry').active,
+      daggerAsSword:buildFlowGearMatches(DB.items.test_flow_dagger,'sword','test_flow_dagger'),
+      daggerAsDagger:buildFlowGearMatches(DB.items.test_flow_dagger,'dagger','test_flow_dagger'),
+      mithrilFlame:buildFlowAccess(owner(['sk_elf_flamesoul','sk_elf_summon2'],{wpn:{id:'wpn_mithril_dagger'}}),'flameSwordDance').active,
+      mithrilSpirit:buildFlowAccess(owner(['sk_elf_flamesoul','sk_elf_summon2'],{wpn:{id:'wpn_mithril_dagger'}}),'spiritCommand').active
     };
 })()`, context);
 
@@ -115,6 +119,10 @@ assert.equal(result.bowJavelin, false, '一般弓不應同時進入雷霆標槍'
 assert.equal(result.launcherRain, false, '投射鐵手甲不應同時進入多重箭雨');
 assert.equal(result.launcherJavelin, true, '投射鐵手甲應進入雷霆標槍');
 assert.equal(result.sentryActive, true, '任意鋼爪＋暗影之牙應可進入雷光哨衛');
+assert.equal(result.daggerAsSword, false, '短劍／匕首不得被劍流派誤判為單手劍');
+assert.equal(result.daggerAsDagger, true, '短劍應繼續可進入匕首流派');
+assert.equal(result.mithrilFlame, false, '米索莉短劍不得啟動火勢劍舞');
+assert.equal(result.mithrilSpirit, true, '米索莉短劍的魔法武器資格應保留，只排除劍流派誤判');
 
 const sourceFiles = [
  'js/37-meteor-rain-gear.js','js/38-thunder-javelin-gear.js','js/39-whirlwind-gear.js','js/40-leap-gear.js',

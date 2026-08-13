@@ -53,7 +53,7 @@ const result=vm.runInContext(`(()=>{
  let supportIds=Object.keys(DB.items).filter(id=>DB.items[id]&&['venomTwinblades','darkstoneAmbush','flameSwordDance','spiritCommand'].includes(DB.items[id].flowSupport));
  let coreIds=['wpn_corroded_moon_dual','wpn_blackstone_ambush_dagger','wpn_ember_dance_sword','wpn_spirit_command_wand'];
  return {relayUnit,relayCd,largeWeaken,stoneLeft,magicDelay,ambushCd,lockedDelay,heatAfterPress,enemyAtkCd,guarded,heatAfterGuard,waterResult,waterHp,manualAfterWater,earthShield,fireHp,fireAttacks,
-  supports:supportIds.length,coreDrops:Object.values(MOB_DROPS).flat().filter(r=>coreIds.includes(r[0])).length,supportDropIds:new Set(Object.values(MOB_DROPS).flat().filter(r=>supportIds.includes(r[0])).map(r=>r[0])).size};
+  supports:supportIds.length,darkSupportLevels:supportIds.filter(id=>['venomTwinblades','darkstoneAmbush'].includes(DB.items[id].flowSupport)).map(id=>DB.items[id].reqLv),elfSupportLevels:supportIds.filter(id=>['flameSwordDance','spiritCommand'].includes(DB.items[id].flowSupport)).map(id=>DB.items[id].reqLv),supportReqAll:supportIds.every(id=>DB.items[id].req==='all'),coreDrops:Object.values(MOB_DROPS).flat().filter(r=>coreIds.includes(r[0])).length,supportDropIds:new Set(Object.values(MOB_DROPS).flat().filter(r=>supportIds.includes(r[0])).map(r=>r[0])).size};
 })()`,context);
 
 assert.equal(result.relayUnit,50,'換目標應轉移舊毒的50%，不叠層或爆發');
@@ -74,6 +74,9 @@ assert.equal(result.earthShield,60,'地靈號令應建立6%最大HP護盾');
 assert.equal(result.fireHp,495,'火靈號令應命令現有精靈立即攻擊一次');
 assert.equal(result.fireAttacks,1,'火靈號令不得新增召喚實體');
 assert.equal(result.supports,16,'四個流派應各有4件配套裝備');
+assert.equal(Array.from(result.darkSupportLevels).every(v=>v===45),true,'蝕毒雙刃／魔石伏擊配套應需 Lv.45');
+assert.equal(Array.from(result.elfSupportLevels).every(v=>v===50),true,'火勢劍舞／精靈號令配套應需 Lv.50');
+assert.equal(result.supportReqAll,true,'新配套應維持全職業可穿，流派效果仍由技能與武器 Tag 判定');
 assert.equal(result.coreDrops,7,'四件核心中，四靈號令杖由4個精靈王共同掉落');
 assert.equal(result.supportDropIds,16,'16件配套裝備都應有故事相符的掉落來源');
 console.log('黑暗妖精／妖精四流派機制測試通過');

@@ -130,7 +130,7 @@ function buildFlowGearMatches(def, kind, itemId) {
     if (kind === 'launcher') return !!(def.ranged && (def.animFam === 'gauntlet' || /鐵手甲|標槍/.test(def.n || '')));
     if (kind === 'bow') return !!(def.isBow && def.animFam !== 'gauntlet');
     if (kind === 'axe') return /斧/.test(family) || /斧/.test(def.n || '');
-    if (kind === 'sword') return !!(def.chainsword !== true && !/鎖鏈劍/.test(def.n || '') && (/劍/.test(family) || /劍/.test(def.n || '')));
+    if (kind === 'sword') return !!(family !== '匕首' && def.chainsword !== true && !/匕首|短劍|短刀|鎖鏈劍/.test(def.n || '') && (/劍/.test(family) || /劍/.test(def.n || '')));
     if (kind === 'chainSword') return !!(def.chainsword || family === '鎖鏈劍' || /鎖鏈劍/.test(def.n || ''));
     if (kind === 'qigu') return !!(def.qigu || family === '奇古獸');
     if (kind === 'claw') return !!(family === '鋼爪' || /鋼爪/.test(def.n || ''));
