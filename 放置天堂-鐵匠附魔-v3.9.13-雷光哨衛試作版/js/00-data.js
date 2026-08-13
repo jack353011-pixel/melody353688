@@ -1,6 +1,6 @@
 ﻿/** 遊戲核心資料庫 */
 // 🏷️ 遊戲版本號（顯示於登入頁面下方·單一真相來源）：更新版本時只改這一行，登入頁面自動同步。
-const GAME_VERSION = 'v3.9.76';   // 🏷️ 版本號：末段 0~99 線性遞增，達 100 進位（中位 +1、末段歸 0）
+const GAME_VERSION = 'v3.9.79';   // 🏷️ 版本號：末段 0~99 線性遞增，達 100 進位（中位 +1、末段歸 0）
 // ===== 💾 存檔壓縮（LZString compressToUTF16/decompressFromUTF16·MIT, Pieroxy）：localStorage 內部以 UTF-16 壓縮，省 ~89%，繞過 5MB 上限 =====
 //  ⚠️ 只壓 localStorage（存檔位/倉庫/共用桶/_bak）；匯出檔維持明文 JSON（可攜·importSave 用 JSON.parse 驗證）。_lzGet 相容舊明文存檔（無 'LZ1:' 前綴→原樣回傳）。
 var LZString = (function () {
@@ -2732,7 +2732,7 @@ const DB = {
         "town_sherine": {   // 🔮 新安全區：席琳神殿
             n: "席琳神殿",
             npcs: [
-                { id: "npc_sherine", n: "席琳", title: "祈禱", type: "pray", d: "靜謐的神女席琳，傾聽虔誠者的禱詞。等級 40 以上可向席琳祈禱，開啟或關閉「席琳的世界」。" },
+                { id: "npc_sherine", n: "席琳", title: "世界難度", type: "pray", d: "靜謐的神女席琳，傾聽虔誠者的禱詞。無需完成故事：Lv40 開放席琳世界，Lv70 開放瘋狂席琳；只能在安全區切換。" },
                 { id: "npc_io", n: "伊奧", title: "遺骸兌換", type: "quest", d: "看守遺骸祭壇的祭司伊奧。以席琳結晶兌換指定部位的席琳遺骸（之爪／之眼／之血／之肉／之心／之骨／之牙／之鱗），遺骸必附隨機一種席琳套裝詞綴。" }
             ]
         },

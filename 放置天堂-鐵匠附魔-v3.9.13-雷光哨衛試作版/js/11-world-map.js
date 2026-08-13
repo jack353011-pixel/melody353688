@@ -1270,8 +1270,20 @@ function changeMap(force) {
 }
 
 // ===== 🔮 席琳神殿：祈禱（席琳的世界 開關介面）=====
+const SHERINE_WORLD_LEVEL = 40;
+const SHERINE_MAD_LEVEL = 70;
+function sherineDifficultySwitchIssue(requiredLevel, activating) {
+    if (!mapState || typeof mapState.current !== 'string' || !mapState.current.startsWith('town_')) {
+        return '世界難度只能在安全區切換；請先返回村莊或席琳神殿。';
+    }
+    if (activating && (player.lv || 1) < requiredLevel) {
+        return `等級未達 ${requiredLevel}，尚未開放此世界難度。`;
+    }
+    return '';
+}
 function toggleSherineWorld() {
-    if ((player.lv || 1) < 40) { logSys('<span class="text-red-400">等級未達 40，席琳對你的祈禱沒有回應。</span>'); return; }
+    let _issue = sherineDifficultySwitchIssue(SHERINE_WORLD_LEVEL, !player.sherineWorld);
+    if (_issue) { logSys(`<span class="text-red-400">${_issue}</span>`); return; }
     player.sherineWorld = !player.sherineWorld;
     if (player.sherineWorld) player.sherineMad = false;   // 🔮 互斥：開啟一般席琳 → 關閉瘋狂席琳
     applySherineTheme();
@@ -1283,7 +1295,8 @@ function toggleSherineWorld() {
     let el = document.getElementById('interaction-content'); if (el) renderSherinePray(el);
 }
 function toggleSherineMad() {
-    if ((player.lv || 1) < 40) { logSys('<span class="text-red-400">等級未達 40，席琳對你的祈禱沒有回應。</span>'); return; }
+    let _issue = sherineDifficultySwitchIssue(SHERINE_MAD_LEVEL, !player.sherineMad);
+    if (_issue) { logSys(`<span class="text-red-400">${_issue}</span>`); return; }
     player.sherineMad = !player.sherineMad;
     if (player.sherineMad) player.sherineWorld = false;   // 🔮 互斥：開啟瘋狂席琳 → 關閉一般席琳
     applySherineTheme();
@@ -1297,22 +1310,33 @@ function toggleSherineMad() {
 function renderSherinePray(div) {
     let on = !!(player && player.sherineWorld);
     let mad = !!(player && player.sherineMad);
-    let lvOk = (player.lv || 1) >= 40;
+    let pity = player && player.sherineCrystalPity && typeof player.sherineCrystalPity === 'object' ? player.sherineCrystalPity : {};
+    let worldPity = Math.max(0, Math.min(99, Math.floor(Number(pity.world) || 0)));
+    let madPity = Math.max(0, Math.min(39, Math.floor(Number(pity.mad) || 0)));
+    let safeOk = !!(mapState && typeof mapState.current === 'string' && mapState.current.startsWith('town_'));
+    let worldLvOk = (player.lv || 1) >= SHERINE_WORLD_LEVEL;
+    let madLvOk = (player.lv || 1) >= SHERINE_MAD_LEVEL;
+    let worldDisabled = !safeOk || (!on && !worldLvOk);
+    let madDisabled = !safeOk || (!mad && !madLvOk);
     div.innerHTML = `
         <div class="flex flex-col gap-3 p-1">
-            <div class="text-slate-300 text-sm leading-relaxed">席琳：旅人啊……是否願意凝視這個世界的另一面？（需等級 40 以上，可自由開啟/關閉；兩種世界互斥）</div>
+            <div class="text-slate-300 text-sm leading-relaxed">席琳：旅人啊……是否願意凝視這個世界的另一面？三種難度不需要完成故事即可解鎖；只能在安全區切換，席琳與瘋狂席琳互斥。<span class="text-emerald-300">席琳結晶可向伊奧兌換席琳遺骸；套裝效果不會直接附在掉落裝備上。</span></div>
+            <div class="bg-slate-800/50 border ${!on && !mad ? 'border-amber-500' : 'border-slate-700'} rounded p-3 text-sm leading-relaxed">
+                <div class="font-bold text-amber-200">普通世界：${!on && !mad ? '<span class="text-green-300">目前使用</span>' : '<span class="text-slate-400">已開放</span>'}</div>
+                <div class="text-slate-400 text-xs">創角即可進入；關閉目前的席琳難度便會返回普通世界。</div>
+            </div>
             <div class="bg-slate-800/60 border ${on ? 'border-red-700' : 'border-slate-600'} rounded p-3 text-sm leading-relaxed">
-                <div class="font-bold mb-1 ${on ? 'c-sherine' : 'text-slate-200'}">席琳的世界：目前 ${on ? '<span class="text-red-300">開啟</span>' : '<span class="text-slate-400">關閉</span>'}</div>
-                <div class="text-slate-200 text-xs">怪物 HP×3、傷害×2、經驗/金錢×5，掉落×3，可能出現<span class="c-sherine font-bold">珍稀套裝裝備</span>與<span class="c-sherine font-bold">席琳結晶</span>。</div>
+                <div class="font-bold mb-1 ${on ? 'c-sherine' : 'text-slate-200'}">席琳的世界（煉獄難度・Lv${SHERINE_WORLD_LEVEL}）：目前 ${on ? '<span class="text-red-300">開啟</span>' : '<span class="text-slate-400">關閉</span>'}</div>
+                <div class="text-slate-200 text-xs">怪物 HP×2.5、AC 降低（一般怪−10、頭目−20）、MR＋25%、命中×1.25、傷害×1.7；一般怪獲得 1 項席琳能力。<br>經驗×2.5、金錢×2、掉落×1.5；一般怪祝福率 3%、頭目固定 20%。頭目累積 100 次未掉落時保底<span class="c-sherine font-bold">席琳結晶</span>；目前保底進度 ${worldPity}/100。</div>
             </div>
-            <button class="btn py-3 text-base font-bold ${!lvOk ? 'bg-slate-600 border-slate-500 opacity-60 cursor-not-allowed' : (on ? 'bg-slate-700 hover:bg-slate-600 border-slate-500' : 'bg-red-800 hover:bg-red-700 border-red-600')}"
-                ${!lvOk ? 'disabled' : ''} onclick="toggleSherineWorld()">${!lvOk ? '等級不足（需 Lv40）' : (on ? '🙏 祈禱：關閉席琳的世界' : '🙏 祈禱：開啟席琳的世界')}</button>
+            <button class="btn py-3 text-base font-bold ${worldDisabled ? 'bg-slate-600 border-slate-500 opacity-60 cursor-not-allowed' : (on ? 'bg-slate-700 hover:bg-slate-600 border-slate-500' : 'bg-red-800 hover:bg-red-700 border-red-600')}"
+                ${worldDisabled ? 'disabled' : ''} onclick="toggleSherineWorld()">${!safeOk ? '只能在安全區切換' : (!on && !worldLvOk ? `等級不足（需 Lv${SHERINE_WORLD_LEVEL}）` : (on ? '🙏 返回普通世界' : '🙏 進入席琳的世界'))}</button>
             <div class="bg-slate-900/70 border ${mad ? 'border-rose-600' : 'border-slate-700'} rounded p-3 text-sm leading-relaxed">
-                <div class="font-bold mb-1 ${mad ? 'c-sherine' : 'text-rose-300'}">🔥 瘋狂的席琳世界：目前 ${mad ? '<span class="text-rose-300">開啟</span>' : '<span class="text-slate-400">關閉</span>'}</div>
-                <div class="text-slate-200 text-xs">極致試煉。怪物 HP×5、AC 降低（一般怪−10、頭目−20）、MR 提高（最多額外＋200）、命中×2、傷害×3、經驗/金錢×10，掉落與詞綴×5；<span class="c-sherine font-bold">套裝效果與席琳結晶掉率為一般席琳的 3 倍</span>。</div>
+                <div class="font-bold mb-1 ${mad ? 'c-sherine' : 'text-rose-300'}">🔥 瘋狂的席琳世界（地獄難度・Lv${SHERINE_MAD_LEVEL}）：目前 ${mad ? '<span class="text-rose-300">開啟</span>' : '<span class="text-slate-400">關閉</span>'}</div>
+                <div class="text-slate-200 text-xs">怪物 HP×5、AC 降低（一般怪−10、頭目−20）、MR＋50%（最多額外＋150）、命中×1.6、傷害×2.6；一般怪獲得 2 項席琳能力。<br>經驗×4、金錢×3、掉落×2.25；一般怪祝福率 5%、頭目固定 30%。結晶率為煉獄 3 倍，頭目 40 次保底；目前保底進度 ${madPity}/40。</div>
             </div>
-            <button class="btn py-3 text-base font-bold ${!lvOk ? 'bg-slate-600 border-slate-500 opacity-60 cursor-not-allowed' : (mad ? 'bg-slate-700 hover:bg-slate-600 border-slate-500' : 'bg-rose-900 hover:bg-rose-800 border-rose-600')}"
-                ${!lvOk ? 'disabled' : ''} onclick="toggleSherineMad()">${!lvOk ? '等級不足（需 Lv40）' : (mad ? '🙏 祈禱：關閉瘋狂的席琳世界' : '🔥 祈禱：開啟瘋狂的席琳世界')}</button>
+            <button class="btn py-3 text-base font-bold ${madDisabled ? 'bg-slate-600 border-slate-500 opacity-60 cursor-not-allowed' : (mad ? 'bg-slate-700 hover:bg-slate-600 border-slate-500' : 'bg-rose-900 hover:bg-rose-800 border-rose-600')}"
+                ${madDisabled ? 'disabled' : ''} onclick="toggleSherineMad()">${!safeOk ? '只能在安全區切換' : (!mad && !madLvOk ? `等級不足（需 Lv${SHERINE_MAD_LEVEL}）` : (mad ? '🙏 返回普通世界' : '🔥 進入瘋狂的席琳世界'))}</button>
         </div>`;
 }
 

@@ -1086,7 +1086,7 @@ function enemyAttackPet(mob, p) {
     if (!hit) { logCombat(`<span class="${getMobColor(mob.lv)}">${mob.n}</span> 對寵物 <span class="text-sky-300 font-bold">${p.form}</span> 的攻擊未命中。`, 'miss', 'enemy'); return; }
     let dc = (mob.dmg && mob.dmg[0]) || 1, ds = (mob.dmg && mob.dmg[1]) || 1;
     let dmg = (heavy ? dc * ds : roll(dc, ds)) + ((mob.db || 0) - (st.weaken > 0 ? 4 : 0) - (st.broken > 0 ? 2 : 0));
-    if (mob._sherine) dmg = Math.floor(dmg * (mob._sherineMad ? 3 : 2));
+    dmg = Math.floor(dmg * sherineEnemyDamageMult(mob));
     if (mob._grace) dmg = Math.floor(dmg * 1.5);
     dmg -= (d.dr || 0) + petRandomPhysicalDr(p, d) + petHardenDr(p);
     dmg = Math.floor(Math.max(1, dmg) * (typeof teamDmgReduceMult === 'function' ? teamDmgReduceMult(true) : 1) * petMasteryTakenMult() * petArmorDmgReduceMult(p));   // 👑 夥伴精通：受到傷害 −50%；🏺 寵物專用盔甲：受傷 ×(1−petDmgReduce)
@@ -1108,7 +1108,7 @@ function applyMobMagicToPet(mob, sk, p) {
     let d = petDerive(p); if (!d) return;
     let st = p._statuses || (p._statuses = newMobStatus());
     let mr = d.mr || 0, nm = '寵物·' + p.form;
-    let shMul = (mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1);
+    let shMul = sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1);
     let chance = (base, src) => Math.random() * 100 < Math.max(0, (((src && src.pbase) !== undefined ? src.pbase : (sk.pbase !== undefined ? sk.pbase : base)) - mr) / 2);
     let applyPure = (type, dur, label, base) => { if (chance(base)) { st[type] = Math.max(st[type] || 0, dur); logCombat(`<span class="${getMobColor(mob.lv)}">${mob.n}</span> 施放${sk.skn || '魔法'}，${nm}${label}！`, 'enemy'); } };
     if (sk.type === 'stone') { applyPure('stone', 60, '被石化了', 100); return; }

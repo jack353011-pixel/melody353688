@@ -1268,7 +1268,7 @@ function _enemyPhysicalAttackInner(mob, idx, stunChance = 0, atkDmg = null, atkD
         let baseWeaponDmg = heavy ? (diceCount * diceSides) : roll(diceCount, diceSides);
         let dmgBonus = (atkDb != null ? atkDb : (mob.db || 0)) - (isBasicAttack ? Math.max(0, Number(mob._corrosiveJellyAtkDown) || 0) : 0) - (st.weaken > 0 ? 4 : 0) - (st.broken > 0 ? 2 : 0) - ((st.confuse > 0 || st.panic > 0) ? 10 : 0) - (st.doom > 0 ? 20 : 0) + ((mob._siegeDmgEnd > state.ticks) ? 4 : 0);   // 暴風神射：額外傷害+4；🔮 混亂/恐慌：一般攻擊傷害-10；🐉 驚悚死神：一般攻擊傷害-20
         let totalDmg = baseWeaponDmg + dmgBonus;
-        if (mob._sherine) totalDmg = Math.floor(totalDmg * (mob._sherineMad ? 3 : 2));   // 🔮 席琳的世界：怪物一般攻擊傷害 ×2（瘋狂×3）
+        totalDmg = Math.floor(totalDmg * sherineEnemyDamageMult(mob));
         if (mob._grace) totalDmg = Math.floor(totalDmg * 1.5);   // 🔮 席琳的恩賜：再 ×1.5
 
         let resFactor = 1.0;
@@ -1450,7 +1450,7 @@ function _enemyPhysicalAttackInner(mob, idx, stunChance = 0, atkDmg = null, atkD
             if (Math.random() * 100 < _ohc) {
                 if (playerStatusResisted('poison')) { logCombat('<span class="text-sky-300 font-bold">你抵抗了中毒！</span>', 'magic'); }
                 else {
-                    let _ohD = Math.floor(((mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1)) * (_ohp.d || 10) * mobRageDmgMult(mob));   // 席琳／頭目狂暴倍率（比照施法中毒）
+                    let _ohD = Math.floor((sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1)) * (_ohp.d || 10) * mobRageDmgMult(mob));
                     player.statuses.poison = (_ohp.dur || 20) * 10;
                     player.statuses.poisonDmg = _ohD;
                     player.statuses.poisonTick = (_ohp.tick || 5) * 10;
@@ -1647,7 +1647,7 @@ function _enemyAttackAllyInner(mob, ally, isBasicAttack = false) {
     }
     let dc = (mob.dmg && mob.dmg[0]) || 1, ds = (mob.dmg && mob.dmg[1]) || 1;
     let totalDmg = (heavy ? dc * ds : roll(dc, ds)) + ((mob.db || 0) - (isBasicAttack ? Math.max(0, Number(mob._corrosiveJellyAtkDown) || 0) : 0) - (st.weaken > 0 ? 4 : 0) - (st.broken > 0 ? 2 : 0) - ((st.confuse > 0 || st.panic > 0) ? 10 : 0) - (st.doom > 0 ? 20 : 0) + ((mob._siegeDmgEnd > state.ticks) ? 4 : 0));
-    if (mob._sherine) totalDmg = Math.floor(totalDmg * (mob._sherineMad ? 3 : 2));
+    totalDmg = Math.floor(totalDmg * sherineEnemyDamageMult(mob));
     if (mob._grace) totalDmg = Math.floor(totalDmg * 1.5);
     let resFactor = 1.0;
     if (mob.e === 'fire' && d.resFire) resFactor -= effResistPct(d.resFire) / 100;
@@ -1729,7 +1729,7 @@ function _enemyAttackAllyInner(mob, ally, isBasicAttack = false) {
         if (Math.random() * 100 < _ohc) {
             if (allyStatusResisted(ally, 'poison')) logCombat(`<span class="text-sky-300 font-bold">協力·${ally._allyName} 抵抗了中毒！</span>`, 'magic');
             else {
-                let _ohD = Math.floor(((mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1)) * (_ohp.d || 10) * mobRageDmgMult(mob));
+                let _ohD = Math.floor((sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1)) * (_ohp.d || 10) * mobRageDmgMult(mob));
                 ally.statuses.poison = (_ohp.dur || 20) * 10;
                 ally.statuses.poisonDmg = _ohD;
                 ally.statuses.poisonTick = (_ohp.tick || 5) * 10;
@@ -2015,7 +2015,7 @@ function _applyMobMagicToAllyInner(mob, sk, ally) {
             return;
         }
     }
-    let _shMul = (mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1);   // 🔮 席琳：傷害/持續傷害倍率
+    let _shMul = sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1);
     let _ch = (base) => Math.max(0, ((sk.pbase !== undefined ? sk.pbase : base) - mr) / 2);
     { let _rk = { freeze: 'freeze', stun: 'stun', paralyze: 'paralyze', slowatk: 'slow', poison: 'poison' }[sk.type]; if (_rk && allyStatusResisted(ally, _rk)) return; }   // 🆕 v2.6.11 #4：裝備型異常抵抗/免疫（主 CC 型入口·純狀態技無傷害→抵抗即整個略過）
     if (sk.type === 'stone') { if (d.immStone) return; if (Math.random() * 100 < _ch(100)) { st.stone = 60; logCombat(`<span class="${getMobColor(mob.lv)}">${mob.n}</span> 施放${sk.skn || '魔法'}，${nm} 被石化了！`, 'enemy'); } return; }
@@ -2327,7 +2327,7 @@ function _applyMobMagicInner(mob, sk) {
         let chance = Math.max(0, ((sk.pbase !== undefined ? sk.pbase : 200) - player.d.mr) / 2);
         if(Math.random() * 100 < chance && !player.dead) {
             if(playerStatusResisted('scald')) { logCombat('<span class="text-sky-300 font-bold">你抵抗了燙傷！</span>', 'magic'); return; }   // 🪆 抵抗異常（娃娃 abnormalResist）涵蓋 DoT
-            let _scD = ((mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1)) * (sk.d||100);   // 🔮 席琳的世界：持續傷害×2
+            let _scD = (sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1)) * (sk.d||100);
             player.statuses.scald = (sk.dur||15) * 10; player.statuses.scaldDmg = _scD; player.statuses.scaldTick = (sk.tick||3) * 10;
             logCombat(`<span class="${getMobColor(mob.lv)}">${mob.n}</span> 施放${sk.skn || '魔法'}，你被燙傷了！每 ${sk.tick||3} 秒受到 ${_scD} 點固定傷害。`, 'enemy');
         }
@@ -2413,7 +2413,7 @@ function _applyMobMagicInner(mob, sk) {
         let chance = Math.max(0, (base - player.d.mr) / 2);
         if(Math.random() * 100 < chance && !player.dead) {
             if(playerStatusResisted('poison')) { logCombat('<span class="text-sky-300 font-bold">你抵抗了中毒！</span>', 'magic'); return; }   // 🪆 抵抗異常（娃娃 abnormalResist）涵蓋 DoT；immPoison 已於上方早退
-            let _poD = Math.floor(((mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1)) * sk.d * mobRageDmgMult(mob));   // 🔮 席琳的世界／🔥頭目狂暴：持續傷害倍率
+            let _poD = Math.floor((sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1)) * sk.d * mobRageDmgMult(mob));
             player.statuses.poison = sk.dur * 10;
             player.statuses.poisonDmg = _poD;
             player.statuses.poisonTick = sk.tick * 10;
@@ -2424,7 +2424,7 @@ function _applyMobMagicInner(mob, sk) {
     
     if(sk.type === 'burn') {
         if(playerStatusResisted('burn')) { logCombat('<span class="text-sky-300 font-bold">你抵抗了灼燒！</span>', 'magic'); return; }   // 🪆 抵抗異常（娃娃 abnormalResist）涵蓋 DoT
-        let _buD = Math.floor(((mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1)) * sk.d * mobRageDmgMult(mob));   // 🔮 席琳的世界／🔥頭目狂暴：持續傷害倍率
+        let _buD = Math.floor((sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1)) * sk.d * mobRageDmgMult(mob));
         player.statuses.burn = sk.dur * 10;
         player.statuses.burnDmg = _buD;
         player.statuses.burnTick = sk.tick * 10;
@@ -2515,7 +2515,7 @@ function _applyMobMagicInner(mob, sk) {
         }
         if(sk.ext_freeze && player.statuses.freeze > 0) { dmg += sk.ext_freeze; if(sk.extUnfreeze) player.statuses.freeze = 0; }   // 🔧 冰裂：對冰凍目標額外傷害，並解除冰凍
 
-        if (mob._sherine) dmg = Math.floor(dmg * (mob._sherineMad ? 3 : 2));            // 🔮 席琳的世界：技能最終傷害 ×2（瘋狂×3·增傷）
+        dmg = Math.floor(dmg * sherineEnemyDamageMult(mob));
         if (mob._grace) dmg = Math.floor(dmg * 2);              // 🔮 席琳的恩賜：再 ×2（增傷）
         // 🔧 百分比受傷「減免」統一乘算（多層疊加採乘算：例 鐵衛20%×聖結界30%＝1−0.8×0.7＝44%，非相加 50%）
         { let _drMult = 1.0;
@@ -2572,7 +2572,7 @@ function _applyMobMagicInner(mob, sk) {
                 let chance = Math.max(0, ((sk.sec.pbase !== undefined ? sk.sec.pbase : 100) - player.d.mr) / 2);
                 if(Math.random() * 100 < chance && !player.dead) {
                     if(playerStatusResisted('burn')) { logCombat('<span class="text-sky-300 font-bold">你抵抗了灼燒！</span>', 'magic'); } else {   // 🪆 抵抗異常（娃娃 abnormalResist）涵蓋 DoT
-                    let _sbD = Math.floor(((mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1)) * sk.sec.d * mobRageDmgMult(mob));   // 🔮 席琳的世界／🔥頭目狂暴：持續傷害倍率
+                    let _sbD = Math.floor((sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1)) * sk.sec.d * mobRageDmgMult(mob));
                     player.statuses.burn = sk.sec.dur * 10; player.statuses.burnDmg = _sbD; player.statuses.burnTick = sk.sec.tick * 10;
                     logCombat(`你陷入了灼燒！每 ${sk.sec.tick} 秒受到 ${_sbD} 點固定傷害。`, 'enemy');
                     }
@@ -2582,7 +2582,7 @@ function _applyMobMagicInner(mob, sk) {
                 let chance = Math.max(0, ((sk.sec.pbase !== undefined ? sk.sec.pbase : 200) - player.d.mr) / 2);
                 if(Math.random() * 100 < chance && !player.dead) {
                     if(playerStatusResisted('scald')) { logCombat('<span class="text-sky-300 font-bold">你抵抗了燙傷！</span>', 'magic'); } else {   // 🪆 抵抗異常（娃娃 abnormalResist）涵蓋 DoT
-                    let _ssD = Math.floor(((mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1)) * sk.sec.d * mobRageDmgMult(mob));   // 🔮 席琳的世界／🔥頭目狂暴：持續傷害倍率
+                    let _ssD = Math.floor((sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1)) * sk.sec.d * mobRageDmgMult(mob));
                     player.statuses.scald = sk.sec.dur * 10; player.statuses.scaldDmg = _ssD; player.statuses.scaldTick = sk.sec.tick * 10;
                     logCombat(`你被燙傷了！每 ${sk.sec.tick} 秒受到 ${_ssD} 點固定傷害。`, 'enemy');
                     }
@@ -2592,7 +2592,7 @@ function _applyMobMagicInner(mob, sk) {
                 let chance = Math.max(0, ((sk.sec.pbase !== undefined ? sk.sec.pbase : 200) - player.d.mr) / 2);
                 if(Math.random() * 100 < chance && !player.dead) {
                     if(playerStatusResisted('bleed')) { logCombat('<span class="text-sky-300 font-bold">你抵抗了出血！</span>', 'magic'); } else {   // 🪆 抵抗異常（娃娃 abnormalResist）涵蓋 DoT
-                    let _sbD = Math.floor(((mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1)) * sk.sec.d * mobRageDmgMult(mob));   // 🔮 席琳的世界／🔥頭目狂暴：持續傷害倍率
+                    let _sbD = Math.floor((sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1)) * sk.sec.d * mobRageDmgMult(mob));
                     player.statuses.bleed = sk.sec.dur * 10; player.statuses.bleedDmg = _sbD; player.statuses.bleedTick = sk.sec.tick * 10;
                     logCombat(`你陷入了出血！每 ${sk.sec.tick} 秒受到 ${_sbD} 點固定傷害。`, 'enemy');
                     }
@@ -2602,7 +2602,7 @@ function _applyMobMagicInner(mob, sk) {
                 let chance = Math.max(0, ((sk.sec.pbase !== undefined ? sk.sec.pbase : 100) - player.d.mr) / 2);
                 if(Math.random() * 100 < chance && !player.dead) {
                     if(playerStatusResisted('poison')) { logCombat('<span class="text-sky-300 font-bold">你抵抗了中毒！</span>', 'magic'); } else {   // 🪆 抵抗異常（娃娃 abnormalResist）涵蓋 DoT
-                    let _spD = Math.floor(((mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1)) * sk.sec.d * mobRageDmgMult(mob));   // 🔮 席琳的世界／🔥頭目狂暴：持續傷害倍率
+                    let _spD = Math.floor((sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1)) * sk.sec.d * mobRageDmgMult(mob));
                     player.statuses.poison = sk.sec.dur * 10; player.statuses.poisonDmg = _spD; player.statuses.poisonTick = sk.sec.tick * 10;
                     logCombat(`你中毒了！每 ${sk.sec.tick} 秒受到 ${_spD} 點固定傷害。`, 'enemy');
                     }

@@ -1307,8 +1307,26 @@
         });
     }
 
+    function _offlineSherineCrystalCount(mob, kills) {
+        kills = Math.max(0, Math.floor(_offlineFinite(kills, 0)));
+        if (!kills || !mob || !mob.sherine) return 0;
+        let rate = (mob.boss ? 0.0001 : 0.00001) * mob.lv * (mob.sherineMad ? 3 : 1);
+        if (!mob.boss) return _offlineBinomial(kills, Math.min(1, rate));
+        if (!player.sherineCrystalPity || typeof player.sherineCrystalPity !== 'object') player.sherineCrystalPity = { world:0, mad:0 };
+        let key = mob.sherineMad ? 'mad' : 'world';
+        let cap = mob.sherineMad ? 40 : 100;
+        let pity = Math.max(0, Math.floor(player.sherineCrystalPity[key] || 0));
+        let count = 0;
+        for (let i = 0; i < kills; i++) {
+            pity++;
+            if (pity >= cap || Math.random() < rate) { count++; pity = 0; }
+        }
+        player.sherineCrystalPity[key] = pity;
+        return count;
+    }
+
     function _offlineRollMobLoot(mob, kills, map, loot) {
-        let dropBase = mob.grace ? 10 : (mob.sherine ? (mob.sherineMad ? 5 : 3) : 1);
+        let dropBase = mob.grace ? 10 : (mob.sherine ? (mob.sherineMad ? 2.25 : 1.5) : 1);
         let classic = typeof classicDropMult === 'function' ? classicDropMult() : 1;
         let party = typeof partyRewardMult === 'function' ? Math.max(1, Number(partyRewardMult()) || 1) : 1;
         let fixedDrop = typeof balanceMult === 'function' ? balanceMult('drop') : 0.5;
@@ -1358,9 +1376,8 @@
                 });
             }
             if (mob.sherine) {
-                // 🩹 v3.7.90 補頭目倍率（線上 js/05:534 是 mob.boss ? 0.0001 : 0.00001）——原本一律 0.00001＝頭目短缺 10 倍。
-                let rate = (mob.boss ? 0.0001 : 0.00001) * mob.lv * (mob.sherineMad ? 3 : 1) * classic * party;
-                _offlineGainItem('sherine_crystal', _offlineBinomial(kills, Math.min(1, rate)), mob, loot);
+                // 結晶是個人進度材料，不吃隊伍倍率；頭目與線上共用煉獄100／地獄40次保底進度。
+                _offlineGainItem('sherine_crystal', _offlineSherineCrystalCount(mob, kills), mob, loot);
             }
             // 🐉 v3.7.90 補四大龍幼龍蛋（線上 js/05:435-443）：兩顆各獨立 10%、不吃經典掉率、吃隊伍倍率。原本離線完全不掉。
             if (OFFLINE_DRAGON_EGG_MOBS.indexOf(mob.n) !== -1) {

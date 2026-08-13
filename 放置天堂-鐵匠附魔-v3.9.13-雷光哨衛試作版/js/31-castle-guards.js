@@ -290,7 +290,7 @@ function enemyAttackGuard(mob, s) {
     if (!hit) { logCombat(`<span class="${getMobColor(mob.lv)}">${mob.n}</span> 對 <span class="text-cyan-300">${s.form}</span> 的攻擊未命中。`, 'miss', 'enemy'); return; }
     let dc = (mob.dmg && mob.dmg[0]) || 1, ds = (mob.dmg && mob.dmg[1]) || 1;
     let dmg = (heavy ? dc * ds : roll(dc, ds)) + ((mob.db || 0) - (st.weaken > 0 ? 4 : 0) - (st.broken > 0 ? 2 : 0));
-    if (mob._sherine) dmg = Math.floor(dmg * (mob._sherineMad ? 3 : 2));
+    dmg = Math.floor(dmg * sherineEnemyDamageMult(mob));
     if (mob._grace) dmg = Math.floor(dmg * 1.5);
     dmg = Math.max(1, Math.floor(dmg * (typeof riftDamageMult === 'function' ? riftDamageMult() : 1)) - d.dr);
     dmg = Math.max(1, Math.floor(dmg * (typeof teamDmgReduceMult === 'function' ? teamDmgReduceMult(true) : 1)));
@@ -306,7 +306,7 @@ function applyMobMagicToGuard(mob, sk, s) {
     if (!mob || mob.curHp <= 0 || !sk || !sk.dmg || !s || s._downed || (s.hp || 0) <= 0) return;
     let d = guardDerive(s);
     let mr = d.mr || 0, dr = d.dr || 0;
-    let shMul = (mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1);
+    let shMul = sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1);
     let baseM = roll(sk.dmg[0], sk.dmg[1]);
     let extra = (sk.db || 0) + (sk.dbLv ? (mob.lv || 0) * (sk.dbLvMult || 1) : 0);
     let dmg = sk.fixedDmg ? (baseM + extra) : (Math.floor((baseM + extra) * (typeof mrMult === 'function' ? mrMult(mr) : 1)) - dr);

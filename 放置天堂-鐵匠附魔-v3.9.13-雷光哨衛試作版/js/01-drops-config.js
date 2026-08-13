@@ -1923,7 +1923,7 @@ const SAVE_VERSION = 2;   // v1 = 未標版本的舊存檔
 const SAVE_DEFAULTS = {
     name: null, bonus: 0, panaceaUsed: 0, bloodPledge: null, lootSeq: 0,
     hellfireTorchOpened: 0,
-    magicShieldCd: 0, reviveScrollCd: 0, lastMapByCat: {}, lastBattleMap: null, tracking: null, sherineWorld: false, sherineMad: false, classicMode: false, traditionalMode: false,
+    magicShieldCd: 0, reviveScrollCd: 0, lastMapByCat: {}, lastBattleMap: null, tracking: null, sherineWorld: false, sherineMad: false, sherineCrystalPity: { world:0, mad:0 }, classicMode: false, traditionalMode: false,
     masteryQuest: null, mastery: null, masteryChangeCnt: 0,
     prideBeatJenis: false, demonTempleOpen: false, flameAffinity: 0, trialStage: 0, prideRank: { best: null, last: null, isNew: false }, prideRankSherine: { best: null, last: null, isNew: false },
     riftRank: { best: null, last: null, isNew: false }, riftRankSherine: { best: null, last: null, isNew: false }, riftRewardMs: null,
@@ -1952,21 +1952,25 @@ function applySaveDefaults(p) {
 }
 
 // ============================================================================
-// 🔮 席琳的世界（席琳神殿「祈禱」開關，Lv40+；存於 player.sherineWorld / player.sherineMad，兩者互斥）
+// 🔮 世界難度（席琳神殿「祈禱」開關；普通／Lv40 席琳／Lv70 瘋狂席琳；不綁故事、只可在安全區切換）
 //  - 視覺：body 加 sherine-world class（一般／瘋狂皆加）；瘋狂另加 sherine-mad
 //  - 怪物（攻城區與血盟敵人除外）　值＝[一般席琳 / 瘋狂席琳]：
-//      HP×[3/5]、AC×[1.5/1.75]、MR×[1.5/3]、命中×[1.5/2]、額外減傷 +floor(等級/3)、
-//      經驗×[5/10]、金錢×[5/10]、一般攻擊傷害×[2/3]、技能最終傷害×[2/3]（含持續傷害）；
+//      HP×[2.5/5]、AC 固定降低[一般怪10/頭目20]、MR＋[25%/50%(最多額外150)]、命中×[1.25/1.6]、額外減傷 +floor(等級/[5/3])、
+//      經驗×[2.5/4]、金錢×[2/3]、一般攻擊與技能最終傷害×[1.7/2.6]（含持續傷害）；
 //      生怪等待 ×0.8（v3.4.26 由「−1 秒」改乘算·與日光術 ×0.8 相乘疊加；下限 0.5 秒）
-//  - 掉落：物品掉落機率×[3/5]、詞綴(祝福)機率×[3/5]
+//  - 掉落：物品掉落機率×[1.5/2.25]；一般怪祝福率3%/5%、頭目固定20%/30%
 //      ⚠️ v3.5.96 更正：本區塊原寫「指定部位裝備可附『席琳套裝效果』」與「席琳套裝效果(席琳詞綴)瘋狂＝3 倍」，
 //         但 v3.1.68 起套裝詞綴**已不再附在裝備上**（js/08 seteff 硬編 false·改由 8 格席琳遺骸 rem_* 欄承載），
 //         現行席琳世界只影響「掉落機率」與「祝福詞綴機率」兩項。席琳結晶掉率的 3 倍仍成立。
-//  - 恩賜（applySherineGrace）：席琳世界每次刷新 1% 機率讓場上一隻怪（含頭目）獲恩賜；
-//      無冷卻、場上同時僅一隻；HP×10／經驗×10／金錢×10／掉落×10／持續傷害再×2
+//  - 恩賜（applySherineGrace）：每次刷新1%；煉獄每3分鐘最多一隻且排除頭目，地獄無冷卻／可多隻／含頭目；
+//      HP×10／經驗×10／金錢×10／掉落×10／持續傷害再×2
 // ============================================================================
 function sherineWorldActive() { return !!(player && (player.sherineWorld || player.sherineMad)); }   // 🔮 一般或瘋狂任一開啟皆視為「席琳的世界」（主題/排名/結晶/套裝效果/出怪強化共用此閘）
 function sherineMadActive() { return !!(player && player.sherineMad); }   // 🔮 僅「瘋狂的席琳世界」：供倍率分流
+function sherineEnemyDamageMult(mob) { return (mob && mob._sherine) ? (mob._sherineMad ? 2.6 : 1.7) : 1; }
+function sherineWorldDropMult(mob) { return (mob && mob._sherine) ? (mob._sherineMad ? 2.25 : 1.5) : 1; }
+function sherineWorldExpMult(mad) { return mad ? 4 : 2.5; }
+function sherineWorldGoldMult(mad) { return mad ? 3 : 2; }
 function applySherineTheme() { document.body.classList.toggle('sherine-world', sherineWorldActive()); document.body.classList.toggle('sherine-mad', sherineMadActive()); }
 let _sherineLootCtx = null;   // 擊殺掉落上下文：killMob 期間設定 { mad }，try/finally 清除。一般怪祝福率 ×3/×5；頭目搭配 _lootMobInfo.boss 固定為席琳 20%／瘋狂席琳 30%。
 //   （🗑️ v3.5.95 刪除此處三行舊註解：它們還在描述已於 v3.5.94 移除的 boss / grace 兩欄，與上一行的「單鍵」敘述互斥，
@@ -2568,7 +2572,7 @@ let _bgHeartbeatWorker = null;
 
 let player = {
     cls: null, name: null, lv: 1, exp: 0, gold: 1000, hp: 0, mhp: 0, mp: 0, mmp: 0, alignmentValue: 0, pvpOn: false, pvpRevengeList: [], socialNpcContacts: [],
-    base: { str:0, dex:0, con:0, int:0, wis:0, cha:8 }, bonus: 0, alloc: { str:0, dex:0, con:0, int:0, wis:0, cha:0 }, panacea: { str:0, dex:0, con:0, int:0, wis:0, cha:0 }, panaceaUsed: 0, junkPrefs: {}, buildFlowFocus: {}, buildFlowFocusManual: {}, bloodPledge: null, magicShieldCd: 0, lastMapByCat: {}, tracking: null, sherineWorld: false, masteryQuest: null, mastery: null, masteryChangeCnt: 0, siege: { active:false, city:'kent', gateKilled:false, towerKilled:false, endTime:0, kills:0, result:null, cooldownUntil:0, accCdUntil:0 },
+    base: { str:0, dex:0, con:0, int:0, wis:0, cha:8 }, bonus: 0, alloc: { str:0, dex:0, con:0, int:0, wis:0, cha:0 }, panacea: { str:0, dex:0, con:0, int:0, wis:0, cha:0 }, panaceaUsed: 0, junkPrefs: {}, buildFlowFocus: {}, buildFlowFocusManual: {}, bloodPledge: null, magicShieldCd: 0, lastMapByCat: {}, tracking: null, sherineWorld: false, sherineMad: false, sherineCrystalPity: { world:0, mad:0 }, masteryQuest: null, mastery: null, masteryChangeCnt: 0, siege: { active:false, city:'kent', gateKilled:false, towerKilled:false, endTime:0, kills:0, result:null, cooldownUntil:0, accCdUntil:0 },
     inv: [], eq: { wpn: null, arrow: null, helm: null, armor: null, shin: null, shield: null, cloak: null, tshirt: null, gloves: null, boots: null, ring1: null, ring2: null, ring3: null, ring4: null, amulet: null, ear1: null, ear2: null, belt: null, charm: null, pet: null, doll: null },
     skills: [], buffs: { haste: 0, brave: 0, blue: 0, cautious: 0, elfcookie: 0, poly: 0, shield: 0, sk_magic_shield: 0 }, poly: null, allies: [],
     summon: null, charmed: null, manualCd: {}, elfEle: null, hots: {},   // 🔧 v3.5.94 同上：孤兒 hot(單數) → 休眠機制真正使用的 hots(複數 dict)

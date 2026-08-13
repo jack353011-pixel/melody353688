@@ -77,6 +77,13 @@ function applyMobStatus(m, st, skillName, damageCoef) {
     let durSec = st.durRand ? roll(st.durRand[0], st.durRand[1]) : (st.dur || 6);
     let dur = durSec * 10;
     let k = st.kind;
+    let _sherineTenacity = false;
+    if (['freeze','stun','stone','sleep','paralyze'].includes(k)
+        && typeof sherineMobHasTrait === 'function' && sherineMobHasTrait(m, 'tenacity') && !m._sherineTenacityUsed) {
+        m._sherineTenacityUsed = true;
+        dur = Math.max(10, Math.floor(dur / 2));
+        _sherineTenacity = true;
+    }
     if(k === 'poison') {
         m.st.poison = dur; m.st.poisonTick = (st.tick || 3) * 10;
         m.st.poisonDmg = Math.max(1, Math.floor(roll(st.dmg[0], st.dmg[1]) * (damageCoef || 1) * wpnEnFinalMult(player && player.eq && player.eq.wpn)));   // 傷害魔法毒咒吃統一係數；通用武器毒傷未傳係數，維持原樣
@@ -96,6 +103,7 @@ function applyMobStatus(m, st, skillName, damageCoef) {
         } else {
             logCombat(`${prefix}對 <span class="${getMobColor(m.lv)}">${m.n}</span> 造成 ${STATUS_NAME[k]||k} 狀態。`, 'magic');
         }
+        if (_sherineTenacity) logCombat(`<span class="${getMobColor(m.lv)}">${m.n}</span> 以席琳韌性將本次控制時間減半。`, 'enemy');
     }
 }
 function mobHasTag(m, tag) {

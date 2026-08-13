@@ -334,7 +334,7 @@ function monsterGoldRange(mob) {
         gMin = Math.floor(cfgMin); gMax = Math.floor(cfgMax);
     } else {
         let worldMult = 1;
-        if (mob && mob._sherine) worldMult *= mob._sherineMad ? 10 : 5;
+        if (mob && mob._sherine) worldMult *= sherineWorldGoldMult(!!mob._sherineMad);
         if (mob && mob._grace) worldMult *= 10;
         gMin = Math.round(mean * 0.65 * diffMult * worldMult);
         gMax = Math.round(mean * 1.35 * diffMult * worldMult);
@@ -346,6 +346,13 @@ function killMob(idx) {
     if (!mob || mob._dead) return;        // 冪等保護：同一隻怪只結算一次獎勵
     if (mob._justTransformedTick != null && state.ticks - mob._justTransformedTick <= 5 && mob.curHp > 0) return;   // 🌅 審查修：同一擊內的過時二次 killMob（on-hit 特效先殺→主判定又用舊 target.curHp 呼叫同槽位）→剛變身的滿血新階段不吃這種幽靈擊殺（真死亡 curHp<=0 不受影響）
     if (mob.transformTo && DB.mobs[mob.transformTo]) { doMobTransform(idx); return; }   // 🌅 三段變身：即使 HP=0 也不會死亡而是強制變身（先於 _dead/特效/獎勵）
+    if (mob.curHp <= 0 && typeof sherineMobHasTrait === 'function' && sherineMobHasTrait(mob, 'lastStand') && !mob._sherineLastStandUsed) {
+        mob._sherineLastStandUsed = true;
+        mob.curHp = Math.max(1, Math.floor((mob.hp || 1) * 0.15));
+        logCombat(`<span class="${getMobColor(mob.lv)}">${mob.n}</span> 在席琳餘威中拒絕倒下，恢復了 15% HP！`, 'enemy');
+        if (!state.ff) renderMobs();
+        return;
+    }
     if (state.antharas && mapState.current === 'antharas_lair' && mob.n === '被侵蝕的瘋狂安塔瑞斯' &&
         typeof antharasClaimDailyClear === 'function') {
         let _antClaim = antharasClaimDailyClear();
@@ -519,7 +526,7 @@ function killMob(idx) {
 
     // === 怪物專屬掉落（依「怪物掉落資料.md」）：每樣物品各自獨立判定一次 ===
     let dropList = _kbNoReward ? [] : (MOB_DROPS[mob.n] || []);   // 🔧 魔獸軍王之室：除頭目外不掉落物品
-    let _dropBase = (mob._grace ? 10 : (mob._sherine ? (mob._sherineMad ? 5 : 3) : 1));   // 🔮 席琳的世界 ×3（瘋狂×5）／恩賜怪 ×10
+    let _dropBase = (mob._grace ? 10 : sherineWorldDropMult(mob));   // 🔮 席琳×1.5／瘋狂×2.25；恩賜怪維持×10
     let _dropMult = _dropBase * classicDropMult() * partyRewardMult() * (typeof balanceMult === 'function' ? balanceMult('drop') : 1);   // 席琳／恩賜／模式倍率後再乘有效隊伍人數（最高 ×8）
     dropList.forEach(entry => {
         let itemId = entry[0];
@@ -601,7 +608,7 @@ function killMob(idx) {
         let hasWorldTree = player.skills.includes('sk_elf_worldtree');
         AREA_BONUS_ITEMS.forEach(itemId => {
             let baseRate = (itemId === 'new_item_195') ? (hasWorldTree ? 0.30 : 0.20) : (hasWorldTree ? 0.03 : 0.02);
-            let bonusRate = baseRate * _dropMult;   // 🔮 席琳的世界×3
+            let bonusRate = baseRate * _dropMult;   // 🔮 吃當前席琳／恩賜／隊伍掉落倍率
             if(DB.items[itemId] && Math.random() < Math.min(1, bonusRate)) gainItem(itemId, 1);
         });
     }
@@ -612,9 +619,19 @@ function killMob(idx) {
     //    瘋狂的席琳世界再 ×3。結晶＝遺骸的唯一產出來源（NPC 伊奧：1 顆換 1 件指定部位遺骸）。
     if (!_kbNoReward && mob._sherine) {   // 🗝️ 軍王之室小怪零產出
         let _cr = (mob.boss ? 0.0001 : 0.00001) * (mob.lv || 1) * (mob._sherineMad ? 3 : 1);
-        if (_cr > 0 && Math.random() < partyDropRate(_cr * classicDropMult())) {
+        let _pityKey = mob._sherineMad ? 'mad' : 'world';
+        let _pityCap = mob._sherineMad ? 40 : 100;
+        if (!player.sherineCrystalPity || typeof player.sherineCrystalPity !== 'object') player.sherineCrystalPity = { world:0, mad:0 };
+        let _pityHit = false;
+        if (mob.boss) {
+            player.sherineCrystalPity[_pityKey] = Math.max(0, Math.floor(player.sherineCrystalPity[_pityKey] || 0)) + 1;
+            _pityHit = player.sherineCrystalPity[_pityKey] >= _pityCap;
+        }
+        // 席琳結晶是個人進度材料：不吃隊伍人數倍率，避免八人隊把遺骸產量再放大八倍。
+        if (_pityHit || (_cr > 0 && Math.random() < _cr)) {
             gainItem('sherine_crystal', 1);
-            logSys(`<span class="c-sherine font-bold">✦✦ 席琳結晶 從 ${mob.n} 的殘骸中浮現！✦✦</span>`);
+            if (mob.boss) player.sherineCrystalPity[_pityKey] = 0;
+            logSys(`<span class="c-sherine font-bold">✦✦ 席琳結晶 從 ${mob.n} 的殘骸中浮現！${_pityHit ? '（頭目保底）' : ''}✦✦</span>`);
         }
     }
     if (typeof d2rWearEquipped === 'function') d2rWearEquipped(mob);
@@ -1292,19 +1309,51 @@ function applySherineBuff(idx) {
     // 攻城區與血盟敵人除外，其餘怪物強化＋報酬翻倍
     if (sherineWorldActive() && !isSiegeArea(mapState.current) && _m.race !== '血盟') {
         let _mad = sherineMadActive();   // 🔮 瘋狂的席琳世界：更高倍率（值＝[一般/瘋狂]）
-        _m.hp = Math.floor(_m.hp * (_mad ? 5 : 3)); _m.curHp = _m.hp;   // HP×[3/5]
+        _m.hp = Math.floor(_m.hp * (_mad ? 5 : 2.5)); _m.curHp = _m.hp;   // HP×[2.5/5]
         _m.ac = (_m.ac || 0) - (_m.boss ? 20 : 10);                    // 🔮 席琳 AC：頭目 −20、一般怪 −10（2026-07 用戶改：原 ×1.5/1.75 把近戰命中壓到 ~10%·改固定值·瘋狂與一般同值）
         let _baseMr = Math.max(0, Number(_m.mr) || 0);
         _m.mr = Math.floor(_mad
-            ? _baseMr + Math.min(_baseMr, 200)                           // 瘋狂：原始 MR＋min(原始 MR, 200)，避免高 MR 頭目被 ×3 壓到近乎魔法免疫
-            : _baseMr * 1.5);                                           // 一般：MR×1.5
-        _m.exp = Math.floor((_m.exp || 0) * (_mad ? 10 : 5));           // 經驗×[5/10]
-        _m.goldMin = Math.floor((_m.goldMin || 0) * (_mad ? 10 : 5));   // 金錢×[5/10]
-        _m.goldMax = Math.floor((_m.goldMax || 0) * (_mad ? 10 : 5));
-        _m.hit = Math.floor((_m.hit || 0) * (_mad ? 2 : 1.5));          // 命中×[1.5/2]
-        _m.dr = (_m.dr || 0) + Math.floor((_m.lv || 1) / 3);            // 額外減傷：等級/3（兩者相同）
-        _m._sherine = true;   // 一般攻擊傷害×[2/3]、技能最終傷害×[2/3]、掉落×[3/5]、掉落附帶席琳詞綴／套裝效果
-        if (_mad) _m._sherineMad = true;   // 🔮 瘋狂旗標：供傷害/掉落/結晶/套裝效果倍率分流
+            ? _baseMr + Math.min(_baseMr * 0.5, 150)                     // 地獄：MR＋50%，額外增加最多 150
+            : _baseMr * 1.25);                                          // 煉獄：MR＋25%
+        _m.exp = Math.floor((_m.exp || 0) * sherineWorldExpMult(_mad));  // 經驗×[2.5/4]
+        _m.goldMin = Math.floor((_m.goldMin || 0) * sherineWorldGoldMult(_mad));   // 金錢×[2/3]
+        _m.goldMax = Math.floor((_m.goldMax || 0) * sherineWorldGoldMult(_mad));
+        _m.hit = Math.floor((_m.hit || 0) * (_mad ? 1.6 : 1.25));        // 命中×[1.25/1.6]
+        _m.dr = (_m.dr || 0) + Math.floor((_m.lv || 1) / (_mad ? 3 : 5));
+        _m._sherine = true;   // 傷害×[1.7/2.6]、掉落×[1.5/2.25]；祝福率與結晶另走獨立規則
+        if (_mad) _m._sherineMad = true;   // 🔮 瘋狂旗標：供傷害／掉落／祝福率／席琳結晶倍率分流（套裝效果已改由遺骸承載）
+        sherineAssignMobTraits(_m, _mad);
+    }
+}
+
+const SHERINE_MOB_TRAITS = ['tenacity', 'renewal', 'lastStand', 'phaseWard'];
+function sherineMobHasTrait(mob, trait) { return !!(mob && Array.isArray(mob._sherineTraits) && mob._sherineTraits.includes(trait)); }
+function sherineAssignMobTraits(mob, mad) {
+    if (!mob || mob.boss || mob.race === '建築' || mob.noAttack || mob._train) return;
+    let pool = SHERINE_MOB_TRAITS.slice(), count = mad ? 2 : 1;
+    mob._sherineTraits = [];
+    while (pool.length && mob._sherineTraits.length < count) {
+        let pick = Math.floor(Math.random() * pool.length);
+        mob._sherineTraits.push(pool.splice(pick, 1)[0]);
+    }
+    if (sherineMobHasTrait(mob, 'phaseWard')) {
+        mob._sherinePhaseBaseAc = mob.ac || 0;
+        mob._sherinePhaseBaseMr = mob.mr || 0;
+        mob._sherinePhaseMagic = false;
+    }
+}
+function sherineMobTraitTick(mob) {
+    if (!mob || !mob._sherine || mob.curHp <= 0) return;
+    if (sherineMobHasTrait(mob, 'renewal') && state.ticks % 50 === 0 && mob.curHp < mob.hp) {
+        let pct = (mob.st && mob.st.muddywater > 0) ? 0.015 : 0.03;
+        mob.curHp = Math.min(mob.hp, mob.curHp + Math.max(1, Math.floor(mob.hp * pct)));
+    }
+    if (sherineMobHasTrait(mob, 'phaseWard') && state.ticks % 50 === 0) {
+        if (!Number.isFinite(mob._sherinePhaseBaseAc)) mob._sherinePhaseBaseAc = mob.ac || 0;
+        if (!Number.isFinite(mob._sherinePhaseBaseMr)) mob._sherinePhaseBaseMr = mob.mr || 0;
+        mob._sherinePhaseMagic = !mob._sherinePhaseMagic;
+        mob.ac = mob._sherinePhaseBaseAc + (mob._sherinePhaseMagic ? 0 : -8);
+        mob.mr = mob._sherinePhaseBaseMr + (mob._sherinePhaseMagic ? 30 : 0);
     }
 }
 // 🔮 席琳的恩賜：席琳的世界中每次刷新 1% 機率讓場上一隻怪獲得恩賜（血盟除外）
@@ -1345,7 +1394,7 @@ function spawnRiftMob(idx) {
     if (!mobId) return;
     let base = DB.mobs[mobId];
     mapState.mobs[idx] = { ...base, curHp: base.hp, uid: uid(), _born: ++_mobBornSeq, _magCd: {}, justHit: false, st: newMobStatus() };
-    applySherineBuff(idx);   // 🔮 時空裂痕也吃席琳世界：怪物強化＋_sherine（詞綴／×3掉／×2傷由 _sherine 帶動）；須在 initHardSkin 前
+    applySherineBuff(idx);   // 🔮 時空裂痕也吃席琳世界：怪物強化、能力、祝福與難度倍率皆由共用席琳管線處理；須在 initHardSkin 前
     if (typeof applyBossArmyScaling === 'function') applyBossArmyScaling(mapState.mobs[idx], mobId);   // 👑 裂痕頭目同樣依在場軍團取得一次性 HP 倍率
     if (mapState.mobs[idx].hard) initHardSkin(mapState.mobs[idx]);
     applySherineGrace(idx);   // 🔮 席琳的恩賜（1% 機率）

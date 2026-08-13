@@ -4,7 +4,7 @@
  * 在遊戲「⚙️ 自動化」面板加一顆「🥊 木人場」入口。進去後：
  *  - 選 1~5 隻怪（每隻可不同，預設第 1 格妖魔 orc），用 select+input 篩選挑選。
  *  - 可選「世界模式」（一般／席琳的世界／瘋狂的席琳世界）：重用原作 applySherineBuff 對訓練怪
- *    套用席琳強度（AC/MR/命中/減傷＋怪傷×2/×3 旗標），數值永遠與遊戲一致、作者改倍率自動跟上。
+ *    套用席琳強度（AC/MR/命中/減傷＋共用怪物傷害倍率），數值永遠與遊戲一致、作者改倍率自動跟上。
  *  - 怪打不死、玩家/傭兵/寵物/召喚物/城堡護衛也都打不死，跑「真實戰鬥」量輸出。
  *  - 旁邊 HUD 兩個檢視：「👥 來源」＝玩家／每個傭兵／每隻寵物／每種召喚物 各自的 DPS 長條圖，
  *    「🎯 目標」＝打在每隻訓練怪身上的 DPS；上方永遠是總 DPS（平均與近 10 秒即時）。
@@ -492,7 +492,7 @@
         var m = mapState.mobs[i];
         if (!m || !m._train) continue;
         window.applySherineBuff(i);
-        m.hp = TRAIN_HP; m.curHp = TRAIN_HP;   // buff 會把 HP ×3/×5，統一回木人場天文血量
+        m.hp = TRAIN_HP; m.curHp = TRAIN_HP;   // buff 會放大 HP，統一回木人場天文血量；訓練木人不抽隨機席琳能力
       }
     } finally {
       player.sherineWorld = sw; player.sherineMad = sm;

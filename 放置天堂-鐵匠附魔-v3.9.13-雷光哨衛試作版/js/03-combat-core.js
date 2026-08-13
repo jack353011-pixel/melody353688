@@ -797,6 +797,7 @@ function tick() {
 
         // --- 異常狀態處理（倒數、中毒 DoT），死亡則跳過 ---
         if (processMobStatusTick(m, i)) continue;
+        if (typeof sherineMobTraitTick === 'function') sherineMobTraitTick(m);
         // 👑 戰鬥頭目：每 5 秒恢復 HP；近 5 秒曾被物理命中回 0.5%，否則回 2.5%。
         if (m.boss && !m.siegeEnemy && m.race !== '建築' && state.ticks % 50 === 0 && m.curHp > 0 && m.curHp < m.hp) {
             let recentPhysicalHit = m._lastPhysicalHitTick != null && state.ticks - m._lastPhysicalHitTick <= 50;

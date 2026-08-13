@@ -670,7 +670,7 @@ function enemyAttackSummon(mob, s) {
     if (!hit) { logCombat(`<span class="${getMobColor(mob.lv)}">${mob.n}</span> 對 <span class="text-purple-300">${s.form}</span> 的攻擊未命中。`, 'miss', 'enemy'); return; }
     const dc = (mob.dmg && mob.dmg[0]) || 1, ds = (mob.dmg && mob.dmg[1]) || 1;
     let dmg = (heavy ? dc * ds : roll(dc, ds)) + ((mob.db || 0) - (st.weaken > 0 ? 4 : 0) - (st.broken > 0 ? 2 : 0));
-    if (mob._sherine) dmg = Math.floor(dmg * (mob._sherineMad ? 3 : 2));
+    dmg = Math.floor(dmg * sherineEnemyDamageMult(mob));
     if (mob._grace) dmg = Math.floor(dmg * 1.5);
     dmg = Math.max(1, Math.floor(dmg * riftDamageMult()) - d.dr);
     dmg = Math.max(1, Math.floor(dmg * (typeof teamDmgReduceMult === 'function' ? teamDmgReduceMult(true) : 1)));   // 🔮 化身對寵物／召喚物保留受傷減免；鋼鐵防護只作用於施法者自身 AC
@@ -691,7 +691,7 @@ function applyMobMagicToSummon(mob, sk, s) {
     if (!mob || mob.curHp <= 0 || !sk || !sk.dmg || !s || s._downed || (s.hp || 0) <= 0) return;
     const d = _sumDeriveAny(s) || {};
     const mr = d.mr || 0, dr = d.dr || 0;
-    const shMul = (mob._sherine ? (mob._sherineMad ? 3 : 2) : 1) * (mob._grace ? 2 : 1);
+    const shMul = sherineEnemyDamageMult(mob) * (mob._grace ? 2 : 1);
     let baseM = roll(sk.dmg[0], sk.dmg[1]);
     let extra = (sk.db || 0) + (sk.dbLv ? (mob.lv || 0) * (sk.dbLvMult || 1) : 0);
     let dmg = sk.fixedDmg ? (baseM + extra) : (Math.floor((baseM + extra) * mrMult(mr)) - dr);
