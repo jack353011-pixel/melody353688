@@ -1600,7 +1600,7 @@ function renderSyslogPandora() {
     el.innerHTML = `<span class="text-xs" style="color:#94a3b8;">黑市最新上架：</span><span class="font-bold ${nameClass}" style="${nameStyle}">${getItemFullName(inst)}</span>${soldTxt}`;
 }
 
-// ===== 黑市商品 tooltip（能力說明·跟隨滑鼠·掛 body 用視口座標，不受 #app-stage 縮放影響）=====
+// ===== 黑市商品說明：hover 只做快速預覽，點擊開啟可捲動的完整能力視窗 =====
 function _pandoraTipEl() {
     let el = document.getElementById('pandora-tooltip');
     if (!el) {
@@ -1615,12 +1615,16 @@ function pandoraTipShow(ev, i) {
     let m = player && player.pandoraMarket2; let s = m && m.slots && m.slots[i]; let d = s && DB.items[s.id]; if (!d) return;
     let inst = { id: s.id, bless: s.bless === true };
     let desc = ''; try { desc = buildItemDescHTML(inst); } catch (e) {}
+    // tooltip 本身不接收滑鼠事件，因此不在這裡放一個無法點擊的 <details>。
+    // 完整內容改由 pandoraOpenDetail() 顯示。
+    desc = desc.replace(/<details class="item-detail-fold item-detail-full">[\s\S]*?<\/details>/, '');
     let nowT = (typeof state !== 'undefined' && state) ? (state.ticks || 0) : 0;
     let mins = Math.max(1, Math.ceil((PANDORA_LIFETIME_TICKS - (nowT - (s.setTick || 0))) / 600));
     let el = _pandoraTipEl();
     el.innerHTML = `<div class="font-bold ${getItemColor(inst)}">${getItemFullName(inst)}</div>
         <div class="text-yellow-300 font-bold">售價 ${s.price.toLocaleString()} 金幣${s.weight === 1 ? '<span style="color:#c084fc;">（珍稀）</span>' : ''}${s.sold ? '<span style="color:#64748b;">（已售出）</span>' : ''}</div>
         <div class="text-slate-300">${desc}</div>
+        <div class="pandora-tip-hint">點擊商品查看完整能力</div>
         <div class="text-slate-500 mt-1" style="font-size:11px;">此格約 ${mins} 分鐘後輪換新商品</div>`;
     el.style.display = 'block';
     pandoraTipMove(ev);
@@ -1635,7 +1639,77 @@ function pandoraTipMove(ev) {
 }
 function pandoraTipHide() { let el = document.getElementById('pandora-tooltip'); if (el) el.style.display = 'none'; }
 
-// 繪製黑市面板：24 件商品（桌面 3×8）·只顯示 icon／名稱／價格／購買·能力用 tooltip
+let _pandoraDetailReturnFocus = null;
+function _pandoraDetailEl() {
+    let el = document.getElementById('pandora-detail-overlay');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'pandora-detail-overlay';
+    el.className = 'pandora-detail-overlay hidden';
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = `<section class="pandora-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="pandora-detail-title">
+        <header class="pandora-detail-header">
+            <div id="pandora-detail-title" class="pandora-detail-title">商品完整能力</div>
+            <button type="button" class="pandora-detail-close" onclick="pandoraCloseDetail(event)" aria-label="關閉商品詳情">關閉</button>
+        </header>
+        <div id="pandora-detail-body" class="pandora-detail-body"></div>
+    </section>`;
+    el.addEventListener('click', event => { if (event.target === el) pandoraCloseDetail(event); });
+    document.body.appendChild(el);
+    return el;
+}
+
+function pandoraOpenDetail(ev, i) {
+    if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
+    let m = (typeof player !== 'undefined' && player) ? player.pandoraMarket2 : null;
+    let s = m && Array.isArray(m.slots) ? m.slots[i] : null;
+    let d = s && DB.items[s.id];
+    if (!d) return;
+    pandoraTipHide();
+    _pandoraDetailReturnFocus = ev && ev.currentTarget && typeof ev.currentTarget.focus === 'function' ? ev.currentTarget : document.activeElement;
+    let inst = { id: s.id, bless: s.bless === true };
+    let desc = '';
+    try { desc = buildItemDescHTML(inst); } catch (e) { desc = '<div class="text-slate-400">能力說明載入失敗。</div>'; }
+    let nowT = (typeof state !== 'undefined' && state) ? (state.ticks || 0) : 0;
+    let mins = Math.max(1, Math.ceil((PANDORA_LIFETIME_TICKS - (nowT - (s.setTick || 0))) / 600));
+    let overlay = _pandoraDetailEl();
+    let body = overlay.querySelector('#pandora-detail-body');
+    body.innerHTML = `<div class="pandora-detail-item-head">
+            <img src="${getIconUrl(d)}" onerror="this.style.display='none';" class="pandora-detail-icon object-contain ${getGlowClass(inst, d)}" alt="">
+            <div class="min-w-0">
+                <div class="pandora-detail-item-name ${getItemColor(inst)}">${getItemFullName(inst)}</div>
+                <div class="pandora-detail-price">售價 ${s.price.toLocaleString()} 金幣${s.weight === 1 ? '<span class="pandora-detail-rare">（珍稀）</span>' : ''}${s.sold ? '<span class="pandora-detail-sold">（已售出）</span>' : ''}</div>
+            </div>
+        </div>
+        <div class="pandora-detail-desc">${desc}</div>
+        <div class="pandora-detail-expire">此格約 ${mins} 分鐘後輪換新商品</div>`;
+    body.querySelectorAll('details.item-detail-full').forEach(detail => { detail.open = true; });
+    body.scrollTop = 0;
+    overlay.classList.remove('hidden');
+    overlay.setAttribute('aria-hidden', 'false');
+    requestAnimationFrame(() => {
+        let close = overlay.querySelector('.pandora-detail-close');
+        if (close) close.focus();
+    });
+}
+
+function pandoraCloseDetail(ev) {
+    if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
+    let overlay = document.getElementById('pandora-detail-overlay');
+    if (!overlay || overlay.classList.contains('hidden')) return;
+    overlay.classList.add('hidden');
+    overlay.setAttribute('aria-hidden', 'true');
+    if (_pandoraDetailReturnFocus && _pandoraDetailReturnFocus.isConnected && typeof _pandoraDetailReturnFocus.focus === 'function') {
+        _pandoraDetailReturnFocus.focus();
+    }
+    _pandoraDetailReturnFocus = null;
+}
+
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') pandoraCloseDetail(event);
+});
+
+// 繪製黑市面板：24 件商品（桌面 3×8）·hover 預覽·點擊商品開啟完整能力
 function pandoraRenderMarket(div) {
     if (!div) return;
     _pandoraDiv = div;
@@ -1664,11 +1738,14 @@ function pandoraRenderMarket(div) {
         let rare = s.weight === 1;
         let afford = (player.gold || 0) >= s.price;
         let border = s.sold ? 'border-slate-700' : rare ? 'border-purple-400 shadow-[0_0_8px_rgba(192,132,252,0.45)]' : 'border-slate-600';
+        let cardAriaName = `${s.bless === true ? '祝福的 ' : ''}${d.n || s.id}`;
         // 三欄橫條：圖示｜名稱/價格｜購買鈕；卡片加寬後保留完整名稱與清楚點擊區。
         let btn = s.sold
             ? `<button disabled class="btn shrink-0 bg-slate-700 border-slate-600 opacity-60 cursor-not-allowed font-bold rounded pandora-card-buy">售出</button>`
-            : `<button onclick="buyPandoraItem(${i})" ${afford ? '' : 'disabled'} class="btn shrink-0 ${afford ? 'bg-purple-700 hover:bg-purple-600 border-purple-500' : 'bg-slate-700 border-slate-600 opacity-60 cursor-not-allowed'} font-bold rounded pandora-card-buy">購買</button>`;
+            : `<button onclick="event.stopPropagation();buyPandoraItem(${i})" ${afford ? '' : 'disabled'} class="btn shrink-0 ${afford ? 'bg-purple-700 hover:bg-purple-600 border-purple-500' : 'bg-slate-700 border-slate-600 opacity-60 cursor-not-allowed'} font-bold rounded pandora-card-buy">購買</button>`;
         return `<div class="pandora-market-card rounded-md border ${border} bg-slate-900/80 flex items-center ${s.sold ? 'opacity-70' : ''}"
+            role="button" tabindex="0" title="點擊查看完整能力" aria-label="查看 ${_pandoraEsc(cardAriaName)} 完整能力"
+            onclick="pandoraOpenDetail(event,${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pandoraOpenDetail(event,${i})}"
             onmouseenter="pandoraTipShow(event,${i})" onmousemove="pandoraTipMove(event)" onmouseleave="pandoraTipHide()">
             <div class="pandora-collection-icon pandora-card-icon-wrap">
                 <img src="${getIconUrl(d)}" onerror="this.src='https://placehold.co/40x40/1e293b/ffffff?text=?';" class="pandora-card-icon object-contain ${s.sold ? 'grayscale opacity-40' : getGlowClass(inst, d)}">
