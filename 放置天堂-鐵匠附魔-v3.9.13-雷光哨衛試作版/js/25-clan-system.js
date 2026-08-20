@@ -1472,8 +1472,7 @@ function npcClanWorldTick() {
         if (clan && clan.mercy && clan.mercy.pending) _npcClanMercyWhisper(clan);
     });
     if (result && result.ok && whispers.length && typeof saveGame === 'function') saveGame();
-    let tab = document.getElementById('tab-clan');
-    if (tab && !tab.classList.contains('hidden')) renderClanTab();
+    if (clanRenderTargetVisible()) renderClanTab();
 }
 
 function clanLevelInfo(xp) {
@@ -1923,9 +1922,24 @@ function _npcClanHostilePanelHtml() {
     </div>`;
 }
 
-function renderClanTab() {
-    let div = document.getElementById('tab-clan');
-    if (!div || !player || !player.cls) return;
+// 血盟主選單已收進「國戰」內分頁；舊 #tab-clan 保留為相容容器，
+// 讓舊呼叫點與外掛仍可繼續呼叫 renderClanTab()。
+function clanRenderTarget() {
+    return document.getElementById('dragon-war-clan-content') || document.getElementById('tab-clan');
+}
+
+function clanRenderTargetVisible() {
+    let div = clanRenderTarget();
+    return !!(div && (div.id === 'dragon-war-clan-content' || !div.classList.contains('hidden')));
+}
+
+function renderClanTab(targetDiv) {
+    let div = targetDiv || clanRenderTarget();
+    if (!div) return;
+    if (!player || !player.cls) {
+        div.innerHTML = '<div class="p-3 text-slate-400">尚未載入角色，無法顯示血盟資料。</div>';
+        return;
+    }
     clanSyncCurrentPlayer();
     let read = _clanReadStateResult();
     if (!read.ok) {
@@ -2078,8 +2092,7 @@ function _clanBuffTimerTick() {
         try { if (typeof _allyLevelRecompute === 'function') _allyLevelRecompute(ally); } catch (e) {}
     });
     if (typeof updateUI === 'function') updateUI();
-    let tab = document.getElementById('tab-clan');
-    if (tab && !tab.classList.contains('hidden')) renderClanTab();
+    if (clanRenderTargetVisible()) renderClanTab();
 }
 
 setInterval(() => {
