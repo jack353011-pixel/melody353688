@@ -464,6 +464,7 @@
             if (typeof npcClanOnSiegeResult === 'function') npcClanOnSiegeResult('kent', 'lose', defenderId);
             log(`<span class="text-slate-300 font-bold">肯特城戰失敗。</span>${esc(reason || '未能在時限內完成攻城。')}`);
         }
+        if (won && typeof global.titleRecordSiege === 'function') global.titleRecordSiege('kent', 'win');
         let timer = document.getElementById('siege-timer'); if (timer) timer.classList.add('hidden');
         let dest = won && typeof siegeVictoryActive === 'function' && siegeVictoryActive() ? 'town_kent_castle' : getHomeTown();
         setMapSelectors(dest);

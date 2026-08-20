@@ -390,6 +390,7 @@ function killMob(idx) {
     if (typeof pvpOnKillMob === 'function') pvpOnKillMob(mob);
     if (typeof necroBookOnKill === 'function') necroBookOnKill(mob);   // 🏺 v3.8.12 死靈之書：全隊1%回復＋骷髏復生（建築由函式內排除）
     if(typeof auditTrackKill === 'function') auditTrackKill(mob);   // 統計：累計經驗/擊殺
+    if(typeof titleRecordKill === 'function') titleRecordKill(mob, 1);   // 🏷️ 永久稱號進度（與換圖會重置的效率統計分開）
     // 🔧 轉場建築（往上層的樓梯 / 遺忘之島傳送門）：擊敗即進入下一層/島，不顯示「擊敗了…」戰鬥訊息（race 建築且 noAutoTeleport，排除攻城塔/城門）
     let _hideKillMsg = (mob.race === '建築' && mob.noAutoTeleport);
     if(!_hideKillMsg) logCombat(`擊敗了 <span class="${getMobColor(mob.lv)}">${mob.n}</span>！`, 'player-heavy');  // 👈 新增

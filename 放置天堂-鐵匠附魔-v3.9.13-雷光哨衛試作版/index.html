@@ -14,7 +14,7 @@
     <title>放置天堂 - 日出之國</title>
     <link rel="icon" type="image/png" href="assets/favicon.png">   <!-- 🖼️ 瀏覽器分頁圖示(favicon)：把你的圖放到 assets/favicon.png 即生效；可改 href 路徑或副檔名(.ico/.svg) -->
 
-    <link rel="stylesheet" href="css/style.css?v=v3.9.87-dragon-war2">
+    <link rel="stylesheet" href="css/style.css?v=v3.9.94-title-system">
     <link rel="stylesheet" href="css/floating-ui.css?v=v3.9.13-mobile-equipment-back">
     <link rel="stylesheet" href="css/tailwind-built.css"><!-- 🔧 預編譯 Tailwind（取代執行期 JIT tailwind.js）：只含實際用到的 class，省 407KB runtime + 移除持續掃描 DOM 的成本。置於 style.css 之後以保留原 cascade（utility 平手時勝過自訂 class，與舊 JIT 注入順序一致） -->
 </head>
@@ -46,7 +46,7 @@
 
         <div id="login-meta-layer">
             <!-- 🏷️ 版本號（載入完成後仍會由 GAME_VERSION 同步；後備文字也保持為目前版本，避免慢速網路閃出舊版號） -->
-            <div id="login-version" class="text-center text-sm text-slate-300 font-medium tracking-wide select-none">v3.9.93</div>
+            <div id="login-version" class="text-center text-sm text-slate-300 font-medium tracking-wide select-none">v3.9.94</div>
             <div id="login-disclaimer" class="text-center text-xs text-slate-400 leading-relaxed mx-auto">本遊戲為非官方免費同人作品，絕無營利意圖；遊戲內圖片與音樂版權歸原權利方 NCSOFT 所有，其餘程式為獨立開發，嚴禁商業販售。</div>
         </div>
       </div>
@@ -186,7 +186,9 @@
         <div id="col-left" class="w-[340px] flex flex-col gap-4">
             <!-- 新增了 id="status-panel"，並加入去底色與加深背景的樣式確保文字可讀 -->
             <div id="status-panel" class="panel bg-cover bg-top bg-no-repeat" style="background-blend-mode: multiply; background-color: rgba(30, 41, 59, 0.85);">
+                <button id="st-title" type="button" class="character-title-display" data-rarity="none" onclick="openTitlePanel()" title="點擊選擇展示稱號">＋ 選擇稱號</button>
                 <div class="panel-header text-center flex justify-between bg-transparent border-b border-slate-700"><span class="flex items-center shrink-0"><span id="st-classname">職業</span><span id="classic-badge" class="hidden font-bold ml-1" style="color:#fbbf24;text-shadow:0 0 5px rgba(251,191,36,0.7);font-size:0.85rem;line-height:1;" title="經典模式（硬核）：死亡損失該等級 5% 最大經驗（不降等）、無祝福/精通/席琳；掉落率、經驗與金幣獲得與一般模式相同">⚔經典</span></span><span id="victory-badge" class="hidden font-bold" style="color:#fde68a;text-shadow:0 0 6px rgba(253,230,138,0.85);font-size:1.05rem;line-height:1;align-items:center;gap:0.15rem;white-space:nowrap;flex-shrink:0;" title="城主：血盟持有城堡，全商店 8 折、開放城堡"><img id="victory-badge-crown" src="assets/ui/castle-crown.gif?v=v3.6.36" alt="" draggable="false" style="width:16px;height:12px;object-fit:contain;image-rendering:pixelated;position:relative;top:-0.08em;filter:drop-shadow(0 1px 1px rgba(69,26,3,.95)) drop-shadow(0 0 3px rgba(250,204,21,.82));"><span id="victory-badge-text" style="line-height:1;">城主</span></span><span id="st-class" class="text-white text-lg font-bold cursor-pointer hover:bg-slate-700/50 rounded px-2 inline-block min-w-[2.5rem] text-right" title="點擊此處修改名稱" onclick="startEditName()"></span></div>
+                <div id="st-clan-line" class="character-clan-line" style="display:none"></div>
                 <div class="status-compact-body text-base">
                     <div class="status-level-row text-slate-400">
                         <span>等級</span><span class="text-white font-bold text-xl" id="st-lv">1</span>
@@ -630,7 +632,7 @@
     </script>
 
     <script src="js/anim-manifest.js?v=v3.8.12-necro-relics"></script>
-    <script src="js/00-data.js?v=v3.9.93-clan-house-fixes"></script>
+    <script src="js/00-data.js?v=v3.9.94-title-system"></script>
     <script src="js/00-tag-core.js?v=v3.9.76-support-gear-fix"></script>
     <script src="js/00-weapon-size-mechanics.js?v=v3.9.66-size-mechanic-label"></script>
     <script src="js/00-indexeddb-shadow.js?v=v3.9.28-idb-compact1"></script>
@@ -642,10 +644,10 @@
 <script src="js/02-stats-recompute.js?v=v3.9.67-d2r-speed-affixes"></script>
 <script src="js/03-combat-core.js?v=v3.9.85-offline-transaction-fix"></script>
     <script src="js/04-combat-attack.js?v=v3.9.79-sherine-balance"></script>
-<script src="js/05-kill-progression.js?v=v3.9.85-offline-transaction-fix"></script>
+<script src="js/05-kill-progression.js?v=v3.9.94-title-system"></script>
     <script src="js/06-status-allies.js?v=v3.9.79-sherine-balance"></script>
     <script src="js/07-skills-cast.js?v=v3.9.19-orbs5"></script>
-<script src="js/08-items-equip.js?v=v3.9.33-tag-split1"></script>
+<script src="js/08-items-equip.js?v=v3.9.94-title-system"></script>
 <script src="js/09-vfx-render.js?v=v3.9.65-mob-tags-hidden"></script>
     <script src="js/10-ui-tabs.js?v=v3.9.87-dragon-war2"></script>
 <script src="js/11-world-map.js?v=v3.9.85-offline-transaction-fix"></script>
@@ -658,16 +660,16 @@
 <script src="js/17-audio.js?v=v3.8.1-monia-sfx"></script>
 <script src="js/19-equipment-window.js?v=v3.9.13-mobile-icon-retry"></script>
 <script src="js/20-warehouse-window.js?v=v3.5.100-audit-tail"></script>
-<script src="js/21-relic-book.js?v=v3.8.15-legacy-import-smooth"></script>
+<script src="js/21-relic-book.js?v=v3.9.94-title-system"></script>
     <script src="js/23-summons.js?v=v3.9.85-offline-transaction-fix"></script>
     <script src="js/22-pets.js?v=v3.9.79-sherine-balance"></script>
     <script src="js/24-pandora-relic-market.js?v=v3.7.70"></script>
     <script src="js/25-clan-system.js?v=v3.9.93-clan-house-fixes"></script>
     <script src="js/26-world-channel.js?v=v3.9.79-sherine-balance"></script>
-<script src="js/27-offline-rewards.js?v=v3.9.85-offline-transaction-fix"></script>
+<script src="js/27-offline-rewards.js?v=v3.9.94-title-system"></script>
 <script src="js/28-pvp-arena.js?v=v3.9.13-addon-slots1"></script>
 <script src="js/29-siege-v2-data.js?v=v3.7.63-siege-v2"></script>
-<script src="js/30-siege-v2.js?v=v3.7.89-castle-ring-layout"></script>
+<script src="js/30-siege-v2.js?v=v3.9.94-title-system"></script>
 <script src="js/31-castle-guards.js?v=v3.9.79-sherine-balance"></script>
 <script src="js/32-threat.js?v=v3.8.23-sherine-set-rework"></script>
 <script src="js/33-platform-tuning.js?v=v3.8.70-exp-1x"></script>
@@ -699,7 +701,8 @@
 <script src="js/64-warrior-illusion-support-gear.js?v=v3.9.74-four-flow-support"></script>
 <script src="js/65-dark-elf-elf-flows.js?v=v3.9.75-dark-elf-elf-flows"></script>
 <script src="js/66-dark-elf-elf-support-gear.js?v=v3.9.76-support-gear-fix"></script>
-<script src="js/67-dragon-faction-war.js?v=v3.9.93-clan-house-fixes"></script>
+<script src="js/67-dragon-faction-war.js?v=v3.9.94-title-system"></script>
+<script src="js/68-title-system.js?v=v3.9.94-title-system"></script>
 <script src="js/55-orb-system.js?v=v3.9.30-tag-match1"></script>
 
 <!-- 外掛相容層：來源 pp771007/idle-lineage-class；不載入橫幅、宣傳與流量統計。 -->

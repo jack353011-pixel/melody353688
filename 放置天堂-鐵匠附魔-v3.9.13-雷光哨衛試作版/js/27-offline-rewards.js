@@ -1870,6 +1870,9 @@
         }
         _offlineApplyAllyExp(allyExp);
         if (kills > 0 && typeof pvpChangeAlignment === 'function') pvpChangeAlignment(kills);
+        if (kills > 0 && typeof titleRecordOfflineKills === 'function') {
+            titleRecordOfflineKills(profile, normalKills, bossPlan, _offlineMobPlan(profile, normalKills));
+        }
         if (options.advanceCombatTime) _offlineAdvanceCombatTime(elapsed);
         if (survivalPlan.died) _offlineLockAfterDeath();
 

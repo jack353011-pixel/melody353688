@@ -28,7 +28,11 @@ function relicCatCount(ck) { let arr = RELIC_CAT_ITEMS[ck] || []; return { got: 
 function registerRelicObtained(id) {   // gainItem 呼叫：獲得任何遺物即登錄
     if (!player) return;
     if (!player.relicDex) player.relicDex = {};
-    if (RELIC_ITEM_CAT[id] && !player.relicDex[id]) { player.relicDex[id] = true; if (typeof saveRelicDex === 'function') saveRelicDex(); }
+    if (RELIC_ITEM_CAT[id] && !player.relicDex[id]) {
+        player.relicDex[id] = true;
+        if (typeof titleSyncUnlocks === 'function') titleSyncUnlocks(false);
+        if (typeof saveRelicDex === 'function') saveRelicDex();
+    }
 }
 // ---- 創角/讀檔保底：把現有(背包+已裝備+倉庫)遺物補登錄 ----
 function ensureRelicDex(warehouse) {

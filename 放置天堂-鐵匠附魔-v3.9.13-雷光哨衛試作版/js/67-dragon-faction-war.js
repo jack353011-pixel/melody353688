@@ -409,6 +409,7 @@
         let seasonRep = seasonClaim && seasonClaim.ok ? seasonClaim.reputation : 0;
         player.gold = Math.max(0, (Number(player.gold) || 0) + result.rewardGold + seasonGold);
         if (typeof logSys === 'function') logSys(`<span class="${result.success ? 'text-emerald-300' : 'text-red-300'} font-bold">🐉 ${esc(result.text)}</span> 獎勵 ${result.rewardGold.toLocaleString()} 金幣，陣營聲望 +${result.reputation}。${seasonGold ? `（另含第 ${seasonClaim.season} 季結算 ${seasonGold.toLocaleString()} 金幣、${seasonRep} 聲望）` : ''}`);
+        if (typeof global.titleSyncUnlocks === 'function') global.titleSyncUnlocks(false);
         persistAndRender();
     }
     function claimReward() {
@@ -417,6 +418,7 @@
         player.dragonWar = result.state;
         player.gold = Math.max(0, (Number(player.gold) || 0) + result.gold);
         if (typeof logSys === 'function') logSys(`<span class="text-amber-200 font-bold">🐉 第 ${result.season} 季國戰結算：${result.gold.toLocaleString()} 金幣、${result.reputation} 聲望已領取。</span>`);
+        if (typeof global.titleSyncUnlocks === 'function') global.titleSyncUnlocks(false);
         persistAndRender();
     }
     function newSeason() {
