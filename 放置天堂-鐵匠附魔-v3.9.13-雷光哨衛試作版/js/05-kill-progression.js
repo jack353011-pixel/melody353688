@@ -1211,6 +1211,7 @@ function enterRiftMap() {   // 仿 enterPrideFloor 的戰鬥進場（不走 chan
     if (typeof mercenaryRoleBattleBlocked === 'function' && mercenaryRoleBattleBlocked('rift_battle')) return false;
     saveSiegeBossHp();
     mapState.current = 'rift_battle';
+    if (typeof titleRecordStoryArea === 'function') titleRecordStoryArea('rift_battle');
     player.lastBattleMap = 'rift_battle';
     mapState.mobs = [null, null, null, null, null];
     state._kbRespawnAt = null;

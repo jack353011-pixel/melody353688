@@ -1006,6 +1006,7 @@
         if (seen.includes(fragment.no)) return false;
         seen.push(fragment.no);
         seen.sort((a, b) => Number(a) - Number(b));
+        try { if (typeof titleRecordLoreProgress === 'function') titleRecordLoreProgress(seen.length); } catch (e) {}
         if (announce && typeof logSys === 'function') {
             logSys(`<div class="world-lore-log"><b>◈ 發現世界殘響・碎片 ${fragment.no}</b><strong>${fragment.title}</strong>`
                 + fragment.lines.map(line => `<span>${line}</span>`).join('') + `</div>`);
@@ -1037,6 +1038,7 @@
 
     function worldLoreOnAreaEnter(mapKey) {
         _worldLoreCurrentArea = mapKey;
+        try { if (typeof titleRecordStoryArea === 'function') titleRecordStoryArea(mapKey); } catch (e) {}
         syncWorldLoreAreaPrompt();
     }
 

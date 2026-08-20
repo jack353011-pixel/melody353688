@@ -7,7 +7,9 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '..', 'js', '68-title-system.js'), 'utf8');
 const worldSource = fs.readFileSync(path.join(__dirname, '..', 'js', '11-world-map.js'), 'utf8');
 const killSource = fs.readFileSync(path.join(__dirname, '..', 'js', '05-kill-progression.js'), 'utf8');
+const loreSource = fs.readFileSync(path.join(__dirname, '..', 'js', '53-world-lore.js'), 'utf8');
 const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const styleSource = fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8');
 const context = { console };
 vm.createContext(context);
 vm.runInContext(source, context);
@@ -37,7 +39,8 @@ function sources(overrides) {
 function runtimeContext(player, overrides) {
     const nodes = {
         'st-title':{ textContent:'', dataset:{}, title:'' },
-        'st-clan-line':{ textContent:'', style:{} }
+        'st-clan-line':{ textContent:'', style:{} },
+        'title-system-overlay':{}
     };
     const context = Object.assign({
         console,
@@ -56,11 +59,11 @@ test('old characters start without an equipped title', () => {
     assert.deepEqual(Object.keys(state.unlocked), []);
 });
 
-test('title catalogue contains 40 unique titles across all six categories', () => {
-    assert.equal(core.DEFINITIONS.length, 40);
-    assert.equal(new Set(core.DEFINITIONS.map(def => def.id)).size, 40);
+test('title catalogue contains 50 unique titles across all six categories', () => {
+    assert.equal(core.DEFINITIONS.length, 50);
+    assert.equal(new Set(core.DEFINITIONS.map(def => def.id)).size, 50);
     assert.deepEqual(Object.fromEntries(core.CATEGORIES.map(category => [category.id, core.DEFINITIONS.filter(def => def.category === category.id).length])), {
-        achievement:9, story:6, clan:7, war:7, castle:7, hidden:4
+        achievement:11, story:12, clan:7, war:7, castle:7, hidden:6
     });
     core.CATEGORIES.forEach(category => {
         assert.ok(core.DEFINITIONS.some(def => def.category === category.id), category.id);
@@ -74,7 +77,7 @@ test('version-one title saves migrate without losing existing progress or unlock
         unlocked:{ goblin_slayer:123 },
         progress:{ goblinKills:10000, valakasKills:1, siegeWins:{ kent:1 } }
     });
-    assert.equal(state.version, 4);
+    assert.equal(state.version, 5);
     assert.equal(state.equipped, 'goblin_slayer');
     assert.equal(state.unlocked.goblin_slayer, 123);
     assert.equal(state.progress.goblinKills, 10000);
@@ -84,7 +87,11 @@ test('version-one title saves migrate without losing existing progress or unlock
     assert.equal(state.progress.kurtKills, 0);
     assert.equal(state.progress.giltasKills, 0);
     assert.equal(state.progress.lowHpBossKills, 0);
+    assert.equal(state.progress.loreFragments, 0);
     assert.deepEqual(Object.keys(state.progress.forgottenElites), []);
+    assert.deepEqual(Object.keys(state.progress.rastabadElders), []);
+    assert.deepEqual(Object.keys(state.progress.rastabadKings), []);
+    assert.deepEqual(Object.keys(state.progress.storyEvents), []);
 });
 
 test('level and gold milestone titles become permanent after first unlock', () => {
@@ -138,6 +145,61 @@ test('new story bosses use their final exact forms', () => {
     assert.equal(!!result.state.unlocked.dantes_witness, true);
 });
 
+test('world lore progress unlocks the echo title and never moves backward', () => {
+    let state = core.recordLoreProgress(null, 20);
+    let result = core.evaluate(state, sources());
+    assert.equal(!!result.state.unlocked.echo_listener, true);
+    state = core.recordLoreProgress(result.state, 2);
+    assert.equal(state.progress.loreFragments, 20);
+});
+
+test('story area events are distinct and idempotent', () => {
+    let state = null;
+    ['town_sherine','town_sherine','rift_battle','sunrise_east','rastabad_gate'].forEach(map => { state = core.recordStoryArea(state, map); });
+    assert.deepEqual(Object.keys(state.progress.storyEvents).sort(), ['rastabad_gate','rift_first_step','sherine_whisper','sunrise_seal']);
+    let result = core.evaluate(state, sources());
+    ['sherine_listener','rift_walker','sunrise_envoy','rasta_infiltrator','story_wayfarer'].forEach(id => assert.equal(!!result.state.unlocked[id], true, id));
+    assert.equal(result.state.unlocked.forbidden_chronicler, undefined);
+});
+
+test('eight elders and four kings require every distinct exact boss', () => {
+    let state = core.recordKills(null, core.RASTABAD_ELDERS.slice(0, 7).map(name => ({ name, count:99 })));
+    state = core.recordKills(state, core.RASTABAD_KINGS.slice(0, 3).map(name => ({ name, count:99 })));
+    let result = core.evaluate(state, sources());
+    assert.equal(result.state.unlocked.elder_chronicler, undefined);
+    assert.equal(result.state.unlocked.four_kings_end, undefined);
+    state = core.recordKills(state, [
+        { name:core.RASTABAD_ELDERS[7], count:1 },
+        { name:core.RASTABAD_KINGS[3], count:1 }
+    ]);
+    result = core.evaluate(state, sources());
+    assert.equal(!!result.state.unlocked.elder_chronicler, true);
+    assert.equal(!!result.state.unlocked.four_kings_end, true);
+});
+
+test('hidden story titles require all chapters and the complete dark dynasty history', () => {
+    let state = null;
+    ['town_sherine','rift_battle','sunrise_castle','rastabad_gate'].forEach(map => { state = core.recordStoryArea(state, map); });
+    state = core.recordKills(state, core.RASTABAD_ELDERS.map(name => ({ name, count:1 })));
+    state = core.recordKills(state, core.RASTABAD_KINGS.map(name => ({ name, count:1 })));
+    let result = core.evaluate(state, sources());
+    assert.equal(!!result.state.unlocked.forbidden_chronicler, true);
+    assert.equal(result.state.unlocked.dark_dynasty_bane, undefined);
+    state = core.recordKills(result.state, [{ name:'真‧死亡騎士 冥皇丹特斯', count:1 }]);
+    result = core.evaluate(state, sources());
+    assert.equal(!!result.state.unlocked.dark_dynasty_bane, true);
+});
+
+test('real world-entry and lore-discovery flows call the title hooks', () => {
+    assert.match(loreSource, /function reveal\(fragment, announce\)[\s\S]*titleRecordLoreProgress\(seen\.length\)/);
+    assert.match(loreSource, /function worldLoreOnAreaEnter\(mapKey\)[\s\S]*titleRecordStoryArea\(mapKey\)/);
+    assert.match(killSource, /function enterRiftMap\(\)[\s\S]*titleRecordStoryArea\('rift_battle'\)/);
+});
+
+test('the collapsible story journal cannot shrink to a hidden line inside the flex list', () => {
+    assert.match(styleSource, /\.title-story-journal\{flex:0 0 auto;/);
+});
+
 test('kingdom political choice is permanent, exclusive, and independent from war factions', () => {
     let result = core.choosePolitics(null, 'guardian');
     assert.equal(result.ok, true);
@@ -146,6 +208,18 @@ test('kingdom political choice is permanent, exclusive, and independent from war
     const rejected = core.choosePolitics(result.state, 'traitor');
     assert.equal(rejected.ok, false);
     assert.equal(rejected.state.storyFlags.kingdomTraitor, undefined);
+});
+
+test('political choice rolls back when the character save fails', () => {
+    const alerts = [];
+    const context = runtimeContext({ lv:40 }, {
+        confirm() { return true; },
+        alert(message) { alerts.push(message); },
+        saveGame() { return false; }
+    });
+    context.titleChoosePolitics('guardian');
+    assert.equal(context.player.titleState.storyFlags.kingdomGuardian, undefined);
+    assert.match(alerts[0], /存檔失敗/);
 });
 
 test('reaching Forgotten Island sets the story flag at the real transition', () => {

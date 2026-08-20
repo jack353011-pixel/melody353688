@@ -2,11 +2,25 @@
 (function (global) {
     'use strict';
 
-    const VERSION = 4;
+    const VERSION = 5;
     const FORGOTTEN_ELITES = [
         '遺忘之島巨大鱷魚', '遺忘之島卡司特王', '遺忘之島食人妖精王',
         '遺忘之島獨眼巨人', '遺忘之島飛龍', '遺忘之島巨大牛人'
     ];
+    const RASTABAD_ELDERS = [
+        '長老．琪娜', '長老．安迪斯', '長老．巴塔斯', '長老．巴洛斯',
+        '長老．巴陸德', '長老．拉曼斯', '長老．泰瑪斯', '長老．艾迪爾'
+    ];
+    const RASTABAD_KINGS = ['魔獸軍王巴蘭卡', '法令軍王蕾雅', '冥法軍王海露拜', '暗殺軍王史雷佛'];
+    const STORY_EVENTS = [
+        { id:'sherine_whisper', icon:'🌙', title:'席琳的低語', hint:'前往席琳所在的村莊。', maps:['town_sherine'], titleId:'sherine_listener', lines:['席琳沒有預言你的勝敗，只問你是否願意凝視世界的另一面。', '當你踏進她的領域，熟悉的亞丁也第一次露出陌生的輪廓。'] },
+        { id:'rift_first_step', icon:'🌀', title:'裂痕彼端', hint:'親自踏入一次時空裂痕戰場。', maps:['rift_battle'], titleId:'rift_walker', lines:['龜裂之核在掌中崩碎，昨日與明日同時從裂口吹來。', '你留下的不是足跡，而是一段不屬於任何年代的回聲。'] },
+        { id:'sunrise_seal', icon:'🌅', title:'日出國的殘印', hint:'深入日出之國的疆域。', maps:['sunrise_castle','sunrise_east','sunrise_west','sunrise_north'], titleId:'sunrise_envoy', lines:['城牆上的晨光照不散妖氣，守門人的名字也早已被風磨去。', '你帶回亞丁的，是一枚證明日出國仍在抵抗的殘印。'] },
+        { id:'rastabad_gate', icon:'🕯️', title:'黑暗帝國之門', hint:'穿越拉斯塔巴德的入口或地底通道。', maps:['rastabad_gate','rastabad_cave1','rastabad_cave2','rastabad_cave3','rastabad_beast','king_baranka_room','law_king_room','necro_king_room','assassin_king_room','dark_magic_lab','necro_training','elder_room'], titleId:'rasta_infiltrator', lines:['門後沒有歡呼，只有被封印的軍令與仍在巡行的亡魂。', '拉斯塔巴德沒有真正覆滅；它只是把王朝藏進更深的黑暗。'] },
+        { id:'elder_testimony', icon:'📚', title:'八長老的證詞', hint:'擊敗八位不同的拉斯塔巴德長老。', titleId:'elder_chronicler', lines:['八位長老各自守著一段互相矛盾的歷史。', '當最後一人倒下，散落的證詞拼出同一個答案：王朝的終局從來不是意外。'] },
+        { id:'four_kings_fall', icon:'♜', title:'四軍王的終局', hint:'分別擊敗拉斯塔巴德四大軍王。', titleId:'four_kings_end', lines:['魔獸、法令、冥法與暗殺的徽印終於不再回應軍令。', '四支軍團一同沉默，黑暗帝國最後的王座也失去了支柱。'] }
+    ];
+    const STORY_EVENT_BY_ID = Object.fromEntries(STORY_EVENTS.map(event => [event.id, event]));
     const CATEGORIES = [
         { id:'achievement', name:'成就', icon:'🏆' },
         { id:'story', name:'劇情', icon:'📜' },
@@ -25,6 +39,8 @@
         { id:'kurt_conqueror', category:'achievement', name:'克特征服者', icon:'⚡', rarity:'rare', requirement:'擊敗克特。', criterion:'kurtKills', value:1 },
         { id:'fire_dragon_slayer', category:'achievement', name:'火龍討伐者', icon:'🔥', rarity:'rare', requirement:'擊敗巴拉卡斯。', criterion:'valakasKills', value:1 },
         { id:'millennial_truth_witness', category:'achievement', name:'千年真相的見證者', icon:'🏺', rarity:'legend', requirement:'完成全部遺物圖鑑。', criterion:'allRelics' },
+        { id:'echo_listener', category:'achievement', name:'殘響聆聽者', icon:'◈', rarity:'rare', requirement:'發現 20 段世界殘響。', criterion:'loreFragments', value:20 },
+        { id:'story_wayfarer', category:'achievement', name:'亞丁行腳者', icon:'🧭', rarity:'rare', requirement:'完成四段不同的故事事件。', criterion:'storyEventCount', value:4 },
 
         { id:'antharas_cleanser', category:'story', name:'安塔瑞斯淨化者', icon:'🌿', rarity:'rare', requirement:'擊敗被侵蝕的瘋狂安塔瑞斯。', criterion:'corruptedAntharasKills', value:1 },
         { id:'kingdom_traitor', category:'story', name:'王國叛徒', icon:'📜', rarity:'rare', requirement:'王國分裂事件中，選擇公開被掩藏的歷史。與「王國守護者」互斥，且與國戰光／暗陣營無關。', criterion:'storyFlag', flag:'kingdomTraitor' },
@@ -32,6 +48,12 @@
         { id:'oblivion_explorer', category:'story', name:'迷霧踏破者', icon:'🏝️', rarity:'rare', requirement:'完成依斯巴的航程，親自登上遺忘之島。', criterion:'storyFlag', flag:'oblivionExplorer' },
         { id:'sunrise_exorcist', category:'story', name:'日出除妖師', icon:'🦊', rarity:'legend', requirement:'擊敗白面金毛九尾狐・殺生石。', criterion:'nineTailedFoxKills', value:1 },
         { id:'dantes_witness', category:'story', name:'冥皇終焉見證者', icon:'💀', rarity:'legend', requirement:'在崩壞的長老會議廳擊敗真‧死亡騎士 冥皇丹特斯。', criterion:'dantesKills', value:1 },
+        { id:'sherine_listener', category:'story', name:'席琳聆聽者', icon:'🌙', rarity:'rare', requirement:'完成故事事件「席琳的低語」。', criterion:'storyEvent', event:'sherine_whisper' },
+        { id:'rift_walker', category:'story', name:'裂痕行者', icon:'🌀', rarity:'rare', requirement:'完成故事事件「裂痕彼端」。', criterion:'storyEvent', event:'rift_first_step' },
+        { id:'sunrise_envoy', category:'story', name:'日出殘印使者', icon:'🌅', rarity:'rare', requirement:'完成故事事件「日出國的殘印」。', criterion:'storyEvent', event:'sunrise_seal' },
+        { id:'rasta_infiltrator', category:'story', name:'黑暗帝國潛行者', icon:'🕯️', rarity:'rare', requirement:'完成故事事件「黑暗帝國之門」。', criterion:'storyEvent', event:'rastabad_gate' },
+        { id:'elder_chronicler', category:'story', name:'八長老編年者', icon:'📚', rarity:'legend', requirement:'完成故事事件「八長老的證詞」。', criterion:'storyEvent', event:'elder_testimony' },
+        { id:'four_kings_end', category:'story', name:'四軍王終結者', icon:'♜', rarity:'legend', requirement:'完成故事事件「四軍王的終局」。', criterion:'storyEvent', event:'four_kings_fall' },
 
         { id:'clan_companion', category:'clan', name:'同盟之證', icon:'🤝', rarity:'common', requirement:'目前已加入血盟。', criterion:'clanMember', current:true },
         { id:'clan_leader', category:'clan', name:'血盟盟主', icon:'🛡️', rarity:'rare', requirement:'目前為血盟盟主。', criterion:'clanLeader', current:true },
@@ -60,7 +82,9 @@
         { id:'abyss_returner', category:'hidden', name:'深淵歸來者', icon:'🜏', rarity:'legend', requirement:'擊敗吉爾塔斯。', criterion:'giltasKills', value:1, hidden:true },
         { id:'forgotten_one', category:'hidden', name:'被遺忘之人', icon:'✦', rarity:'legend', requirement:'擊敗遺忘之島的巨大鱷魚、卡司特王、食人妖精王、獨眼巨人、飛龍與巨大牛人。', criterion:'forgottenElites', value:6, hidden:true },
         { id:'desperate_survivor', category:'hidden', name:'絕境生還者', icon:'♥', rarity:'legend', requirement:'在存活且 HP 不高於 5% 時，親自擊敗一隻非建築頭目。', criterion:'lowHpBossKills', value:1, hidden:true },
-        { id:'double_witness', category:'hidden', name:'雙面見證者', icon:'☽', rarity:'legend', requirement:'曾分別為光與暗陣營累積至少 120 國戰聲望。', criterion:'dualFactionReputation', value:120, hidden:true }
+        { id:'double_witness', category:'hidden', name:'雙面見證者', icon:'☽', rarity:'legend', requirement:'曾分別為光與暗陣營累積至少 120 國戰聲望。', criterion:'dualFactionReputation', value:120, hidden:true },
+        { id:'forbidden_chronicler', category:'hidden', name:'禁史保管人', icon:'🗝️', rarity:'legend', requirement:'完成稱號圖鑑中的全部六段故事事件。', criterion:'allStoryEvents', hidden:true },
+        { id:'dark_dynasty_bane', category:'hidden', name:'黑王朝送葬者', icon:'⚰️', rarity:'legend', requirement:'擊敗八長老、四大軍王與真‧死亡騎士 冥皇丹特斯。', criterion:'darkDynasty', hidden:true }
     ];
     const DEFINITION_BY_ID = Object.fromEntries(DEFINITIONS.map(def => [def.id, def]));
 
@@ -73,7 +97,7 @@
             version:VERSION,
             equipped:null,
             unlocked:{},
-            progress:{ goblinKills:0, deathKnightKills:0, kurtKills:0, giltasKills:0, valakasKills:0, corruptedAntharasKills:0, nineTailedFoxKills:0, dantesKills:0, lowHpBossKills:0, forgottenElites:{}, siegeWins:{} },
+            progress:{ goblinKills:0, deathKnightKills:0, kurtKills:0, giltasKills:0, valakasKills:0, corruptedAntharasKills:0, nineTailedFoxKills:0, dantesKills:0, lowHpBossKills:0, loreFragments:0, forgottenElites:{}, rastabadElders:{}, rastabadKings:{}, storyEvents:{}, siegeWins:{} },
             storyFlags:{}
         };
     }
@@ -95,8 +119,15 @@
         out.progress.nineTailedFoxKills = number(progress.nineTailedFoxKills);
         out.progress.dantesKills = number(progress.dantesKills);
         out.progress.lowHpBossKills = number(progress.lowHpBossKills);
+        out.progress.loreFragments = number(progress.loreFragments);
         let forgotten = progress.forgottenElites && typeof progress.forgottenElites === 'object' && !Array.isArray(progress.forgottenElites) ? progress.forgottenElites : {};
         FORGOTTEN_ELITES.forEach(name => { if (forgotten[name]) out.progress.forgottenElites[name] = true; });
+        let elders = progress.rastabadElders && typeof progress.rastabadElders === 'object' && !Array.isArray(progress.rastabadElders) ? progress.rastabadElders : {};
+        RASTABAD_ELDERS.forEach(name => { if (elders[name]) out.progress.rastabadElders[name] = true; });
+        let kings = progress.rastabadKings && typeof progress.rastabadKings === 'object' && !Array.isArray(progress.rastabadKings) ? progress.rastabadKings : {};
+        RASTABAD_KINGS.forEach(name => { if (kings[name]) out.progress.rastabadKings[name] = true; });
+        let events = progress.storyEvents && typeof progress.storyEvents === 'object' && !Array.isArray(progress.storyEvents) ? progress.storyEvents : {};
+        STORY_EVENTS.forEach(event => { if (events[event.id]) out.progress.storyEvents[event.id] = true; });
         let wins = progress.siegeWins && typeof progress.siegeWins === 'object' ? progress.siegeWins : {};
         ['kent','windwood','heine'].forEach(city => { out.progress.siegeWins[city] = number(wins[city]); });
         if (source.storyFlags && typeof source.storyFlags === 'object' && !Array.isArray(source.storyFlags)) {
@@ -119,6 +150,11 @@
             case 'dantesKills': return state.progress.dantesKills >= def.value;
             case 'lowHpBossKills': return state.progress.lowHpBossKills >= def.value;
             case 'forgottenElites': return Object.keys(state.progress.forgottenElites).length >= def.value;
+            case 'loreFragments': return state.progress.loreFragments >= def.value;
+            case 'storyEvent': return !!state.progress.storyEvents[def.event];
+            case 'storyEventCount': return Object.keys(state.progress.storyEvents).length >= def.value;
+            case 'allStoryEvents': return STORY_EVENTS.every(event => state.progress.storyEvents[event.id]);
+            case 'darkDynasty': return RASTABAD_ELDERS.every(name => state.progress.rastabadElders[name]) && RASTABAD_KINGS.every(name => state.progress.rastabadKings[name]) && state.progress.dantesKills >= 1;
             case 'allRelics': return number(sources.relicTotal) > 0 && number(sources.relicGot) >= number(sources.relicTotal);
             case 'storyFlag': return !!state.storyFlags[def.flag];
             case 'clanMember': return !!sources.clanMember;
@@ -167,7 +203,21 @@
             if (name === '白面金毛九尾狐・殺生石') state.progress.nineTailedFoxKills = number(state.progress.nineTailedFoxKills + count);
             if (name === '真‧死亡騎士 冥皇丹特斯') state.progress.dantesKills = number(state.progress.dantesKills + count);
             if (FORGOTTEN_ELITES.includes(name)) state.progress.forgottenElites[name] = true;
+            if (RASTABAD_ELDERS.includes(name)) state.progress.rastabadElders[name] = true;
+            if (RASTABAD_KINGS.includes(name)) state.progress.rastabadKings[name] = true;
         });
+        if (RASTABAD_ELDERS.every(name => state.progress.rastabadElders[name])) state.progress.storyEvents.elder_testimony = true;
+        if (RASTABAD_KINGS.every(name => state.progress.rastabadKings[name])) state.progress.storyEvents.four_kings_fall = true;
+        return state;
+    }
+    function recordStoryArea(raw, mapKey) {
+        let state = normalize(raw), key = String(mapKey || '');
+        STORY_EVENTS.forEach(event => { if (event.maps && event.maps.includes(key)) state.progress.storyEvents[event.id] = true; });
+        return state;
+    }
+    function recordLoreProgress(raw, count) {
+        let state = normalize(raw);
+        state.progress.loreFragments = Math.max(state.progress.loreFragments, number(count));
         return state;
     }
     function recordSiege(raw, city, won) {
@@ -192,7 +242,7 @@
         return { ok:true, state:state };
     }
 
-    const Core = { VERSION, CATEGORIES, DEFINITIONS, DEFINITION_BY_ID, FORGOTTEN_ELITES, defaultState, normalize, conditionMet, isAvailable, evaluate, recordKills, recordSiege, setEquipped, choosePolitics };
+    const Core = { VERSION, CATEGORIES, DEFINITIONS, DEFINITION_BY_ID, FORGOTTEN_ELITES, RASTABAD_ELDERS, RASTABAD_KINGS, STORY_EVENTS, STORY_EVENT_BY_ID, defaultState, normalize, conditionMet, isAvailable, evaluate, recordKills, recordStoryArea, recordLoreProgress, recordSiege, setEquipped, choosePolitics };
     global.TitleSystemCore = Core;
 
     let activeCategory = 'achievement';
@@ -245,6 +295,22 @@
             if (def) global.logSys(`<span class="text-amber-300 font-bold">🏷️ 獲得稱號【${esc(def.name)}】</span><span class="text-slate-300">（稱號不增加能力，可點角色名字上方自由展示）</span>`);
         });
     }
+    function completedStoryIds(raw) {
+        let state = normalize(raw);
+        return STORY_EVENTS.filter(event => state.progress.storyEvents[event.id]).map(event => event.id);
+    }
+    function newlyCompletedStoryIds(before, after) {
+        let oldIds = new Set(completedStoryIds(before));
+        return completedStoryIds(after).filter(id => !oldIds.has(id));
+    }
+    function announceStoryEvents(ids) {
+        if (!ids || !ids.length || typeof global.logSys !== 'function') return;
+        ids.forEach(id => {
+            let event = STORY_EVENT_BY_ID[id];
+            if (!event) return;
+            global.logSys(`<div class="title-story-event-log"><b>${event.icon} 故事事件・${esc(event.title)}</b>${event.lines.map(line => `<span>${esc(line)}</span>`).join('')}<small>已收入「稱號圖鑑 → 劇情」的故事紀錄。</small></div>`);
+        });
+    }
     function sync(silent) {
         if (typeof player === 'undefined' || !player || !player.cls) return defaultState();
         let result = evaluate(player.titleState, liveSources());
@@ -254,12 +320,14 @@
     }
     function recordKill(mob, count) {
         if (typeof player === 'undefined' || !player || !mob) return;
+        let before = player.titleState;
         player.titleState = recordKills(player.titleState, [{ name:mob.n, count:count || 1 }]);
         if (mob.boss && mob.race !== '建築' && number(player.hp) > 0 && number(player.mhp) > 0 && number(player.hp) * 20 <= number(player.mhp)) {
             let state = normalize(player.titleState);
             state.progress.lowHpBossKills = number(state.progress.lowHpBossKills + 1);
             player.titleState = state;
         }
+        announceStoryEvents(newlyCompletedStoryIds(before, player.titleState));
         sync(false);
     }
     function recordOfflineKills(profile, normalKills, bossPlan, normalPlan) {
@@ -270,8 +338,27 @@
             else if (profile && Array.isArray(profile.mobs) && profile.mobs.length === 1) rows.push({ name:profile.mobs[0].n, count:normalKills });
         } catch (e) {}
         if (bossPlan && Array.isArray(bossPlan.rows)) bossPlan.rows.forEach(row => rows.push({ name:row.mob && row.mob.n, count:row.kills }));
+        let before = player.titleState;
         player.titleState = recordKills(player.titleState, rows);
+        announceStoryEvents(newlyCompletedStoryIds(before, player.titleState));
         sync(false);
+    }
+    function recordStoryAreaEvent(mapKey) {
+        if (typeof player === 'undefined' || !player || !mapKey) return;
+        let before = player.titleState;
+        let next = recordStoryArea(before, mapKey);
+        let added = newlyCompletedStoryIds(before, next);
+        if (!added.length) return;
+        player.titleState = next;
+        announceStoryEvents(added);
+        sync(false);
+        try { if (typeof global.saveGame === 'function') global.saveGame(); } catch (e) {}
+    }
+    function recordWorldLoreProgress(count) {
+        if (typeof player === 'undefined' || !player) return;
+        let before = normalize(player.titleState).progress.loreFragments;
+        player.titleState = recordLoreProgress(player.titleState, count);
+        if (player.titleState.progress.loreFragments !== before) sync(false);
     }
     function recordSiegeResult(city, result) {
         if (typeof player === 'undefined' || !player) return;
@@ -288,14 +375,24 @@
     function choosePoliticalPath(path) {
         if (typeof player === 'undefined' || !player) return;
         if (number(player.lv) < 40) { if (typeof global.alert === 'function') global.alert('角色等級達到 40 後才能面對王國分裂事件。'); return; }
+        if (player.dead) { if (typeof global.alert === 'function') global.alert('角色死亡期間無法作出永久政治選擇，請先復活。'); return; }
         let label = path === 'guardian' ? '維持現行秩序' : '公開被掩藏的歷史';
         if (typeof global.confirm === 'function' && !global.confirm(`確定選擇「${label}」？\n這是角色的永久歷史，且不會強迫你選擇國戰光／暗陣營。`)) return;
-        let result = choosePolitics(player.titleState, path);
-        player.titleState = result.state;
+        let before = normalize(player.titleState);
+        let result = choosePolitics(before, path);
         if (!result.ok) { if (typeof global.alert === 'function') global.alert(result.error); return; }
-        sync(false);
+        let evaluated = evaluate(result.state, liveSources());
+        player.titleState = evaluated.state;
+        let saved = true;
+        try { if (typeof global.saveGame === 'function') saved = global.saveGame() === true; } catch (e) { saved = false; }
+        if (!saved) {
+            player.titleState = before;
+            renderPanel();
+            if (typeof global.alert === 'function') global.alert('角色存檔失敗，這次政治選擇已取消；請確認可正常存檔後再選擇。');
+            return;
+        }
+        announce(evaluated.added);
         renderPanel();
-        try { if (typeof global.saveGame === 'function') global.saveGame(); } catch (e) {}
     }
     function clanLine(sources) {
         if (!sources.clanMember || !sources.clanName) return '';
@@ -355,12 +452,19 @@
         let defs = DEFINITIONS.filter(def => def.category === category.id);
         let got = defs.filter(def => isAvailable(def, state, sources)).length;
         summary.innerHTML = `<span>${category.icon} ${category.name}稱號</span><span>已取得 ${got} / ${defs.length}</span>`;
-        let politicalChoice = '';
+        let politicalChoice = '', storyJournal = '';
         if (category.id === 'story' && !state.storyFlags.kingdomGuardian && !state.storyFlags.kingdomTraitor) {
             let ready = sources.level >= 40;
             politicalChoice = `<section class="title-system-choice"><strong>⚖️ 王國分裂事件</strong><p>${ready ? '你發現了王國刻意掩藏的歷史。這是獨立的政治選擇，不代表光／暗陣營善惡。' : '角色等級達到 40 後，將面對一次永久的政治選擇。'}</p><div><button type="button" onclick="titleChoosePolitics('guardian')" ${ready ? '' : 'disabled'}>維持現行秩序</button><button type="button" onclick="titleChoosePolitics('traitor')" ${ready ? '' : 'disabled'}>公開被掩藏的歷史</button></div></section>`;
         }
-        list.innerHTML = politicalChoice + defs.map(def => {
+        if (category.id === 'story') {
+            let completed = STORY_EVENTS.filter(event => state.progress.storyEvents[event.id]).length;
+            storyJournal = `<details class="title-story-journal"><summary><span>📖 故事事件</span><small>已完成 ${completed} / ${STORY_EVENTS.length}</small></summary><div>${STORY_EVENTS.map(event => {
+                let done = !!state.progress.storyEvents[event.id];
+                return `<article class="${done ? 'completed' : 'locked'}"><strong>${done ? event.icon : '◇'} ${done ? esc(event.title) : '尚未揭露'}</strong>${done ? event.lines.map(line => `<p>${esc(line)}</p>`).join('') : `<p>${esc(event.hint)}</p>`}<small>${done ? '故事已收入紀錄' : '完成線索後自動揭露'}</small></article>`;
+            }).join('')}</div></details>`;
+        }
+        list.innerHTML = storyJournal + politicalChoice + defs.map(def => {
             let available = isAvailable(def, state, sources), equipped = state.equipped === def.id;
             let hidden = def.hidden && !available;
             let name = hidden ? '？？？' : def.name;
@@ -397,6 +501,8 @@
     global.titleSyncUnlocks = sync;
     global.titleRecordKill = recordKill;
     global.titleRecordOfflineKills = recordOfflineKills;
+    global.titleRecordStoryArea = recordStoryAreaEvent;
+    global.titleRecordLoreProgress = recordWorldLoreProgress;
     global.titleRecordSiege = recordSiegeResult;
     global.titleSetStoryFlag = setStoryFlag;
     global.titleChoosePolitics = choosePoliticalPath;
