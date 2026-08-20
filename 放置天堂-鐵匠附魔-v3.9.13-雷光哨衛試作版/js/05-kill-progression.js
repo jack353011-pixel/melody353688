@@ -1154,6 +1154,7 @@ function oblivionOnPortalKill() {
     state.oblivion = 'island';
     logSys('<span class="text-cyan-300 font-bold">🏝️ 迷霧散去，你發現了遺忘之島！</span>');
     enterOblivionMap('oblivion_island');
+    if (typeof titleSetStoryFlag === 'function') titleSetStoryFlag('oblivionExplorer');
     if (!state.ff) saveGame();
 }
 // 依斯巴：港口搭船 UI

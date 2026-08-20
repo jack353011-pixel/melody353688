@@ -53,6 +53,19 @@ test('old clan saves receive a safe level-one house', () => {
     assert.equal(house.level, 1);
     assert.deepEqual(Object.keys(house.facilities).sort(), ['lounge', 'training', 'warRoom', 'warehouse']);
     Object.values(house.facilities).forEach(level => assert.equal(level, 1));
+    assert.equal(state.members.leader.totalContribution, 0);
+    assert.equal(state.members.leader.houseBuilds, 0);
+    assert.equal(state.members.leader.houseTrainings, 0);
+    assert.equal(state.members.leader.houseUpgrades, 0);
+});
+
+test('old spendable contribution migrates into lifetime contribution', () => {
+    const context = createContext();
+    const raw = oldClanState();
+    raw.members.leader.contribution = 250;
+    const member = context._clanNormalizeState(raw).members.leader;
+    assert.equal(member.contribution, 250);
+    assert.equal(member.totalContribution, 250);
 });
 
 test('corrupt house values are bounded and unsafe daily markers are removed', () => {
@@ -96,6 +109,7 @@ test('only the leader can spend shared resources to upgrade the hall', () => {
     assert.equal(house.level, 2);
     assert.equal(house.funds, 600);
     assert.equal(house.materials, 14);
+    assert.equal(context._clanReadState().members.leader.houseUpgrades, 1);
 });
 
 test('war room grants a bounded national-war-only chance bonus', () => {
@@ -119,6 +133,7 @@ test('daily construction charges once and cannot be repeated by another role in 
     assert.equal(context.player.gold, 10000);
     assert.equal(house.funds, 500);
     assert.equal(house.materials, 10);
+    assert.equal(context._clanReadState().members.member.houseBuilds, 1);
 
     context.clanHouseDailyBuild();
     house = context._clanReadState().modes.normal.house;
@@ -139,6 +154,7 @@ test('failed character save safely rolls back construction when the house is unc
     assert.equal(house.funds, 0);
     assert.equal(house.materials, 0);
     assert.equal(house.dailyBuild.leader, undefined);
+    assert.equal(context._clanReadState().members.leader.houseBuilds, 0);
     assert.match(context.alerts.pop(), /協作已取消/);
 });
 
@@ -168,6 +184,7 @@ test('failed character save does not roll back across a newer house transaction'
     assert.equal(house.funds, 100);
     assert.equal(house.materials, 4);
     assert.equal(!!house.dailyBuild.leader, true);
+    assert.equal(context._clanReadState().members.leader.houseBuilds, 1);
     assert.match(context.alerts.pop(), /協作保留並維持金幣扣除/);
 });
 
@@ -257,6 +274,21 @@ test('training immediately recomputes active clan bonuses', () => {
     context.clanHouseTrain();
     assert.equal(recomputes, 1);
     assert.equal(updates, 1);
+    const member = context._clanReadState().members.leader;
+    assert.equal(member.houseTrainings, 1);
+    assert.equal(member.totalContribution, 5);
+});
+
+test('title snapshot exposes persistent house and contribution history in one read', () => {
+    const context = createContext();
+    const state = context._clanNormalizeState(oldClanState());
+    Object.assign(state.members.leader, { totalContribution:1234, houseBuilds:2, houseTrainings:30, houseUpgrades:4 });
+    assert.equal(context._clanWriteState(state), true);
+    const snapshot = context.clanTitleSnapshot({ cls:'royal', enSeed:'leader', classicMode:false });
+    assert.equal(snapshot.totalContribution, 1234);
+    assert.equal(snapshot.houseBuilds, 2);
+    assert.equal(snapshot.houseTrainings, 30);
+    assert.equal(snapshot.houseUpgrades, 4);
 });
 
 test('house markup only uses background classes present in the compiled stylesheet', () => {

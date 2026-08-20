@@ -2,7 +2,11 @@
 (function (global) {
     'use strict';
 
-    const VERSION = 3;
+    const VERSION = 4;
+    const FORGOTTEN_ELITES = [
+        '遺忘之島巨大鱷魚', '遺忘之島卡司特王', '遺忘之島食人妖精王',
+        '遺忘之島獨眼巨人', '遺忘之島飛龍', '遺忘之島巨大牛人'
+    ];
     const CATEGORIES = [
         { id:'achievement', name:'成就', icon:'🏆' },
         { id:'story', name:'劇情', icon:'📜' },
@@ -23,11 +27,19 @@
         { id:'millennial_truth_witness', category:'achievement', name:'千年真相的見證者', icon:'🏺', rarity:'legend', requirement:'完成全部遺物圖鑑。', criterion:'allRelics' },
 
         { id:'antharas_cleanser', category:'story', name:'安塔瑞斯淨化者', icon:'🌿', rarity:'rare', requirement:'擊敗被侵蝕的瘋狂安塔瑞斯。', criterion:'corruptedAntharasKills', value:1 },
-        { id:'kingdom_traitor', category:'story', name:'王國叛徒', icon:'📜', rarity:'rare', requirement:'在特殊劇情或政治事件中作出對應選擇。', criterion:'storyFlag', flag:'kingdomTraitor' },
+        { id:'kingdom_traitor', category:'story', name:'王國叛徒', icon:'📜', rarity:'rare', requirement:'王國分裂事件中，選擇公開被掩藏的歷史。與「王國守護者」互斥，且與國戰光／暗陣營無關。', criterion:'storyFlag', flag:'kingdomTraitor' },
+        { id:'kingdom_guardian', category:'story', name:'王國守護者', icon:'⚜️', rarity:'rare', requirement:'王國分裂事件中，選擇維持現行秩序。與「王國叛徒」互斥，且與國戰光／暗陣營無關。', criterion:'storyFlag', flag:'kingdomGuardian' },
+        { id:'oblivion_explorer', category:'story', name:'迷霧踏破者', icon:'🏝️', rarity:'rare', requirement:'完成依斯巴的航程，親自登上遺忘之島。', criterion:'storyFlag', flag:'oblivionExplorer' },
+        { id:'sunrise_exorcist', category:'story', name:'日出除妖師', icon:'🦊', rarity:'legend', requirement:'擊敗白面金毛九尾狐・殺生石。', criterion:'nineTailedFoxKills', value:1 },
+        { id:'dantes_witness', category:'story', name:'冥皇終焉見證者', icon:'💀', rarity:'legend', requirement:'在崩壞的長老會議廳擊敗真‧死亡騎士 冥皇丹特斯。', criterion:'dantesKills', value:1 },
 
         { id:'clan_companion', category:'clan', name:'同盟之證', icon:'🤝', rarity:'common', requirement:'目前已加入血盟。', criterion:'clanMember', current:true },
         { id:'clan_leader', category:'clan', name:'血盟盟主', icon:'🛡️', rarity:'rare', requirement:'目前為血盟盟主。', criterion:'clanLeader', current:true },
         { id:'dragon_clan_hero', category:'clan', name:'龍族英雄', icon:'🐲', rarity:'legend', requirement:'加入血盟，並在任一陣營累積 240 國戰聲望。', criterion:'clanWarHero' },
+        { id:'house_collaborator', category:'clan', name:'盟屋協力者', icon:'🧱', rarity:'common', requirement:'親自完成一次每日盟屋協作。', criterion:'clanHouseBuilds', value:1 },
+        { id:'tempered_ally', category:'clan', name:'百鍊盟友', icon:'⚒️', rarity:'rare', requirement:'累計完成 30 次盟屋訓練。', criterion:'clanHouseTrainings', value:30 },
+        { id:'clan_pillar', category:'clan', name:'血盟支柱', icon:'🏛️', rarity:'rare', requirement:'在血盟歷史中累計獲得 1,000 貢獻。消耗貢獻不會倒扣進度。', criterion:'clanTotalContribution', value:1000 },
+        { id:'home_architect', category:'clan', name:'盟屋築造者', icon:'🏗️', rarity:'rare', requirement:'作為盟主，親自完成一次盟屋大廳或設施升級。', criterion:'clanHouseUpgrades', value:1 },
 
         { id:'war_recruit', category:'war', name:'陣營新兵', icon:'⚑', rarity:'common', requirement:'任一陣營聲望達 15。', criterion:'warReputation', value:15 },
         { id:'frontline_knight', category:'war', name:'戰線騎士', icon:'⚔️', rarity:'common', requirement:'任一陣營聲望達 50。', criterion:'warReputation', value:50 },
@@ -46,7 +58,9 @@
         { id:'three_castle_conqueror', category:'castle', name:'三城征服者', icon:'🗺️', rarity:'legend', requirement:'曾分別攻下肯特城、風木城與海音城。', criterion:'allCastleWins' },
 
         { id:'abyss_returner', category:'hidden', name:'深淵歸來者', icon:'🜏', rarity:'legend', requirement:'擊敗吉爾塔斯。', criterion:'giltasKills', value:1, hidden:true },
-        { id:'forgotten_one', category:'hidden', name:'被遺忘之人', icon:'✦', rarity:'legend', requirement:'隱藏劇情條件尚未揭露。', criterion:'storyFlag', flag:'forgottenOne', hidden:true }
+        { id:'forgotten_one', category:'hidden', name:'被遺忘之人', icon:'✦', rarity:'legend', requirement:'擊敗遺忘之島的巨大鱷魚、卡司特王、食人妖精王、獨眼巨人、飛龍與巨大牛人。', criterion:'forgottenElites', value:6, hidden:true },
+        { id:'desperate_survivor', category:'hidden', name:'絕境生還者', icon:'♥', rarity:'legend', requirement:'在存活且 HP 不高於 5% 時，親自擊敗一隻非建築頭目。', criterion:'lowHpBossKills', value:1, hidden:true },
+        { id:'double_witness', category:'hidden', name:'雙面見證者', icon:'☽', rarity:'legend', requirement:'曾分別為光與暗陣營累積至少 120 國戰聲望。', criterion:'dualFactionReputation', value:120, hidden:true }
     ];
     const DEFINITION_BY_ID = Object.fromEntries(DEFINITIONS.map(def => [def.id, def]));
 
@@ -59,7 +73,7 @@
             version:VERSION,
             equipped:null,
             unlocked:{},
-            progress:{ goblinKills:0, deathKnightKills:0, kurtKills:0, giltasKills:0, valakasKills:0, corruptedAntharasKills:0, siegeWins:{} },
+            progress:{ goblinKills:0, deathKnightKills:0, kurtKills:0, giltasKills:0, valakasKills:0, corruptedAntharasKills:0, nineTailedFoxKills:0, dantesKills:0, lowHpBossKills:0, forgottenElites:{}, siegeWins:{} },
             storyFlags:{}
         };
     }
@@ -78,6 +92,11 @@
         out.progress.giltasKills = number(progress.giltasKills);
         out.progress.valakasKills = number(progress.valakasKills);
         out.progress.corruptedAntharasKills = number(progress.corruptedAntharasKills);
+        out.progress.nineTailedFoxKills = number(progress.nineTailedFoxKills);
+        out.progress.dantesKills = number(progress.dantesKills);
+        out.progress.lowHpBossKills = number(progress.lowHpBossKills);
+        let forgotten = progress.forgottenElites && typeof progress.forgottenElites === 'object' && !Array.isArray(progress.forgottenElites) ? progress.forgottenElites : {};
+        FORGOTTEN_ELITES.forEach(name => { if (forgotten[name]) out.progress.forgottenElites[name] = true; });
         let wins = progress.siegeWins && typeof progress.siegeWins === 'object' ? progress.siegeWins : {};
         ['kent','windwood','heine'].forEach(city => { out.progress.siegeWins[city] = number(wins[city]); });
         if (source.storyFlags && typeof source.storyFlags === 'object' && !Array.isArray(source.storyFlags)) {
@@ -96,12 +115,21 @@
             case 'giltasKills': return state.progress.giltasKills >= def.value;
             case 'valakasKills': return state.progress.valakasKills >= def.value;
             case 'corruptedAntharasKills': return state.progress.corruptedAntharasKills >= def.value;
+            case 'nineTailedFoxKills': return state.progress.nineTailedFoxKills >= def.value;
+            case 'dantesKills': return state.progress.dantesKills >= def.value;
+            case 'lowHpBossKills': return state.progress.lowHpBossKills >= def.value;
+            case 'forgottenElites': return Object.keys(state.progress.forgottenElites).length >= def.value;
             case 'allRelics': return number(sources.relicTotal) > 0 && number(sources.relicGot) >= number(sources.relicTotal);
             case 'storyFlag': return !!state.storyFlags[def.flag];
             case 'clanMember': return !!sources.clanMember;
             case 'clanLeader': return !!sources.clanLeader;
             case 'clanWarHero': return !!sources.clanMember && number(sources.warReputation) >= 240;
+            case 'clanHouseBuilds': return number(sources.clanHouseBuilds) >= def.value;
+            case 'clanHouseTrainings': return number(sources.clanHouseTrainings) >= def.value;
+            case 'clanTotalContribution': return number(sources.clanTotalContribution) >= def.value;
+            case 'clanHouseUpgrades': return number(sources.clanHouseUpgrades) >= def.value;
             case 'warReputation': return number(sources.warReputation) >= def.value;
+            case 'dualFactionReputation': return number(sources.lightReputation) >= def.value && number(sources.darkReputation) >= def.value;
             case 'warSeason': return Array.isArray(sources.warSeasons) && sources.warSeasons.includes(def.value);
             case 'warSeasonCount': return new Set(Array.isArray(sources.warSeasons) ? sources.warSeasons : []).size >= def.value;
             case 'castleLeader': return !!sources.clanLeader && sources.castleCity === def.city;
@@ -136,6 +164,9 @@
             if (name === '吉爾塔斯') state.progress.giltasKills = number(state.progress.giltasKills + count);
             if (name.includes('巴拉卡斯')) state.progress.valakasKills = number(state.progress.valakasKills + count);
             if (name.includes('被侵蝕的瘋狂安塔瑞斯')) state.progress.corruptedAntharasKills = number(state.progress.corruptedAntharasKills + count);
+            if (name === '白面金毛九尾狐・殺生石') state.progress.nineTailedFoxKills = number(state.progress.nineTailedFoxKills + count);
+            if (name === '真‧死亡騎士 冥皇丹特斯') state.progress.dantesKills = number(state.progress.dantesKills + count);
+            if (FORGOTTEN_ELITES.includes(name)) state.progress.forgottenElites[name] = true;
         });
         return state;
     }
@@ -153,19 +184,28 @@
         return { ok:true, state:state };
     }
 
-    const Core = { VERSION, CATEGORIES, DEFINITIONS, DEFINITION_BY_ID, defaultState, normalize, conditionMet, isAvailable, evaluate, recordKills, recordSiege, setEquipped };
+    function choosePolitics(raw, path) {
+        let state = normalize(raw);
+        if (state.storyFlags.kingdomGuardian || state.storyFlags.kingdomTraitor) return { ok:false, error:'這個角色已經作出政治選擇。', state:state };
+        if (path !== 'guardian' && path !== 'traitor') return { ok:false, error:'無效的政治選擇。', state:state };
+        state.storyFlags[path === 'guardian' ? 'kingdomGuardian' : 'kingdomTraitor'] = true;
+        return { ok:true, state:state };
+    }
+
+    const Core = { VERSION, CATEGORIES, DEFINITIONS, DEFINITION_BY_ID, FORGOTTEN_ELITES, defaultState, normalize, conditionMet, isAvailable, evaluate, recordKills, recordSiege, setEquipped, choosePolitics };
     global.TitleSystemCore = Core;
 
     let activeCategory = 'achievement';
     function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function liveSources() {
-        let clanInfo = null, castleCity = null, clanLeader = false;
+        let clanInfo = null, castleCity = null, clanLeader = false, clanStats = {};
         try {
             if (typeof global.clanTitleSnapshot === 'function') {
                 let snapshot = global.clanTitleSnapshot(player);
                 clanInfo = snapshot && snapshot.member ? { name:snapshot.name } : null;
                 castleCity = snapshot && snapshot.castleCity || null;
                 clanLeader = !!(snapshot && snapshot.leader);
+                clanStats = snapshot || {};
             } else {
                 if (typeof global.clanGetModeInfo === 'function') clanInfo = global.clanGetModeInfo(player);
                 if (typeof global.clanGetCastleCity === 'function') castleCity = global.clanGetCastleCity(player);
@@ -185,7 +225,13 @@
             clanLeader:!!clanLeader,
             clanName:clanInfo ? String(clanInfo.name || '') : '',
             castleCity:castleCity,
+            clanHouseBuilds:number(clanStats.houseBuilds),
+            clanHouseTrainings:number(clanStats.houseTrainings),
+            clanHouseUpgrades:number(clanStats.houseUpgrades),
+            clanTotalContribution:number(clanStats.totalContribution),
             warReputation:warReputation,
+            lightReputation:war ? number(war.reputation.light) : 0,
+            darkReputation:war ? number(war.reputation.dark) : 0,
             warSeasons:warSeasons,
             relicTotal:relicIds.length,
             relicGot:relicIds.filter(id => relicDex[id]).length,
@@ -209,6 +255,11 @@
     function recordKill(mob, count) {
         if (typeof player === 'undefined' || !player || !mob) return;
         player.titleState = recordKills(player.titleState, [{ name:mob.n, count:count || 1 }]);
+        if (mob.boss && mob.race !== '建築' && number(player.hp) > 0 && number(player.mhp) > 0 && number(player.hp) * 20 <= number(player.mhp)) {
+            let state = normalize(player.titleState);
+            state.progress.lowHpBossKills = number(state.progress.lowHpBossKills + 1);
+            player.titleState = state;
+        }
         sync(false);
     }
     function recordOfflineKills(profile, normalKills, bossPlan, normalPlan) {
@@ -233,6 +284,18 @@
         state.storyFlags[String(flag).slice(0, 64)] = true;
         player.titleState = state;
         sync(false);
+    }
+    function choosePoliticalPath(path) {
+        if (typeof player === 'undefined' || !player) return;
+        if (number(player.lv) < 40) { if (typeof global.alert === 'function') global.alert('角色等級達到 40 後才能面對王國分裂事件。'); return; }
+        let label = path === 'guardian' ? '維持現行秩序' : '公開被掩藏的歷史';
+        if (typeof global.confirm === 'function' && !global.confirm(`確定選擇「${label}」？\n這是角色的永久歷史，且不會強迫你選擇國戰光／暗陣營。`)) return;
+        let result = choosePolitics(player.titleState, path);
+        player.titleState = result.state;
+        if (!result.ok) { if (typeof global.alert === 'function') global.alert(result.error); return; }
+        sync(false);
+        renderPanel();
+        try { if (typeof global.saveGame === 'function') global.saveGame(); } catch (e) {}
     }
     function clanLine(sources) {
         if (!sources.clanMember || !sources.clanName) return '';
@@ -292,12 +355,18 @@
         let defs = DEFINITIONS.filter(def => def.category === category.id);
         let got = defs.filter(def => isAvailable(def, state, sources)).length;
         summary.innerHTML = `<span>${category.icon} ${category.name}稱號</span><span>已取得 ${got} / ${defs.length}</span>`;
-        list.innerHTML = defs.map(def => {
+        let politicalChoice = '';
+        if (category.id === 'story' && !state.storyFlags.kingdomGuardian && !state.storyFlags.kingdomTraitor) {
+            let ready = sources.level >= 40;
+            politicalChoice = `<section class="title-system-choice"><strong>⚖️ 王國分裂事件</strong><p>${ready ? '你發現了王國刻意掩藏的歷史。這是獨立的政治選擇，不代表光／暗陣營善惡。' : '角色等級達到 40 後，將面對一次永久的政治選擇。'}</p><div><button type="button" onclick="titleChoosePolitics('guardian')" ${ready ? '' : 'disabled'}>維持現行秩序</button><button type="button" onclick="titleChoosePolitics('traitor')" ${ready ? '' : 'disabled'}>公開被掩藏的歷史</button></div></section>`;
+        }
+        list.innerHTML = politicalChoice + defs.map(def => {
             let available = isAvailable(def, state, sources), equipped = state.equipped === def.id;
             let hidden = def.hidden && !available;
             let name = hidden ? '？？？' : def.name;
             let requirement = hidden ? '達成隱藏條件後才會揭露。' : def.requirement;
-            let action = equipped ? '展示中' : (available ? '點擊展示' : '尚未取得');
+            let exclusive = (def.id === 'kingdom_traitor' && state.storyFlags.kingdomGuardian) || (def.id === 'kingdom_guardian' && state.storyFlags.kingdomTraitor);
+            let action = equipped ? '展示中' : (available ? '點擊展示' : (exclusive ? '互斥・無法取得' : '尚未取得'));
             return `<button type="button" class="title-system-card rarity-${def.rarity}${available ? ' unlocked' : ' locked'}${equipped ? ' equipped' : ''}" onclick="titleEquip('${def.id}')" ${available ? '' : 'disabled'}><span class="title-system-emblem">${hidden ? '？' : def.icon}</span><span class="title-system-copy"><strong>【${esc(name)}】</strong><small>${esc(requirement)}</small></span><span class="title-system-action">${action}</span></button>`;
         }).join('');
     }
@@ -330,6 +399,7 @@
     global.titleRecordOfflineKills = recordOfflineKills;
     global.titleRecordSiege = recordSiegeResult;
     global.titleSetStoryFlag = setStoryFlag;
+    global.titleChoosePolitics = choosePoliticalPath;
     global.refreshTitleDisplay = refreshDisplay;
     global.openTitlePanel = openPanel;
     global.closeTitlePanel = closePanel;

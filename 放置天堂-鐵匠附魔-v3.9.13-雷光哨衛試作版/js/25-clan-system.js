@@ -157,6 +157,10 @@ function _clanDefaultState() {
     };
 }
 
+function _clanMemberDefault(mode) {
+    return { mode:mode === 'classic' ? 'classic' : 'normal', contribution:0, totalContribution:0, houseBuilds:0, houseTrainings:0, houseUpgrades:0, buffOn:false, buffAt:0 };
+}
+
 function _clanHouseDefault() {
     return {
         revision:0,
@@ -423,9 +427,14 @@ function _clanNormalizeState(raw) {
             let m = raw.members[id];
             if (!m || typeof m !== 'object') return;
             let buffAt = Math.max(0, Math.floor(Number(m.buffAt) || 0));
+            let contribution = Math.max(0, Math.min(1000000000000, Math.floor(Number(m.contribution) || 0)));
             out.members[String(id).slice(0, 96)] = {
                 mode:m.mode === 'classic' ? 'classic' : 'normal',
-                contribution:Math.max(0, Math.min(1000000000000, Math.floor(Number(m.contribution) || 0))),
+                contribution:contribution,
+                totalContribution:Math.max(contribution, Math.min(1000000000000, Math.floor(Number(m.totalContribution) || 0))),
+                houseBuilds:Math.max(0, Math.min(1000000, Math.floor(Number(m.houseBuilds) || 0))),
+                houseTrainings:Math.max(0, Math.min(1000000, Math.floor(Number(m.houseTrainings) || 0))),
+                houseUpgrades:Math.max(0, Math.min(1000000, Math.floor(Number(m.houseUpgrades) || 0))),
                 buffOn:!!m.buffOn && buffAt > 0,
                 buffAt:buffAt
             };
@@ -1666,7 +1675,7 @@ function clanSyncCurrentPlayer() {
     if (!id || (st.members[id] && st.members[id].mode === mode)) return true;
     _clanWithLock(live => {
         if (!live.modes[mode]) return { commit:false, error:'血盟已不存在。' };
-        if (!live.members[id]) live.members[id] = { mode:mode, contribution:0, buffOn:false, buffAt:0 };
+        if (!live.members[id]) live.members[id] = _clanMemberDefault(mode);
         return {};
     });
     return true;
@@ -1703,7 +1712,7 @@ function clanCreateFromInput() {
     let result = _clanWithLock(st => {
         if (st.modes[mode]) return { commit:false, error:'此模式已經創立血盟。' };
         st.modes[mode] = { name:name, leaderId:leaderId, faction:faction, createdAt:Date.now(), castle:null };
-        if (!st.members[leaderId]) st.members[leaderId] = { mode:mode, contribution:0, buffOn:false, buffAt:0 };
+        if (!st.members[leaderId]) st.members[leaderId] = _clanMemberDefault(mode);
         return {};
     });
     if (!result.ok) { alert(result.error || '創立血盟失敗。'); return; }
@@ -1741,10 +1750,11 @@ function _clanAdjustContribution(points) {
     let id = clanRoleId(player);
     return _clanWithLock(st => {
         if (!st.modes[mode]) return { commit:false, error:'你尚未加入血盟。' };
-        let member = st.members[id] || (st.members[id] = { mode:mode, contribution:0, buffOn:false, buffAt:0 });
-        if (member.mode !== mode) member = st.members[id] = { mode:mode, contribution:0, buffOn:false, buffAt:0 };
+        let member = st.members[id] || (st.members[id] = _clanMemberDefault(mode));
+        if (member.mode !== mode) member = st.members[id] = _clanMemberDefault(mode);
         if (points < 0 && member.contribution < -points) return { commit:false, error:'貢獻度不足。' };
         member.contribution = Math.max(0, member.contribution + points);
+        member.totalContribution = Math.max(member.contribution, member.totalContribution + points);
         st.xp = Math.max(0, st.xp + points);
         return { contribution:member.contribution, xp:st.xp };
     });
@@ -1770,6 +1780,7 @@ function clanDonateGold() {
         return;
     }
     if (typeof logSys === 'function') logSys(`<span class="text-amber-300">捐獻 ${amount.toLocaleString()} 金幣，獲得 ${points.toLocaleString()} 貢獻與血盟經驗。</span>`);
+    _clanRefreshTitles();
     if (typeof updateUI === 'function') updateUI();
     renderClanTab();
 }
@@ -1789,6 +1800,7 @@ function clanDonateDiamonds() {
         return;
     }
     if (typeof logSys === 'function') logSys(`<span class="text-cyan-300">捐獻 ${amount.toLocaleString()} 顆龍之鑽石，獲得 ${points.toLocaleString()} 貢獻與血盟經驗。</span>`);
+    _clanRefreshTitles();
     if (typeof updateUI === 'function') updateUI();
     renderClanTab();
 }
@@ -1843,7 +1855,7 @@ function clanToggleBuff(on) {
     let mode = clanModeKey(player), id = clanRoleId(player);
     let result = _clanWithLock(st => {
         if (!st.modes[mode]) return { commit:false, error:'你尚未加入血盟。' };
-        let member = st.members[id] || (st.members[id] = { mode:mode, contribution:0, buffOn:false, buffAt:0 });
+        let member = st.members[id] || (st.members[id] = _clanMemberDefault(mode));
         if (on && member.contribution < CLAN_BUFF_HOUR_COST) return { commit:false, error:'至少需要 5 點貢獻才能開啟血盟 Buff。' };
         let partialCharged = false;
         if (!on && member.buffOn && member.buffAt > 0) {
@@ -1935,12 +1947,22 @@ function _clanBuffText(buff) {
 function clanTitleSnapshot(p) {
     let role = p || player, st = _clanReadState();
     let info = st && st.modes[clanModeKey(role)];
+    let member = st && st.members[clanRoleId(role)];
     return {
         member:!!info,
         name:info ? String(info.name || '') : '',
         castleCity:info && info.castle ? info.castle : null,
-        leader:!!(info && info.leaderId && info.leaderId === clanRoleId(role))
+        leader:!!(info && info.leaderId && info.leaderId === clanRoleId(role)),
+        totalContribution:member && member.mode === clanModeKey(role) ? member.totalContribution : 0,
+        houseBuilds:member && member.mode === clanModeKey(role) ? member.houseBuilds : 0,
+        houseTrainings:member && member.mode === clanModeKey(role) ? member.houseTrainings : 0,
+        houseUpgrades:member && member.mode === clanModeKey(role) ? member.houseUpgrades : 0
     };
+}
+
+function _clanRefreshTitles() {
+    try { if (typeof titleSyncUnlocks === 'function') titleSyncUnlocks(false); } catch (e) {}
+    try { if (typeof saveGame === 'function') saveGame(); } catch (e) {}
 }
 
 function setClanPanelView(view) {
@@ -1995,6 +2017,9 @@ function clanHouseDailyBuild() {
         house.funds += funds;
         house.materials += materials;
         house.dailyBuild[id] = day;
+        let member = st.members[id] || (st.members[id] = _clanMemberDefault(mode));
+        if (member.mode !== mode) member = st.members[id] = _clanMemberDefault(mode);
+        member.houseBuilds += 1;
         _clanHouseLog(house, `${_clanHouseMemberName()}完成今日協作：資金 +${funds}、建材 +${materials}`);
         return { funds:funds, materials:materials, revision:_clanHouseTouch(house) };
     });
@@ -2010,6 +2035,8 @@ function clanHouseDailyBuild() {
             house.funds = Math.max(0, house.funds - result.funds);
             house.materials = Math.max(0, house.materials - result.materials);
             delete house.dailyBuild[id];
+            let member = st.members[id];
+            if (member && member.mode === mode) member.houseBuilds = Math.max(0, member.houseBuilds - 1);
             _clanHouseLog(house, `${_clanHouseMemberName()}的今日協作因角色存檔失敗而取消`);
             _clanHouseTouch(house);
             return {};
@@ -2024,6 +2051,7 @@ function clanHouseDailyBuild() {
         renderClanTab();
         return;
     }
+    _clanRefreshTitles();
     if (typeof updateUI === 'function') updateUI();
     if (typeof logSys === 'function') logSys(`<span class="text-amber-300">完成盟屋協作：資金 +${result.funds}、建材 +${result.materials}。</span>`);
     renderClanTab();
@@ -2053,11 +2081,13 @@ function clanHouseUpgrade(kind) {
         if (!info) return { commit:false, error:'你尚未加入血盟。' };
         if (info.leaderId !== id) return { commit:false, error:'只有盟主可以升級盟屋。' };
         let house = info.house = _clanHouseNormalize(info.house);
+        let member = st.members[id] || (st.members[id] = _clanMemberDefault(mode));
+        if (member.mode !== mode) member = st.members[id] = _clanMemberDefault(mode);
         if (kind === 'hall') {
             if (house.level >= CLAN_HOUSE_MAX_LEVEL) return { commit:false, error:'盟屋已達最高等級。' };
             let next = house.level + 1, cost = CLAN_HOUSE_LEVEL_COSTS[next];
             if (house.funds < cost.funds || house.materials < cost.materials) return { commit:false, error:`升級需要 ${cost.funds.toLocaleString()} 資金與 ${cost.materials} 建材。` };
-            house.funds -= cost.funds; house.materials -= cost.materials; house.level = next;
+            house.funds -= cost.funds; house.materials -= cost.materials; house.level = next; member.houseUpgrades += 1;
             _clanHouseLog(house, `${_clanHouseMemberName()}將盟屋大廳升至 Lv.${next}`);
             _clanHouseTouch(house);
             return { name:'盟屋大廳', level:next };
@@ -2068,12 +2098,13 @@ function clanHouseUpgrade(kind) {
         if (current >= house.level) return { commit:false, error:'設施等級不能超過盟屋大廳，請先升級大廳。' };
         let next = current + 1, cost = { funds:150 * next * next, materials:2 * next };
         if (house.funds < cost.funds || house.materials < cost.materials) return { commit:false, error:`升級需要 ${cost.funds.toLocaleString()} 資金與 ${cost.materials} 建材。` };
-        house.funds -= cost.funds; house.materials -= cost.materials; house.facilities[kind] = next;
+        house.funds -= cost.funds; house.materials -= cost.materials; house.facilities[kind] = next; member.houseUpgrades += 1;
         _clanHouseLog(house, `${_clanHouseMemberName()}將${spec.name}升至 Lv.${next}`);
         _clanHouseTouch(house);
         return { name:spec.name, level:next };
     });
     if (!result.ok) { alert(result.error || '盟屋升級失敗。'); return; }
+    _clanRefreshTitles();
     if (typeof logSys === 'function') logSys(`<span class="text-emerald-300">${clanEsc(result.name)}已升至 Lv.${result.level}。</span>`);
     renderClanTab();
 }
@@ -2087,15 +2118,16 @@ function clanHouseTrain() {
         let house = info.house = _clanHouseNormalize(info.house);
         if (house.dailyTraining[id] === day) return { commit:false, error:'此角色今天已完成盟屋訓練。' };
         let points = Math.max(5, house.facilities.training * 5);
-        let member = st.members[id] || (st.members[id] = { mode:mode, contribution:0, buffOn:false, buffAt:0 });
-        if (member.mode !== mode) member = st.members[id] = { mode:mode, contribution:0, buffOn:false, buffAt:0 };
-        member.contribution += points; st.xp += points; house.dailyTraining[id] = day;
+        let member = st.members[id] || (st.members[id] = _clanMemberDefault(mode));
+        if (member.mode !== mode) member = st.members[id] = _clanMemberDefault(mode);
+        member.contribution += points; member.totalContribution += points; member.houseTrainings += 1; st.xp += points; house.dailyTraining[id] = day;
         _clanHouseLog(house, `${_clanHouseMemberName()}完成訓練：貢獻 +${points}`);
         _clanHouseTouch(house);
         return { points:points };
     });
     if (!result.ok) { alert(result.error || '盟屋訓練失敗。'); return; }
     if (typeof calcStats === 'function') calcStats();
+    _clanRefreshTitles();
     if (typeof updateUI === 'function') updateUI();
     if (typeof logSys === 'function') logSys(`<span class="text-cyan-300">完成盟屋訓練，獲得 ${result.points} 貢獻。</span>`);
     renderClanTab();

@@ -6,6 +6,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'js', '68-title-system.js'), 'utf8');
 const worldSource = fs.readFileSync(path.join(__dirname, '..', 'js', '11-world-map.js'), 'utf8');
+const killSource = fs.readFileSync(path.join(__dirname, '..', 'js', '05-kill-progression.js'), 'utf8');
 const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const context = { console };
 vm.createContext(context);
@@ -19,7 +20,13 @@ function sources(overrides) {
         clanMember:false,
         clanLeader:false,
         castleCity:null,
+        clanHouseBuilds:0,
+        clanHouseTrainings:0,
+        clanHouseUpgrades:0,
+        clanTotalContribution:0,
         warReputation:0,
+        lightReputation:0,
+        darkReputation:0,
         warSeasons:[],
         relicGot:0,
         relicTotal:10,
@@ -49,9 +56,12 @@ test('old characters start without an equipped title', () => {
     assert.deepEqual(Object.keys(state.unlocked), []);
 });
 
-test('title catalogue contains 30 unique titles across all six categories', () => {
-    assert.equal(core.DEFINITIONS.length, 30);
-    assert.equal(new Set(core.DEFINITIONS.map(def => def.id)).size, 30);
+test('title catalogue contains 40 unique titles across all six categories', () => {
+    assert.equal(core.DEFINITIONS.length, 40);
+    assert.equal(new Set(core.DEFINITIONS.map(def => def.id)).size, 40);
+    assert.deepEqual(Object.fromEntries(core.CATEGORIES.map(category => [category.id, core.DEFINITIONS.filter(def => def.category === category.id).length])), {
+        achievement:9, story:6, clan:7, war:7, castle:7, hidden:4
+    });
     core.CATEGORIES.forEach(category => {
         assert.ok(core.DEFINITIONS.some(def => def.category === category.id), category.id);
     });
@@ -64,7 +74,7 @@ test('version-one title saves migrate without losing existing progress or unlock
         unlocked:{ goblin_slayer:123 },
         progress:{ goblinKills:10000, valakasKills:1, siegeWins:{ kent:1 } }
     });
-    assert.equal(state.version, 3);
+    assert.equal(state.version, 4);
     assert.equal(state.equipped, 'goblin_slayer');
     assert.equal(state.unlocked.goblin_slayer, 123);
     assert.equal(state.progress.goblinKills, 10000);
@@ -73,6 +83,8 @@ test('version-one title saves migrate without losing existing progress or unlock
     assert.equal(state.progress.deathKnightKills, 0);
     assert.equal(state.progress.kurtKills, 0);
     assert.equal(state.progress.giltasKills, 0);
+    assert.equal(state.progress.lowHpBossKills, 0);
+    assert.deepEqual(Object.keys(state.progress.forgottenElites), []);
 });
 
 test('level and gold milestone titles become permanent after first unlock', () => {
@@ -107,6 +119,37 @@ test('dragon and story boss titles use exact target names', () => {
     const result = core.evaluate(state, sources());
     assert.equal(!!result.state.unlocked.fire_dragon_slayer, true);
     assert.equal(!!result.state.unlocked.antharas_cleanser, true);
+});
+
+test('new story bosses use their final exact forms', () => {
+    let state = core.recordKills(null, [
+        { name:'白面金毛九尾狐・九尾', count:1 },
+        { name:'死亡騎士', count:1 }
+    ]);
+    let result = core.evaluate(state, sources());
+    assert.equal(result.state.unlocked.sunrise_exorcist, undefined);
+    assert.equal(result.state.unlocked.dantes_witness, undefined);
+    state = core.recordKills(state, [
+        { name:'白面金毛九尾狐・殺生石', count:1 },
+        { name:'真‧死亡騎士 冥皇丹特斯', count:1 }
+    ]);
+    result = core.evaluate(state, sources());
+    assert.equal(!!result.state.unlocked.sunrise_exorcist, true);
+    assert.equal(!!result.state.unlocked.dantes_witness, true);
+});
+
+test('kingdom political choice is permanent, exclusive, and independent from war factions', () => {
+    let result = core.choosePolitics(null, 'guardian');
+    assert.equal(result.ok, true);
+    assert.equal(result.state.storyFlags.kingdomGuardian, true);
+    assert.equal(core.evaluate(result.state, sources({ lightReputation:500, darkReputation:500 })).state.unlocked.kingdom_guardian > 0, true);
+    const rejected = core.choosePolitics(result.state, 'traitor');
+    assert.equal(rejected.ok, false);
+    assert.equal(rejected.state.storyFlags.kingdomTraitor, undefined);
+});
+
+test('reaching Forgotten Island sets the story flag at the real transition', () => {
+    assert.match(killSource, /function oblivionOnPortalKill\(\)[\s\S]*titleSetStoryFlag\('oblivionExplorer'\)/);
 });
 
 test('death knight and Kurt titles count only their exact bosses', () => {
@@ -218,6 +261,17 @@ test('national-war, clan and relic conditions unlock independently', () => {
     });
 });
 
+test('clan house history unlocks four permanent clan titles', () => {
+    const result = core.evaluate(null, sources({
+        clanMember:true,
+        clanHouseBuilds:1,
+        clanHouseTrainings:30,
+        clanHouseUpgrades:1,
+        clanTotalContribution:1000
+    }));
+    ['house_collaborator','tempered_ally','home_architect','clan_pillar'].forEach(id => assert.equal(!!result.state.unlocked[id], true, id));
+});
+
 test('three-season veteran requires three distinct participated seasons', () => {
     let result = core.evaluate(null, sources({ warSeasons:[2, 2, 4] }));
     assert.equal(result.state.unlocked.three_season_veteran, undefined);
@@ -240,6 +294,36 @@ test('Giltas unlocks the hidden abyss returner title by exact boss name', () => 
     result = core.evaluate(state, sources());
     assert.equal(!!result.state.unlocked.abyss_returner, true);
     assert.equal(core.DEFINITION_BY_ID.abyss_returner.hidden, true);
+});
+
+test('all six distinct Forgotten Island elites unlock the hidden title', () => {
+    let state = core.recordKills(null, core.FORGOTTEN_ELITES.slice(0, 5).map(name => ({ name, count:99 })));
+    let result = core.evaluate(state, sources());
+    assert.equal(result.state.unlocked.forgotten_one, undefined);
+    state = core.recordKills(state, [{ name:core.FORGOTTEN_ELITES[5], count:1 }]);
+    result = core.evaluate(state, sources());
+    assert.equal(!!result.state.unlocked.forgotten_one, true);
+});
+
+test('hidden dual-faction title requires historical reputation in both camps', () => {
+    let result = core.evaluate(null, sources({ lightReputation:120, darkReputation:119, warReputation:120 }));
+    assert.equal(result.state.unlocked.double_witness, undefined);
+    result = core.evaluate(result.state, sources({ lightReputation:120, darkReputation:120, warReputation:120 }));
+    assert.equal(!!result.state.unlocked.double_witness, true);
+});
+
+test('online boss victory at five-percent HP unlocks the survival title', () => {
+    const context = runtimeContext({ hp:5, mhp:100 });
+    context.titleRecordKill({ n:'測試頭目', boss:true }, 1);
+    assert.equal(!!context.player.titleState.unlocked.desperate_survivor, true);
+
+    const safe = runtimeContext({ hp:6, mhp:100 });
+    safe.titleRecordKill({ n:'測試頭目', boss:true }, 1);
+    assert.equal(safe.player.titleState.unlocked.desperate_survivor, undefined);
+
+    const structure = runtimeContext({ hp:1, mhp:100 });
+    structure.titleRecordKill({ n:'遺忘之島', boss:true, race:'建築' }, 1);
+    assert.equal(structure.player.titleState.unlocked.desperate_survivor, undefined);
 });
 
 test('hidden titles do not unlock or expose a display by default', () => {
