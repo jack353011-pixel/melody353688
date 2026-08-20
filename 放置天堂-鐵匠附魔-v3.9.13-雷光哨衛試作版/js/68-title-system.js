@@ -2,7 +2,7 @@
 (function (global) {
     'use strict';
 
-    const VERSION = 5;
+    const VERSION = 6;
     const FORGOTTEN_ELITES = [
         '遺忘之島巨大鱷魚', '遺忘之島卡司特王', '遺忘之島食人妖精王',
         '遺忘之島獨眼巨人', '遺忘之島飛龍', '遺忘之島巨大牛人'
@@ -62,6 +62,7 @@
         { id:'tempered_ally', category:'clan', name:'百鍊盟友', icon:'⚒️', rarity:'rare', requirement:'累計完成 30 次盟屋訓練。', criterion:'clanHouseTrainings', value:30 },
         { id:'clan_pillar', category:'clan', name:'血盟支柱', icon:'🏛️', rarity:'rare', requirement:'在血盟歷史中累計獲得 1,000 貢獻。消耗貢獻不會倒扣進度。', criterion:'clanTotalContribution', value:1000 },
         { id:'home_architect', category:'clan', name:'盟屋築造者', icon:'🏗️', rarity:'rare', requirement:'作為盟主，親自完成一次盟屋大廳或設施升級。', criterion:'clanHouseUpgrades', value:1 },
+        { id:'clan_home_heart', category:'clan', name:'盟屋之心', icon:'🏠', rarity:'legend', requirement:'所屬血盟的盟屋大廳達到 Lv.5。', criterion:'clanHouseLevel', value:5 },
 
         { id:'war_recruit', category:'war', name:'陣營新兵', icon:'⚑', rarity:'common', requirement:'任一陣營聲望達 15。', criterion:'warReputation', value:15 },
         { id:'frontline_knight', category:'war', name:'戰線騎士', icon:'⚔️', rarity:'common', requirement:'任一陣營聲望達 50。', criterion:'warReputation', value:50 },
@@ -164,6 +165,7 @@
             case 'clanHouseTrainings': return number(sources.clanHouseTrainings) >= def.value;
             case 'clanTotalContribution': return number(sources.clanTotalContribution) >= def.value;
             case 'clanHouseUpgrades': return number(sources.clanHouseUpgrades) >= def.value;
+            case 'clanHouseLevel': return number(sources.clanHouseLevel) >= def.value;
             case 'warReputation': return number(sources.warReputation) >= def.value;
             case 'dualFactionReputation': return number(sources.lightReputation) >= def.value && number(sources.darkReputation) >= def.value;
             case 'warSeason': return Array.isArray(sources.warSeasons) && sources.warSeasons.includes(def.value);
@@ -278,6 +280,7 @@
             clanHouseBuilds:number(clanStats.houseBuilds),
             clanHouseTrainings:number(clanStats.houseTrainings),
             clanHouseUpgrades:number(clanStats.houseUpgrades),
+            clanHouseLevel:number(clanStats.houseLevel),
             clanTotalContribution:number(clanStats.totalContribution),
             warReputation:warReputation,
             lightReputation:war ? number(war.reputation.light) : 0,

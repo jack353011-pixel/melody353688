@@ -122,7 +122,7 @@ test('war room grants a bounded national-war-only chance bonus', () => {
     assert.equal(context.clanHouseWarBonus({ cls:'knight', enSeed:'member', classicMode:true }), 0);
 });
 
-test('daily construction charges once and cannot be repeated by another role in the same clan', () => {
+test('daily construction is once per role and gives shared resources plus personal contribution', () => {
     const context = createContext();
     assert.equal(context._clanWriteState(context._clanNormalizeState(oldClanState())), true);
     context.player = { cls:'royal', enSeed:'leader', name:'盟主', gold:20000, classicMode:false };
@@ -131,15 +131,23 @@ test('daily construction charges once and cannot be repeated by another role in 
     context.clanHouseDailyBuild();
     let house = context._clanReadState().modes.normal.house;
     assert.equal(context.player.gold, 10000);
-    assert.equal(house.funds, 500);
-    assert.equal(house.materials, 10);
+    assert.equal(house.funds, 200);
+    assert.equal(house.materials, 3);
     assert.equal(context._clanReadState().members.member.houseBuilds, 1);
+    assert.equal(context._clanReadState().members.member.contribution, 5);
 
     context.clanHouseDailyBuild();
     house = context._clanReadState().modes.normal.house;
     assert.equal(context.player.gold, 10000);
-    assert.equal(house.funds, 500);
-    assert.match(context.alerts.pop(), /血盟今天已完成/);
+    assert.equal(house.funds, 200);
+    assert.match(context.alerts.pop(), /此角色今天已完成/);
+
+    context.player.enSeed = 'second';
+    context.player.name = '第二成員';
+    context.clanHouseDailyBuild();
+    house = context._clanReadState().modes.normal.house;
+    assert.equal(house.funds, 400);
+    assert.equal(house.materials, 6);
 });
 
 test('failed character save safely rolls back construction when the house is unchanged', () => {
@@ -160,7 +168,10 @@ test('failed character save safely rolls back construction when the house is unc
 
 test('failed character save does not roll back across a newer house transaction', () => {
     const context = createContext();
-    assert.equal(context._clanWriteState(context._clanNormalizeState(oldClanState())), true);
+    const seeded = context._clanNormalizeState(oldClanState());
+    seeded.modes.normal.house.funds = 400;
+    seeded.modes.normal.house.materials = 6;
+    assert.equal(context._clanWriteState(seeded), true);
     context.player = { cls:'royal', enSeed:'leader', name:'盟主', gold:20000, classicMode:false };
     let saves = 0;
     context.saveGame = () => {
@@ -181,8 +192,8 @@ test('failed character save does not roll back across a newer house transaction'
     const house = context._clanReadState().modes.normal.house;
     assert.equal(context.player.gold, 10000);
     assert.equal(house.level, 2);
-    assert.equal(house.funds, 100);
-    assert.equal(house.materials, 4);
+    assert.equal(house.funds, 200);
+    assert.equal(house.materials, 3);
     assert.equal(!!house.dailyBuild.leader, true);
     assert.equal(context._clanReadState().members.leader.houseBuilds, 1);
     assert.match(context.alerts.pop(), /協作保留並維持金幣扣除/);
@@ -234,18 +245,18 @@ test('catch-up mode blocks gold and recovery transactions without consuming reso
     assert.equal(context.alerts.filter(message => /結算離線進度/.test(message)).length, 2);
 });
 
-test('daily construction refuses partial rewards near the storage cap', () => {
+test('daily construction refuses partial resource rewards near the storage cap', () => {
     const context = createContext();
     const state = context._clanNormalizeState(oldClanState());
-    state.modes.normal.house.funds = 3700;
-    state.modes.normal.house.materials = 75;
+    state.modes.normal.house.funds = 3900;
+    state.modes.normal.house.materials = 78;
     assert.equal(context._clanWriteState(state), true);
     context.player = { cls:'royal', enSeed:'leader', name:'盟主', gold:20000, classicMode:false };
     context.clanHouseDailyBuild();
     const house = context._clanReadState().modes.normal.house;
     assert.equal(context.player.gold, 20000);
-    assert.equal(house.funds, 3700);
-    assert.equal(house.materials, 75);
+    assert.equal(house.funds, 3900);
+    assert.equal(house.materials, 78);
     assert.match(context.alerts.pop(), /容量不足/);
 });
 
@@ -279,6 +290,68 @@ test('training immediately recomputes active clan bonuses', () => {
     assert.equal(member.totalContribution, 5);
 });
 
+test('only the first five daily collaborators add shared resources', () => {
+    const context = createContext();
+    assert.equal(context._clanWriteState(context._clanNormalizeState(oldClanState())), true);
+    for (let i = 1; i <= 6; i++) {
+        context.player = { cls:'knight', enSeed:`member-${i}`, name:`成員${i}`, gold:20000, classicMode:false };
+        context.clanHouseDailyBuild();
+    }
+    const state = context._clanReadState();
+    assert.equal(state.modes.normal.house.funds, 1000);
+    assert.equal(state.modes.normal.house.materials, 15);
+    assert.equal(state.members['member-6'].contribution, 5);
+    assert.equal(state.members['member-6'].houseBuilds, 1);
+});
+
+test('level-five lounge allows two uses and restores statuses plus living companions', () => {
+    const context = createContext();
+    const state = context._clanNormalizeState(oldClanState());
+    state.modes.normal.house.level = 5;
+    state.modes.normal.house.facilities.lounge = 5;
+    assert.equal(context._clanWriteState(state), true);
+    const ally = { curHp:10, mhp:80, mp:2, mmp:30, _downed:false };
+    const pet = { hp:3, mhp:40, mp:1, mmp:10, _downed:false };
+    const summon = { hp:4, mhp:60, _downed:false };
+    context.player = { cls:'royal', enSeed:'leader', name:'盟主', hp:20, mhp:100, mp:5, mmp:50, dead:false, classicMode:false, statuses:{ poison:99 }, allies:[ally] };
+    context.petsOutList = () => [pet];
+    context.petMhpEff = value => value.mhp;
+    context.summonV2List = () => [summon];
+    context.clanHouseRest();
+    context.player.hp = 50;
+    context.clanHouseRest();
+    context.clanHouseRest();
+    const house = context._clanReadState().modes.normal.house;
+    assert.equal(house.dailyRest.leader.count, 2);
+    assert.equal(context.player.hp, 100);
+    assert.equal(context.player.statuses.poison, 0);
+    assert.equal(ally.curHp, 80);
+    assert.equal(pet.hp, 40);
+    assert.equal(summon.hp, 60);
+    assert.equal(context.clanHouseRestRegenBonus(context.player).hp, 10);
+    assert.match(context.alerts.pop(), /已用完/);
+});
+
+test('hall visitor and commission unlock at their intended levels', () => {
+    const context = createContext();
+    const state = context._clanNormalizeState(oldClanState());
+    state.modes.normal.house.level = 3;
+    state.modes.normal.house.materials = 10;
+    assert.equal(context._clanWriteState(state), true);
+    context.player = { cls:'royal', enSeed:'leader', name:'盟主', gold:0, hp:100, mhp:100, mp:50, mmp:50, dead:false, classicMode:false };
+    context.clanHouseVisitorTrade();
+    let house = context._clanReadState().modes.normal.house;
+    assert.equal(house.funds, 500);
+    assert.equal(house.materials, 0);
+    context.clanHouseCommission();
+    assert.match(context.alerts.pop(), /先完成今日訓練/);
+    context.clanHouseTrain();
+    context.clanHouseCommission();
+    const member = context._clanReadState().members.leader;
+    assert.equal(member.contribution, 10);
+    assert.equal(member.totalContribution, 10);
+});
+
 test('title snapshot exposes persistent house and contribution history in one read', () => {
     const context = createContext();
     const state = context._clanNormalizeState(oldClanState());
@@ -289,6 +362,7 @@ test('title snapshot exposes persistent house and contribution history in one re
     assert.equal(snapshot.houseBuilds, 2);
     assert.equal(snapshot.houseTrainings, 30);
     assert.equal(snapshot.houseUpgrades, 4);
+    assert.equal(snapshot.houseLevel, 1);
 });
 
 test('house markup only uses background classes present in the compiled stylesheet', () => {

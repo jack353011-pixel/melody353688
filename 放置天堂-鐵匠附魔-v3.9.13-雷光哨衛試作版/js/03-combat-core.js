@@ -948,6 +948,7 @@ function _regenHP() {
         let baseHpRegen = player.d.hpRegenMax > 0 ? roll(1, player.d.hpRegenMax) : 0;
         // 使用 Number() 強制轉換為數字，避免 10 + '1' = 101 的字串相加 Bug
         let totalHpRegen = Number(baseHpRegen) + Number(player.d.hpR || 0);
+        if (typeof clanHouseRestRegenBonus === 'function') totalHpRegen += Number(clanHouseRestRegenBonus(player).hp || 0);
         if (totalHpRegen > 0) {
             player.hp = Math.min(player.mhp, player.hp + totalHpRegen);
         }
@@ -959,6 +960,7 @@ function _regenMP() {
     if(player.mp < player.mmp && (_loadFreeRegen || (player.d.loadTier||0) < 1)) {
         // 同樣加上 Number() 保護
         let totalMpRegen = Number(player.d.mpR || 0);
+        if (typeof clanHouseRestRegenBonus === 'function') totalMpRegen += Number(clanHouseRestRegenBonus(player).mp || 0);
         if (player.d.lowMpRegenBonus && player.mp < player.mmp * 0.15) totalMpRegen += player.d.lowMpRegenBonus;   // 🐍 蛇神的凝視：MP<15% 時 MP自然恢復量額外 +N
         if (totalMpRegen > 0) {
             player.mp = Math.min(player.mmp, player.mp + totalMpRegen);

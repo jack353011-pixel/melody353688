@@ -8,8 +8,10 @@ const CLAN_BUFF_HOUR_MS = 60 * 60 * 1000;
 const CLAN_BUFF_HOUR_COST = 5;
 const CLAN_HOUSE_MAX_LEVEL = 5;
 const CLAN_HOUSE_DAILY_GOLD_COST = 10000;
-const CLAN_HOUSE_DAILY_FUNDS = 500;
-const CLAN_HOUSE_DAILY_MATERIALS = 10;
+const CLAN_HOUSE_DAILY_MEMBER_LIMIT = 5;
+const CLAN_HOUSE_DAILY_FUNDS = 200;
+const CLAN_HOUSE_DAILY_MATERIALS = 3;
+const CLAN_HOUSE_DAILY_POINTS = 5;
 const CLAN_HOUSE_LEVEL_COSTS = {
     2:{ funds:400, materials:6 },
     3:{ funds:1200, materials:18 },
@@ -17,10 +19,10 @@ const CLAN_HOUSE_LEVEL_COSTS = {
     5:{ funds:7000, materials:80 }
 };
 const CLAN_HOUSE_FACILITIES = {
-    warehouse:{ icon:'📦', name:'建材倉庫', effect:level => `盟屋資金上限 ${(2000 + level * 2000).toLocaleString()}、建材上限 ${40 + level * 40}（不存放裝備道具）` },
+    warehouse:{ icon:'📦', name:'盟屋資源庫', effect:level => `盟屋資金上限 ${(2000 + level * 2000).toLocaleString()}、建材上限 ${40 + level * 40}（只存建設資源，不存裝備道具）` },
     training:{ icon:'⚔️', name:'訓練場', effect:level => `每日訓練可獲得 ${level * 5} 貢獻` },
     warRoom:{ icon:'🗺️', name:'作戰室', effect:level => `國戰成功率最多 +${level}%（總成功率上限 88%）` },
-    lounge:{ icon:'🛏️', name:'休息室', effect:level => `每日可完全恢復 HP、MP 一次` }
+    lounge:{ icon:'🛏️', name:'休息室', effect:level => level >= 5 ? '每日兩次：全復 HP、MP、淨化異常、恢復隊伍，並獲得 60 分鐘充分休息' : level >= 4 ? '全復 HP、MP、淨化異常、恢復隊伍，並獲得 60 分鐘充分休息' : level >= 3 ? '全復 HP、MP、淨化異常，並恢復存活的傭兵、寵物與召喚物' : level >= 2 ? '每日全復 HP、MP 並淨化異常一次' : '每日可完全恢復 HP、MP 一次' }
 };
 const CLAN_LEVEL_COSTS = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000, 250000];
 const CLAN_BUFF_BY_LEVEL = [
@@ -171,6 +173,9 @@ function _clanHouseDefault() {
         dailyBuild:{},
         dailyTraining:{},
         dailyRest:{},
+        dailyCommission:{},
+        visitorDay:'',
+        completedAt:0,
         logs:[]
     };
 }
@@ -181,6 +186,19 @@ function _clanHouseNormalizeDaily(raw) {
     Object.keys(raw).slice(-128).forEach(id => {
         let day = String(raw[id] || '').slice(0, 10);
         if (/^\d{4}-\d{2}-\d{2}$/.test(day)) out[String(id).slice(0, 96)] = day;
+    });
+    return out;
+}
+
+function _clanHouseNormalizeRest(raw) {
+    let out = {};
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+    Object.keys(raw).slice(-128).forEach(id => {
+        let value = raw[id], day = typeof value === 'string' ? value : value && value.day;
+        day = String(day || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+        let count = typeof value === 'string' ? 1 : Math.max(1, Math.min(2, Math.floor(Number(value.count) || 1)));
+        out[String(id).slice(0, 96)] = { day:day, count:count };
     });
     return out;
 }
@@ -201,7 +219,11 @@ function _clanHouseNormalize(raw) {
     out.materials = Math.min(out.materials, caps.materials);
     out.dailyBuild = _clanHouseNormalizeDaily(raw.dailyBuild);
     out.dailyTraining = _clanHouseNormalizeDaily(raw.dailyTraining);
-    out.dailyRest = _clanHouseNormalizeDaily(raw.dailyRest);
+    out.dailyRest = _clanHouseNormalizeRest(raw.dailyRest);
+    out.dailyCommission = _clanHouseNormalizeDaily(raw.dailyCommission);
+    let visitorDay = String(raw.visitorDay || '').slice(0, 10);
+    out.visitorDay = /^\d{4}-\d{2}-\d{2}$/.test(visitorDay) ? visitorDay : '';
+    out.completedAt = Math.max(0, Math.floor(Number(raw.completedAt) || 0));
     out.logs = (Array.isArray(raw.logs) ? raw.logs : []).map(item => {
         if (!item || typeof item !== 'object') return null;
         let text = String(item.text || '').trim().slice(0, 120);
@@ -1956,7 +1978,8 @@ function clanTitleSnapshot(p) {
         totalContribution:member && member.mode === clanModeKey(role) ? member.totalContribution : 0,
         houseBuilds:member && member.mode === clanModeKey(role) ? member.houseBuilds : 0,
         houseTrainings:member && member.mode === clanModeKey(role) ? member.houseTrainings : 0,
-        houseUpgrades:member && member.mode === clanModeKey(role) ? member.houseUpgrades : 0
+        houseUpgrades:member && member.mode === clanModeKey(role) ? member.houseUpgrades : 0,
+        houseLevel:info && info.house ? _clanHouseNormalize(info.house).level : 0
     };
 }
 
@@ -1989,8 +2012,18 @@ function _clanHouseMemberName() {
     return _clanRoleDisplayName(typeof player !== 'undefined' ? player : null);
 }
 
-function _clanHouseBuildUsedToday(house, day) {
-    return Object.keys(house && house.dailyBuild || {}).some(id => house.dailyBuild[id] === day);
+function _clanHouseBuildCountToday(house, day) {
+    return Object.keys(house && house.dailyBuild || {}).filter(id => house.dailyBuild[id] === day).length;
+}
+
+function _clanHouseBuildUsedBy(house, id, day) {
+    return !!(house && house.dailyBuild && house.dailyBuild[id] === day);
+}
+
+function _clanHouseRestUses(house, id, day) {
+    let marker = house && house.dailyRest && house.dailyRest[id];
+    if (typeof marker === 'string') return marker === day ? 1 : 0;
+    return marker && marker.day === day ? Math.max(0, Math.min(2, Math.floor(Number(marker.count) || 0))) : 0;
 }
 
 function clanHouseDailyBuild() {
@@ -2000,28 +2033,36 @@ function clanHouseDailyBuild() {
     let mode = clanModeKey(player), id = clanRoleId(player), day = _clanHouseDay();
     let preview = _clanReadState(), previewInfo = preview && preview.modes[mode], previewHouse = previewInfo && _clanHouseNormalize(previewInfo.house);
     if (!previewHouse) { alert('你尚未加入血盟。'); return; }
-    if (_clanHouseBuildUsedToday(previewHouse, day)) { alert('此血盟今天已完成盟屋協作。'); return; }
+    if (_clanHouseBuildUsedBy(previewHouse, id, day)) { alert('此角色今天已完成盟屋協作。'); return; }
+    let previewCount = _clanHouseBuildCountToday(previewHouse, day), resourceEligible = previewCount < CLAN_HOUSE_DAILY_MEMBER_LIMIT;
     let previewCaps = _clanHouseCaps(previewHouse);
-    if (previewCaps.funds - previewHouse.funds < CLAN_HOUSE_DAILY_FUNDS || previewCaps.materials - previewHouse.materials < CLAN_HOUSE_DAILY_MATERIALS) { alert('盟屋剩餘容量不足以取得完整協作資源，請先升級或使用現有資源。'); return; }
-    if (typeof confirm === 'function' && !confirm(`確定花費 ${CLAN_HOUSE_DAILY_GOLD_COST.toLocaleString()} 金幣進行今日盟屋協作？\n每個血盟每天只能完成一次。`)) return;
+    if (resourceEligible && (previewCaps.funds - previewHouse.funds < CLAN_HOUSE_DAILY_FUNDS || previewCaps.materials - previewHouse.materials < CLAN_HOUSE_DAILY_MATERIALS)) { alert('盟屋剩餘容量不足以取得完整協作資源，請先升級或使用現有資源。'); return; }
+    let confirmText = resourceEligible
+        ? `確定花費 ${CLAN_HOUSE_DAILY_GOLD_COST.toLocaleString()} 金幣進行今日盟屋協作？\n將獲得 ${CLAN_HOUSE_DAILY_POINTS} 貢獻，並為盟屋增加 ${CLAN_HOUSE_DAILY_FUNDS} 資金與 ${CLAN_HOUSE_DAILY_MATERIALS} 建材。`
+        : `今日共享資源名額已滿。\n仍要花費 ${CLAN_HOUSE_DAILY_GOLD_COST.toLocaleString()} 金幣協作，只獲得 ${CLAN_HOUSE_DAILY_POINTS} 貢獻嗎？`;
+    if (typeof confirm === 'function' && !confirm(confirmText)) return;
     player.gold -= CLAN_HOUSE_DAILY_GOLD_COST;
     let result = _clanWithLock(st => {
         let info = st.modes[mode];
         if (!info) return { commit:false, error:'你尚未加入血盟。' };
         let house = info.house = _clanHouseNormalize(info.house);
-        if (_clanHouseBuildUsedToday(house, day)) return { commit:false, error:'此血盟今天已完成盟屋協作。' };
+        if (_clanHouseBuildUsedBy(house, id, day)) return { commit:false, error:'此角色今天已完成盟屋協作。' };
+        let eligible = _clanHouseBuildCountToday(house, day) < CLAN_HOUSE_DAILY_MEMBER_LIMIT;
         let caps = _clanHouseCaps(house);
-        if (caps.funds - house.funds < CLAN_HOUSE_DAILY_FUNDS || caps.materials - house.materials < CLAN_HOUSE_DAILY_MATERIALS) return { commit:false, error:'盟屋剩餘容量不足以取得完整協作資源，請先升級或使用現有資源。' };
-        let funds = CLAN_HOUSE_DAILY_FUNDS;
-        let materials = CLAN_HOUSE_DAILY_MATERIALS;
+        if (eligible && (caps.funds - house.funds < CLAN_HOUSE_DAILY_FUNDS || caps.materials - house.materials < CLAN_HOUSE_DAILY_MATERIALS)) return { commit:false, error:'盟屋剩餘容量不足以取得完整協作資源，請先升級或使用現有資源。' };
+        let funds = eligible ? CLAN_HOUSE_DAILY_FUNDS : 0;
+        let materials = eligible ? CLAN_HOUSE_DAILY_MATERIALS : 0;
         house.funds += funds;
         house.materials += materials;
         house.dailyBuild[id] = day;
         let member = st.members[id] || (st.members[id] = _clanMemberDefault(mode));
         if (member.mode !== mode) member = st.members[id] = _clanMemberDefault(mode);
         member.houseBuilds += 1;
-        _clanHouseLog(house, `${_clanHouseMemberName()}完成今日協作：資金 +${funds}、建材 +${materials}`);
-        return { funds:funds, materials:materials, revision:_clanHouseTouch(house) };
+        member.contribution += CLAN_HOUSE_DAILY_POINTS;
+        member.totalContribution += CLAN_HOUSE_DAILY_POINTS;
+        st.xp += CLAN_HOUSE_DAILY_POINTS;
+        _clanHouseLog(house, `${_clanHouseMemberName()}完成今日協作：貢獻 +${CLAN_HOUSE_DAILY_POINTS}${eligible ? `、資金 +${funds}、建材 +${materials}` : '（共享資源名額已滿）'}`);
+        return { funds:funds, materials:materials, points:CLAN_HOUSE_DAILY_POINTS, revision:_clanHouseTouch(house) };
     });
     if (!result.ok) {
         player.gold += CLAN_HOUSE_DAILY_GOLD_COST;
@@ -2036,7 +2077,12 @@ function clanHouseDailyBuild() {
             house.materials = Math.max(0, house.materials - result.materials);
             delete house.dailyBuild[id];
             let member = st.members[id];
-            if (member && member.mode === mode) member.houseBuilds = Math.max(0, member.houseBuilds - 1);
+            if (member && member.mode === mode) {
+                member.houseBuilds = Math.max(0, member.houseBuilds - 1);
+                member.contribution = Math.max(0, member.contribution - result.points);
+                member.totalContribution = Math.max(0, member.totalContribution - result.points);
+            }
+            st.xp = Math.max(0, st.xp - result.points);
             _clanHouseLog(house, `${_clanHouseMemberName()}的今日協作因角色存檔失敗而取消`);
             _clanHouseTouch(house);
             return {};
@@ -2053,7 +2099,8 @@ function clanHouseDailyBuild() {
     }
     _clanRefreshTitles();
     if (typeof updateUI === 'function') updateUI();
-    if (typeof logSys === 'function') logSys(`<span class="text-amber-300">完成盟屋協作：資金 +${result.funds}、建材 +${result.materials}。</span>`);
+    if (typeof calcStats === 'function') calcStats();
+    if (typeof logSys === 'function') logSys(`<span class="text-amber-300">完成盟屋協作：貢獻 +${result.points}${result.funds ? `、資金 +${result.funds}、建材 +${result.materials}` : '，今日共享資源名額已滿'}。</span>`);
     renderClanTab();
 }
 
@@ -2088,7 +2135,9 @@ function clanHouseUpgrade(kind) {
             let next = house.level + 1, cost = CLAN_HOUSE_LEVEL_COSTS[next];
             if (house.funds < cost.funds || house.materials < cost.materials) return { commit:false, error:`升級需要 ${cost.funds.toLocaleString()} 資金與 ${cost.materials} 建材。` };
             house.funds -= cost.funds; house.materials -= cost.materials; house.level = next; member.houseUpgrades += 1;
+            if (next >= CLAN_HOUSE_MAX_LEVEL && !house.completedAt) house.completedAt = Date.now();
             _clanHouseLog(house, `${_clanHouseMemberName()}將盟屋大廳升至 Lv.${next}`);
+            if (next >= CLAN_HOUSE_MAX_LEVEL) _clanHouseLog(house, '盟屋正式落成，全體成員可獲得紀念稱號。');
             _clanHouseTouch(house);
             return { name:'盟屋大廳', level:next };
         }
@@ -2133,33 +2182,122 @@ function clanHouseTrain() {
     renderClanTab();
 }
 
-function clanHouseRest() {
+function clanHouseVisitorTrade() {
     if (!player || !player.cls) return;
-    if (player.dead || !(Number(player.hp) > 0)) { alert('死亡狀態無法使用休息室，請先復活。'); return; }
-    if (typeof catchupActive === 'function' && catchupActive()) { alert('正在結算離線進度，完成後才能使用休息室。'); return; }
-    if ((Number(player.hp) || 0) >= (Number(player.mhp) || 0) && (Number(player.mp) || 0) >= (Number(player.mmp) || 0)) { alert('目前 HP 與 MP 已全滿，不會消耗今日休息次數。'); return; }
-    let mode = clanModeKey(player), id = clanRoleId(player), day = _clanHouseDay();
-    if (typeof confirm === 'function' && !confirm('確定使用今天一次的休息室恢復機會？')) return;
+    let mode = clanModeKey(player), day = _clanHouseDay();
+    let preview = _clanReadState(), previewInfo = preview && preview.modes[mode], previewHouse = previewInfo && _clanHouseNormalize(previewInfo.house);
+    if (!previewHouse) { alert('你尚未加入血盟。'); return; }
+    if (previewHouse.level < 2) { alert('盟屋大廳達 Lv.2 才會出現流浪商人。'); return; }
+    if (previewHouse.visitorDay === day) { alert('今日的流浪商人交易已完成。'); return; }
+    let previewCaps = _clanHouseCaps(previewHouse);
+    if (previewHouse.materials < 10) { alert('交易需要 10 建材。'); return; }
+    if (previewCaps.funds - previewHouse.funds < 500) { alert('盟屋資金容量不足 500，請先升級資源庫或使用資金。'); return; }
+    if (typeof confirm === 'function' && !confirm('確定用 10 建材向流浪商人交換 500 盟屋資金？')) return;
     let result = _clanWithLock(st => {
         let info = st.modes[mode];
         if (!info) return { commit:false, error:'你尚未加入血盟。' };
         let house = info.house = _clanHouseNormalize(info.house);
-        if (house.dailyRest[id] === day) return { commit:false, error:'此角色今天已使用過休息室。' };
-        house.dailyRest[id] = day;
+        if (house.level < 2) return { commit:false, error:'盟屋大廳達 Lv.2 才會出現流浪商人。' };
+        if (house.visitorDay === day) return { commit:false, error:'今日的流浪商人交易已完成。' };
+        let caps = _clanHouseCaps(house);
+        if (house.materials < 10) return { commit:false, error:'交易需要 10 建材。' };
+        if (caps.funds - house.funds < 500) return { commit:false, error:'盟屋資金容量不足 500，請先升級資源庫或使用資金。' };
+        house.materials -= 10;
+        house.funds += 500;
+        house.visitorDay = day;
+        _clanHouseLog(house, `${_clanHouseMemberName()}與流浪商人交易：建材 -10、資金 +500`);
+        _clanHouseTouch(house);
+        return {};
+    });
+    if (!result.ok) { alert(result.error || '流浪商人交易失敗。'); return; }
+    if (typeof logSys === 'function') logSys('<span class="text-amber-300">流浪商人收下 10 建材，留下 500 盟屋資金。</span>');
+    renderClanTab();
+}
+
+function clanHouseCommission() {
+    if (!player || !player.cls) return;
+    let mode = clanModeKey(player), id = clanRoleId(player), day = _clanHouseDay();
+    let result = _clanWithLock(st => {
+        let info = st.modes[mode];
+        if (!info) return { commit:false, error:'你尚未加入血盟。' };
+        let house = info.house = _clanHouseNormalize(info.house);
+        if (house.level < 3) return { commit:false, error:'盟屋大廳達 Lv.3 才會開放每日委託。' };
+        if (house.dailyCommission[id] === day) return { commit:false, error:'此角色今天已完成盟屋委託。' };
+        if (house.dailyTraining[id] !== day) return { commit:false, error:'先完成今日訓練，才能處理盟屋委託。' };
+        let member = st.members[id] || (st.members[id] = _clanMemberDefault(mode));
+        if (member.mode !== mode) member = st.members[id] = _clanMemberDefault(mode);
+        member.contribution += 5; member.totalContribution += 5; st.xp += 5;
+        house.dailyCommission[id] = day;
+        _clanHouseLog(house, `${_clanHouseMemberName()}完成盟屋委託：貢獻 +5`);
+        _clanHouseTouch(house);
+        return { points:5 };
+    });
+    if (!result.ok) { alert(result.error || '盟屋委託失敗。'); return; }
+    if (typeof calcStats === 'function') calcStats();
+    _clanRefreshTitles();
+    if (typeof updateUI === 'function') updateUI();
+    if (typeof logSys === 'function') logSys('<span class="text-cyan-300">完成盟屋委託，獲得 5 貢獻。</span>');
+    renderClanTab();
+}
+
+function _clanHouseRecoveryTargets() {
+    let out = [];
+    (player.allies || []).forEach(a => { if (a && !a._downed) out.push({ target:a, hpKey:a.curHp != null ? 'curHp' : 'hp', hpMax:a.mhp, mpMax:a.mmp }); });
+    try { if (typeof petsOutList === 'function') petsOutList().forEach(p => { if (p && !p._downed) out.push({ target:p, hpKey:'hp', hpMax:typeof petMhpEff === 'function' ? petMhpEff(p) : p.mhp, mpMax:p.mmp, pet:true }); }); } catch (e) {}
+    try { if (typeof summonV2List === 'function') summonV2List().forEach(s => { if (s && !s._downed) out.push({ target:s, hpKey:'hp', hpMax:s.mhp, mpMax:s.mmp }); }); } catch (e) {}
+    return out;
+}
+
+function clanHouseRestRegenBonus(p) {
+    let role = p || (typeof player !== 'undefined' ? player : null);
+    return role && Number(role.clanHouseRestedUntil) > Date.now() ? { hp:10, mp:5 } : { hp:0, mp:0 };
+}
+
+function clanHouseRest() {
+    if (!player || !player.cls) return;
+    if (player.dead || !(Number(player.hp) > 0)) { alert('死亡狀態無法使用休息室，請先復活。'); return; }
+    if (typeof catchupActive === 'function' && catchupActive()) { alert('正在結算離線進度，完成後才能使用休息室。'); return; }
+    let mode = clanModeKey(player), id = clanRoleId(player), day = _clanHouseDay();
+    let preview = _clanReadState(), previewInfo = preview && preview.modes[mode], previewHouse = previewInfo && _clanHouseNormalize(previewInfo.house);
+    if (!previewHouse) { alert('你尚未加入血盟。'); return; }
+    let previewLevel = previewHouse.facilities.lounge, previewMax = previewLevel >= 5 ? 2 : 1;
+    if (_clanHouseRestUses(previewHouse, id, day) >= previewMax) { alert('此角色今天已用完休息室次數。'); return; }
+    if (previewLevel === 1 && (Number(player.hp) || 0) >= (Number(player.mhp) || 0) && (Number(player.mp) || 0) >= (Number(player.mmp) || 0)) { alert('目前 HP 與 MP 已全滿，不會消耗今日休息次數。'); return; }
+    if (typeof confirm === 'function' && !confirm(`確定使用休息室恢復機會？\n今日上限 ${previewMax} 次。`)) return;
+    let result = _clanWithLock(st => {
+        let info = st.modes[mode];
+        if (!info) return { commit:false, error:'你尚未加入血盟。' };
+        let house = info.house = _clanHouseNormalize(info.house);
+        let level = house.facilities.lounge, maxUses = level >= 5 ? 2 : 1, used = _clanHouseRestUses(house, id, day);
+        if (used >= maxUses) return { commit:false, error:'此角色今天已用完休息室次數。' };
+        house.dailyRest[id] = { day:day, count:used + 1 };
         _clanHouseLog(house, `${_clanHouseMemberName()}在休息室恢復狀態`);
         let revision = _clanHouseTouch(house);
-        return { revision:revision };
+        return { revision:revision, level:level, used:used, count:used + 1 };
     });
     if (!result.ok) { alert(result.error || '休息室目前無法使用。'); return; }
-    let oldHp = player.hp, oldMp = player.mp;
+    let oldHp = player.hp, oldMp = player.mp, oldStatuses = player.statuses, oldRestedUntil = player.clanHouseRestedUntil;
+    let teamSnapshots = [];
     player.hp = Math.max(0, Number(player.mhp) || 0);
     player.mp = Math.max(0, Number(player.mmp) || 0);
+    if (result.level >= 2) player.statuses = { stun:0, freeze:0, stone:0, poison:0, poisonDmg:0, poisonTick:0, burn:0, burnDmg:0, burnTick:0, scald:0, scaldDmg:0, scaldTick:0, bleed:0, bleedDmg:0, bleedTick:0, sleep:0, silence:0, paralyze:0, magicseal:0, armorBreak:0, slowAtk:0, cleave:0, evilAura:0 };
+    if (result.level >= 3) _clanHouseRecoveryTargets().forEach(entry => {
+        teamSnapshots.push({ target:entry.target, hpKey:entry.hpKey, hp:entry.target[entry.hpKey], mp:entry.target.mp, pet:entry.pet });
+        entry.target[entry.hpKey] = Math.max(0, Number(entry.hpMax) || 0);
+        if (entry.mpMax != null) entry.target.mp = Math.max(0, Number(entry.mpMax) || 0);
+    });
+    if (teamSnapshots.some(entry => entry.pet) && typeof petMarkDirty === 'function') petMarkDirty();
+    if (result.level >= 4) player.clanHouseRestedUntil = Date.now() + 60 * 60 * 1000;
+    if (typeof calcStats === 'function' && result.level >= 2) calcStats();
     if (typeof saveGame === 'function' && saveGame() !== true) {
-        player.hp = oldHp; player.mp = oldMp;
+        player.hp = oldHp; player.mp = oldMp; player.statuses = oldStatuses; player.clanHouseRestedUntil = oldRestedUntil;
+        teamSnapshots.forEach(entry => { entry.target[entry.hpKey] = entry.hp; if (entry.mp != null) entry.target.mp = entry.mp; });
+        if (teamSnapshots.some(entry => entry.pet) && typeof petMarkDirty === 'function') petMarkDirty();
         let rollback = _clanWithLock(st => {
             let info = st.modes[mode], house = info && info.house;
-            if (!house || house.dailyRest[id] !== day) return { commit:false };
-            delete house.dailyRest[id];
+            if (!house || house.revision !== result.revision || _clanHouseRestUses(house, id, day) !== result.count) return { commit:false };
+            if (result.used > 0) house.dailyRest[id] = { day:day, count:result.used };
+            else delete house.dailyRest[id];
             _clanHouseLog(house, `${_clanHouseMemberName()}的休息因角色存檔失敗而取消`);
             _clanHouseTouch(house);
             return {};
@@ -2170,7 +2308,7 @@ function clanHouseRest() {
         return;
     }
     if (typeof updateUI === 'function') updateUI();
-    if (typeof logSys === 'function') logSys('<span class="text-emerald-300">你在盟屋休息室恢復了全部 HP 與 MP。</span>');
+    if (typeof logSys === 'function') logSys(`<span class="text-emerald-300">你在盟屋休息室恢復了全部 HP 與 MP${result.level >= 2 ? '、淨化異常' : ''}${result.level >= 3 ? '、恢復隊伍' : ''}${result.level >= 4 ? '，並獲得 60 分鐘充分休息' : ''}。</span>`);
     renderClanTab();
 }
 
@@ -2184,9 +2322,11 @@ function clanHouseWarBonus(p) {
 
 function _clanHousePanelHtml(st, info) {
     let house = _clanHouseNormalize(info.house), id = clanRoleId(player), day = _clanHouseDay();
-    let leader = info.leaderId === id, caps = _clanHouseCaps(house), buildUsed = _clanHouseBuildUsedToday(house, day);
-    let buildCapacityReady = caps.funds - house.funds >= CLAN_HOUSE_DAILY_FUNDS && caps.materials - house.materials >= CLAN_HOUSE_DAILY_MATERIALS;
+    let leader = info.leaderId === id, caps = _clanHouseCaps(house), buildUsed = _clanHouseBuildUsedBy(house, id, day), buildCount = _clanHouseBuildCountToday(house, day);
+    let buildGetsResources = buildCount < CLAN_HOUSE_DAILY_MEMBER_LIMIT;
+    let buildCapacityReady = !buildGetsResources || (caps.funds - house.funds >= CLAN_HOUSE_DAILY_FUNDS && caps.materials - house.materials >= CLAN_HOUSE_DAILY_MATERIALS);
     let restFull = (Number(player.hp) || 0) >= (Number(player.mhp) || 0) && (Number(player.mp) || 0) >= (Number(player.mmp) || 0);
+    let loungeLevel = house.facilities.lounge, restUses = _clanHouseRestUses(house, id, day), restMax = loungeLevel >= 5 ? 2 : 1;
     let hallCost = house.level < CLAN_HOUSE_MAX_LEVEL ? CLAN_HOUSE_LEVEL_COSTS[house.level + 1] : null;
     let hallAffordable = hallCost && house.funds >= hallCost.funds && house.materials >= hallCost.materials;
     let facilityCards = Object.keys(CLAN_HOUSE_FACILITIES).map(kind => {
@@ -2195,20 +2335,27 @@ function _clanHousePanelHtml(st, info) {
         let action = kind === 'training'
             ? `<button class="btn mt-2 w-full py-2 text-sm" onclick="clanHouseTrain()" ${house.dailyTraining[id] === day ? 'disabled' : ''}>${house.dailyTraining[id] === day ? '今日已訓練' : '今日訓練'}</button>`
             : kind === 'lounge'
-                ? `<button class="btn mt-2 w-full py-2 text-sm" onclick="clanHouseRest()" ${(house.dailyRest[id] === day || restFull) ? 'disabled' : ''}>${house.dailyRest[id] === day ? '今日已休息' : (restFull ? 'HP／MP 已全滿' : '恢復 HP／MP')}</button>`
+                ? `<button class="btn mt-2 w-full py-2 text-sm" onclick="clanHouseRest()" ${(restUses >= restMax || (loungeLevel === 1 && restFull)) ? 'disabled' : ''}>${restUses >= restMax ? '今日次數已用完' : (loungeLevel === 1 && restFull ? 'HP／MP 已全滿' : `休息恢復（${restUses}／${restMax}）`)}</button>`
                 : '';
         let affordable = cost && house.funds >= cost.funds && house.materials >= cost.materials;
         let upgrade = leader ? `<button class="btn mt-2 w-full py-2 text-xs bg-slate-800 border-slate-600" onclick="clanHouseUpgrade('${kind}')" ${affordable ? '' : 'disabled'}>${cost ? (affordable ? `升級：${cost.funds} 資金／${cost.materials} 建材` : `資源不足：${cost.funds}／${cost.materials}`) : (level >= CLAN_HOUSE_MAX_LEVEL ? '最高等級' : '需先升級大廳')}</button>` : '';
         return `<div class="border border-slate-700 bg-slate-900 rounded p-3"><div class="flex items-center justify-between"><b class="text-slate-100">${spec.icon} ${spec.name}</b><span class="text-cyan-200 text-sm">Lv.${level}</span></div><div class="text-xs text-slate-400 mt-2">${clanEsc(spec.effect(level))}</div>${action}${upgrade}</div>`;
     }).join('');
+    let hallFeatures = [
+        house.level >= 2 ? `<button class="btn w-full py-2 text-sm" onclick="clanHouseVisitorTrade()" ${house.visitorDay === day ? 'disabled' : ''}>${house.visitorDay === day ? '今日商人已交易' : '🧓 流浪商人：10 建材換 500 資金'}</button>` : '<div class="text-xs text-slate-500">🔒 Lv.2：流浪商人</div>',
+        house.level >= 3 ? `<button class="btn w-full py-2 text-sm" onclick="clanHouseCommission()" ${house.dailyCommission[id] === day ? 'disabled' : ''}>${house.dailyCommission[id] === day ? '今日委託已完成' : '📜 每日委託：訓練後獲得 5 貢獻'}</button>` : '<div class="text-xs text-slate-500">🔒 Lv.3：成員每日委託</div>',
+        house.level >= 4 ? `<div class="text-xs text-cyan-200 border border-slate-700 rounded p-2">🔭 國戰情報：作戰室目前提供 +${Math.round(clanHouseWarBonus(player) * 100)}% 國戰成功率，不影響其他戰鬥。</div>` : '<div class="text-xs text-slate-500">🔒 Lv.4：國戰情報板</div>',
+        house.level >= 5 ? '<div class="text-xs text-amber-200 border border-amber-700 rounded p-2">🎉 盟屋已落成：全體成員可獲得【盟屋之心】稱號。</div>' : '<div class="text-xs text-slate-500">🔒 Lv.5：盟屋落成紀念</div>'
+    ].join('');
     let logs = house.logs.map(item => `<div class="text-xs text-slate-400 border-b border-slate-800 py-1"><span class="text-slate-500">${clanEsc(new Date(item.at).toLocaleString('zh-TW', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }))}</span>　${clanEsc(item.text)}</div>`).join('');
     return `<div class="flex flex-col gap-4">
         <div class="border border-amber-700 bg-slate-900 rounded p-4">
             <div class="flex items-start justify-between gap-3"><div><div class="text-xl font-black text-amber-200">🏠 ${clanEsc(info.name)}盟屋</div><div class="text-xs text-slate-400 mt-1">所有同模式血盟角色共享建設進度</div></div><div class="text-right"><b class="text-cyan-200">大廳 Lv.${house.level}</b><div class="text-xs text-slate-400">最高 Lv.${CLAN_HOUSE_MAX_LEVEL}</div></div></div>
             <div class="grid grid-cols-2 gap-2 mt-3 text-sm"><div class="bg-slate-800 rounded p-2">💰 資金 <b class="text-amber-200">${house.funds.toLocaleString()}</b><span class="text-slate-500"> / ${caps.funds.toLocaleString()}</span></div><div class="bg-slate-800 rounded p-2">🧱 建材 <b class="text-cyan-200">${house.materials}</b><span class="text-slate-500"> / ${caps.materials}</span></div></div>
-            <button class="btn mt-3 w-full py-2 font-bold bg-amber-900 border-amber-600" onclick="clanHouseDailyBuild()" ${(buildUsed || !buildCapacityReady) ? 'disabled' : ''}>${buildUsed ? '此血盟今日已協作' : (!buildCapacityReady ? '盟屋容量不足' : `今日協作（${CLAN_HOUSE_DAILY_GOLD_COST.toLocaleString()} 金幣）`)}</button>
-            <div class="text-xs text-slate-400 mt-1 text-center">獲得 ${CLAN_HOUSE_DAILY_FUNDS} 資金與 ${CLAN_HOUSE_DAILY_MATERIALS} 建材；每個血盟每日一次，容量不足時不扣款</div>
+            <button class="btn mt-3 w-full py-2 font-bold bg-amber-900 border-amber-600" onclick="clanHouseDailyBuild()" ${(buildUsed || !buildCapacityReady) ? 'disabled' : ''}>${buildUsed ? '此角色今日已協作' : (!buildCapacityReady ? '盟屋容量不足' : `今日協作（${CLAN_HOUSE_DAILY_GOLD_COST.toLocaleString()} 金幣）`)}</button>
+            <div class="text-xs text-slate-400 mt-1 text-center">每角色每日一次、獲得 ${CLAN_HOUSE_DAILY_POINTS} 貢獻；前 ${CLAN_HOUSE_DAILY_MEMBER_LIMIT} 名協作者各增加 ${CLAN_HOUSE_DAILY_FUNDS} 資金與 ${CLAN_HOUSE_DAILY_MATERIALS} 建材（今日 ${buildCount}／${CLAN_HOUSE_DAILY_MEMBER_LIMIT}）</div>
             ${leader ? `<button class="btn mt-3 w-full py-2 font-bold bg-emerald-900 border-emerald-600" onclick="clanHouseUpgrade('hall')" ${hallAffordable ? '' : 'disabled'}>${hallCost ? (hallAffordable ? `升級大廳：${hallCost.funds.toLocaleString()} 資金／${hallCost.materials} 建材` : `大廳資源不足：${hallCost.funds.toLocaleString()}／${hallCost.materials}`) : '盟屋大廳已滿級'}</button>` : '<div class="text-xs text-slate-500 mt-3 text-center">只有盟主可以升級盟屋與設施</div>'}
+            <div class="mt-3 grid grid-cols-1 gap-2">${hallFeatures}</div>
         </div>
         <div class="grid grid-cols-1 gap-3">${facilityCards}</div>
         <div class="border-t border-slate-700 pt-3"><div class="font-bold text-slate-200 mb-2">盟屋紀錄</div>${logs || '<div class="text-sm text-slate-500">尚無盟屋紀錄。</div>'}</div>
@@ -2308,7 +2455,7 @@ function renderClanTab(targetDiv) {
                 </div>
                 <div class="border border-emerald-800 bg-slate-900 rounded p-3 text-sm text-slate-300">
                     <div class="font-bold text-emerald-300">🏠 血盟盟屋</div>
-                    <div class="text-xs text-slate-400 mt-1">創立血盟後會開放「盟屋」分頁，可共同建設建材倉庫、訓練場、作戰室與休息室。</div>
+                    <div class="text-xs text-slate-400 mt-1">創立血盟後會開放「盟屋」分頁，可共同建設盟屋資源庫、訓練場、作戰室與休息室。</div>
                 </div>
                 ${player.cls === 'royal' ? `
                 <div class="flex flex-col gap-2">

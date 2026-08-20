@@ -25,6 +25,7 @@ function sources(overrides) {
         clanHouseBuilds:0,
         clanHouseTrainings:0,
         clanHouseUpgrades:0,
+        clanHouseLevel:0,
         clanTotalContribution:0,
         warReputation:0,
         lightReputation:0,
@@ -59,11 +60,11 @@ test('old characters start without an equipped title', () => {
     assert.deepEqual(Object.keys(state.unlocked), []);
 });
 
-test('title catalogue contains 50 unique titles across all six categories', () => {
-    assert.equal(core.DEFINITIONS.length, 50);
-    assert.equal(new Set(core.DEFINITIONS.map(def => def.id)).size, 50);
+test('title catalogue contains 51 unique titles across all six categories', () => {
+    assert.equal(core.DEFINITIONS.length, 51);
+    assert.equal(new Set(core.DEFINITIONS.map(def => def.id)).size, 51);
     assert.deepEqual(Object.fromEntries(core.CATEGORIES.map(category => [category.id, core.DEFINITIONS.filter(def => def.category === category.id).length])), {
-        achievement:11, story:12, clan:7, war:7, castle:7, hidden:6
+        achievement:11, story:12, clan:8, war:7, castle:7, hidden:6
     });
     core.CATEGORIES.forEach(category => {
         assert.ok(core.DEFINITIONS.some(def => def.category === category.id), category.id);
@@ -77,7 +78,7 @@ test('version-one title saves migrate without losing existing progress or unlock
         unlocked:{ goblin_slayer:123 },
         progress:{ goblinKills:10000, valakasKills:1, siegeWins:{ kent:1 } }
     });
-    assert.equal(state.version, 5);
+    assert.equal(state.version, 6);
     assert.equal(state.equipped, 'goblin_slayer');
     assert.equal(state.unlocked.goblin_slayer, 123);
     assert.equal(state.progress.goblinKills, 10000);
@@ -335,15 +336,16 @@ test('national-war, clan and relic conditions unlock independently', () => {
     });
 });
 
-test('clan house history unlocks four permanent clan titles', () => {
+test('clan house history and a completed hall unlock five permanent clan titles', () => {
     const result = core.evaluate(null, sources({
         clanMember:true,
         clanHouseBuilds:1,
         clanHouseTrainings:30,
         clanHouseUpgrades:1,
-        clanTotalContribution:1000
+        clanTotalContribution:1000,
+        clanHouseLevel:5
     }));
-    ['house_collaborator','tempered_ally','home_architect','clan_pillar'].forEach(id => assert.equal(!!result.state.unlocked[id], true, id));
+    ['house_collaborator','tempered_ally','home_architect','clan_pillar','clan_home_heart'].forEach(id => assert.equal(!!result.state.unlocked[id], true, id));
 });
 
 test('three-season veteran requires three distinct participated seasons', () => {
