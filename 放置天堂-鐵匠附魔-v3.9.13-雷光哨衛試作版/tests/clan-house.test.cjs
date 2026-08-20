@@ -8,6 +8,7 @@ const source = fs.readFileSync(path.join(__dirname, '..', 'js', '25-clan-system.
 
 function createContext() {
     const values = new Map();
+    const listeners = {};
     const localStorage = {
         getItem(key) { return values.has(key) ? values.get(key) : null; },
         setItem(key, value) { values.set(key, String(value)); },
@@ -18,6 +19,7 @@ function createContext() {
         localStorage,
         setInterval() { return 0; },
         document:{ getElementById() { return null; } },
+        addEventListener(type, listener) { (listeners[type] || (listeners[type] = [])).push(listener); },
         alert(message) { context.alerts.push(String(message)); },
         confirm() { return context.confirmResult; },
         confirmResult:true,
@@ -26,6 +28,7 @@ function createContext() {
     context.window = context;
     vm.createContext(context);
     vm.runInContext(source, context);
+    context.emitStorage = event => (listeners.storage || []).forEach(listener => listener(event));
     return context;
 }
 
@@ -122,6 +125,62 @@ test('daily construction charges once and cannot be repeated by another role in 
     assert.equal(context.player.gold, 10000);
     assert.equal(house.funds, 500);
     assert.match(context.alerts.pop(), /血盟今天已完成/);
+});
+
+test('failed character save safely rolls back construction when the house is unchanged', () => {
+    const context = createContext();
+    assert.equal(context._clanWriteState(context._clanNormalizeState(oldClanState())), true);
+    context.player = { cls:'royal', enSeed:'leader', name:'盟主', gold:20000, classicMode:false };
+    let saves = 0;
+    context.saveGame = () => ++saves > 1;
+    context.clanHouseDailyBuild();
+    const house = context._clanReadState().modes.normal.house;
+    assert.equal(context.player.gold, 20000);
+    assert.equal(house.funds, 0);
+    assert.equal(house.materials, 0);
+    assert.equal(house.dailyBuild.leader, undefined);
+    assert.match(context.alerts.pop(), /協作已取消/);
+});
+
+test('failed character save does not roll back across a newer house transaction', () => {
+    const context = createContext();
+    assert.equal(context._clanWriteState(context._clanNormalizeState(oldClanState())), true);
+    context.player = { cls:'royal', enSeed:'leader', name:'盟主', gold:20000, classicMode:false };
+    let saves = 0;
+    context.saveGame = () => {
+        saves++;
+        if (saves !== 1) return true;
+        const upgrade = context._clanWithLock(state => {
+            const house = state.modes.normal.house;
+            house.funds -= 400;
+            house.materials -= 6;
+            house.level = 2;
+            context._clanHouseTouch(house);
+            return {};
+        });
+        assert.equal(upgrade.ok, true);
+        return false;
+    };
+    context.clanHouseDailyBuild();
+    const house = context._clanReadState().modes.normal.house;
+    assert.equal(context.player.gold, 10000);
+    assert.equal(house.level, 2);
+    assert.equal(house.funds, 100);
+    assert.equal(house.materials, 4);
+    assert.equal(!!house.dailyBuild.leader, true);
+    assert.match(context.alerts.pop(), /協作保留並維持金幣扣除/);
+});
+
+test('storage changes refresh title identity and the visible clan panel', () => {
+    const context = createContext();
+    let titles = 0, panels = 0;
+    context.refreshTitleDisplay = () => { titles++; };
+    context.clanRenderTargetVisible = () => true;
+    context.renderClanTab = () => { panels++; };
+    context.emitStorage({ key:'unrelated' });
+    context.emitStorage({ key:'fb5_clan_state_v1' });
+    assert.equal(titles, 1);
+    assert.equal(panels, 1);
 });
 
 test('dead characters cannot consume the daily lounge use', () => {

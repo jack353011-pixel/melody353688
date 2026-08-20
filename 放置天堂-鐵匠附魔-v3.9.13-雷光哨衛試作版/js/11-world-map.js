@@ -729,9 +729,11 @@ function endSiege(result) {
         if (setResult && setResult.ok) {
             rememberCastleOwnerCity(_cfg.key);   // 寫入成功後立即更新快取，不等待下一個 5 秒檢查
             if (typeof npcClanOnSiegeResult === 'function') npcClanOnSiegeResult(_cfg.key, 'win', _npcDefenderClanId);
+            if (typeof titleRecordSiege === 'function') titleRecordSiege(_cfg.key, 'win');
             let replaced = setResult.previous && setResult.previous !== _cfg.key && SIEGE_CITY[setResult.previous] ? `，原有的${SIEGE_CITY[setResult.previous].castleName}已放棄` : '';
             logSys(`🏆🏰 <span class="text-yellow-300 font-bold">攻城獲勝！</span>血盟已永久佔領${_cfg.castleName}${replaced}。同模式所有角色可使用城堡、全商店 8 折，回村按鈕改為回城。`);
         } else {
+            s.result = 'claim_failed';
             rememberCastleOwnerCity(typeof clanGetCastleCity === 'function' ? clanGetCastleCity(player) : null);
             logSys('<span class="text-red-400 font-bold">攻城獲勝，但城堡共用資料寫入失敗。</span>攻城已無冷卻，可立即再次宣戰重試佔領。');
         }

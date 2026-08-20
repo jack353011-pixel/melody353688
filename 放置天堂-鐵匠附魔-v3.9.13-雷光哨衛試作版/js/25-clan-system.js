@@ -159,6 +159,7 @@ function _clanDefaultState() {
 
 function _clanHouseDefault() {
     return {
+        revision:0,
         level:1,
         funds:0,
         materials:0,
@@ -183,6 +184,7 @@ function _clanHouseNormalizeDaily(raw) {
 function _clanHouseNormalize(raw) {
     let out = _clanHouseDefault();
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+    out.revision = Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(Number(raw.revision) || 0)));
     out.level = Math.max(1, Math.min(CLAN_HOUSE_MAX_LEVEL, Math.floor(Number(raw.level) || 1)));
     out.funds = Math.max(0, Math.min(1000000000, Math.floor(Number(raw.funds) || 0)));
     out.materials = Math.max(0, Math.min(1000000, Math.floor(Number(raw.materials) || 0)));
@@ -203,6 +205,12 @@ function _clanHouseNormalize(raw) {
         return { at:Math.max(0, Math.floor(Number(item.at) || 0)), text:text };
     }).filter(Boolean).slice(0, 20);
     return out;
+}
+
+function _clanHouseTouch(house) {
+    let current = Math.max(0, Math.floor(Number(house.revision) || 0));
+    house.revision = current >= Number.MAX_SAFE_INTEGER ? 1 : current + 1;
+    return house.revision;
 }
 
 function clanModeKey(p) {
@@ -1923,6 +1931,18 @@ function _clanBuffText(buff) {
     return `HP +${buff.hp}、MP +${buff.mp}、額外傷害 +${buff.extraDmg}、額外命中 +${buff.extraHit}、魔法防禦 +${buff.mr}、魔法傷害 +${buff.magicDmg}、HP/MP 自然恢復 +${buff.hpR}、防禦 ${buff.ac}`;
 }
 
+// 稱號列只需要這四個欄位；一次讀取共用資料即可，避免每次 UI 更新重複解壓與解析。
+function clanTitleSnapshot(p) {
+    let role = p || player, st = _clanReadState();
+    let info = st && st.modes[clanModeKey(role)];
+    return {
+        member:!!info,
+        name:info ? String(info.name || '') : '',
+        castleCity:info && info.castle ? info.castle : null,
+        leader:!!(info && info.leaderId && info.leaderId === clanRoleId(role))
+    };
+}
+
 function setClanPanelView(view) {
     _clanPanelView = view === 'hostile' || view === 'house' ? view : 'home';
     renderClanTab();
@@ -1976,7 +1996,7 @@ function clanHouseDailyBuild() {
         house.materials += materials;
         house.dailyBuild[id] = day;
         _clanHouseLog(house, `${_clanHouseMemberName()}完成今日協作：資金 +${funds}、建材 +${materials}`);
-        return { funds:funds, materials:materials };
+        return { funds:funds, materials:materials, revision:_clanHouseTouch(house) };
     });
     if (!result.ok) {
         player.gold += CLAN_HOUSE_DAILY_GOLD_COST;
@@ -1984,18 +2004,23 @@ function clanHouseDailyBuild() {
         return;
     }
     if (typeof saveGame === 'function' && saveGame() !== true) {
-        player.gold += CLAN_HOUSE_DAILY_GOLD_COST;
         let rollback = _clanWithLock(st => {
             let info = st.modes[mode], house = info && info.house;
-            if (!house || house.dailyBuild[id] !== day) return { commit:false };
+            if (!house || house.dailyBuild[id] !== day || house.revision !== result.revision) return { commit:false, conflict:true };
             house.funds = Math.max(0, house.funds - result.funds);
             house.materials = Math.max(0, house.materials - result.materials);
             delete house.dailyBuild[id];
             _clanHouseLog(house, `${_clanHouseMemberName()}的今日協作因角色存檔失敗而取消`);
+            _clanHouseTouch(house);
             return {};
         });
+        if (rollback && rollback.ok) player.gold += CLAN_HOUSE_DAILY_GOLD_COST;
         let restored = saveGame() === true;
-        alert('角色存檔失敗，本次盟屋協作已取消' + (rollback && rollback.ok ? '' : '（盟屋資源回滾失敗）') + (restored ? '，金幣未扣除。' : '；請重新整理後確認金幣。'));
+        if (rollback && rollback.ok) {
+            alert('角色存檔失敗，本次盟屋協作已取消' + (restored ? '，金幣未扣除。' : '；請重新整理後確認金幣。'));
+        } else {
+            alert('角色存檔第一次失敗，且盟屋期間已有其他分頁更新；為避免覆蓋其他成員資料，本次協作保留並維持金幣扣除' + (restored ? '。' : '，但角色資料仍無法存檔，請勿關閉頁面並先清理儲存空間。'));
+        }
         renderClanTab();
         return;
     }
@@ -2034,6 +2059,7 @@ function clanHouseUpgrade(kind) {
             if (house.funds < cost.funds || house.materials < cost.materials) return { commit:false, error:`升級需要 ${cost.funds.toLocaleString()} 資金與 ${cost.materials} 建材。` };
             house.funds -= cost.funds; house.materials -= cost.materials; house.level = next;
             _clanHouseLog(house, `${_clanHouseMemberName()}將盟屋大廳升至 Lv.${next}`);
+            _clanHouseTouch(house);
             return { name:'盟屋大廳', level:next };
         }
         let spec = CLAN_HOUSE_FACILITIES[kind];
@@ -2044,6 +2070,7 @@ function clanHouseUpgrade(kind) {
         if (house.funds < cost.funds || house.materials < cost.materials) return { commit:false, error:`升級需要 ${cost.funds.toLocaleString()} 資金與 ${cost.materials} 建材。` };
         house.funds -= cost.funds; house.materials -= cost.materials; house.facilities[kind] = next;
         _clanHouseLog(house, `${_clanHouseMemberName()}將${spec.name}升至 Lv.${next}`);
+        _clanHouseTouch(house);
         return { name:spec.name, level:next };
     });
     if (!result.ok) { alert(result.error || '盟屋升級失敗。'); return; }
@@ -2064,6 +2091,7 @@ function clanHouseTrain() {
         if (member.mode !== mode) member = st.members[id] = { mode:mode, contribution:0, buffOn:false, buffAt:0 };
         member.contribution += points; st.xp += points; house.dailyTraining[id] = day;
         _clanHouseLog(house, `${_clanHouseMemberName()}完成訓練：貢獻 +${points}`);
+        _clanHouseTouch(house);
         return { points:points };
     });
     if (!result.ok) { alert(result.error || '盟屋訓練失敗。'); return; }
@@ -2087,7 +2115,8 @@ function clanHouseRest() {
         if (house.dailyRest[id] === day) return { commit:false, error:'此角色今天已使用過休息室。' };
         house.dailyRest[id] = day;
         _clanHouseLog(house, `${_clanHouseMemberName()}在休息室恢復狀態`);
-        return {};
+        let revision = _clanHouseTouch(house);
+        return { revision:revision };
     });
     if (!result.ok) { alert(result.error || '休息室目前無法使用。'); return; }
     let oldHp = player.hp, oldMp = player.mp;
@@ -2100,6 +2129,7 @@ function clanHouseRest() {
             if (!house || house.dailyRest[id] !== day) return { commit:false };
             delete house.dailyRest[id];
             _clanHouseLog(house, `${_clanHouseMemberName()}的休息因角色存檔失敗而取消`);
+            _clanHouseTouch(house);
             return {};
         });
         saveGame();
@@ -2402,4 +2432,11 @@ setInterval(() => {
 if (typeof window !== 'undefined') {
     window.clanExportSharedState = clanExportSharedState;
     window.clanRestoreSharedState = clanRestoreSharedState;
+    window.clanTitleSnapshot = clanTitleSnapshot;
+    if (typeof window.addEventListener === 'function') window.addEventListener('storage', event => {
+        if (!event || event.key !== CLAN_STATE_KEY) return;
+        _clanScanCache = { mode:null, at:0, roles:null };
+        if (typeof refreshTitleDisplay === 'function') refreshTitleDisplay();
+        if (clanRenderTargetVisible()) renderClanTab();
+    });
 }
