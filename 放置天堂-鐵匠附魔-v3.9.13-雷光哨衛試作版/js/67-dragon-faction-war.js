@@ -167,11 +167,12 @@
         let operation = OPERATIONS[input && input.operation];
         if (!FACTIONS[faction] || !operation) return 0;
         let power = Math.max(1, Number(input.power) || 1), balance = balanceInfo(state);
+        let clanBonus = clamp(input && input.clanBonus, 0, .05);
         let activeSupport = state.support, supportChance = 0;
         if (activeSupport && activeSupport.effect === 'NPC 增援') supportChance = activeSupport.faction === faction ? .08 : -.08;
         else if (activeSupport && activeSupport.effect === '快速復活') supportChance = activeSupport.faction === faction ? .04 : -.04;
         let aided = balance.weaker === faction;
-        return clamp(.56 + operation.chance + supportChance + (aided ? .12 + balance.ratio * .35 : 0) + clamp((power - 300) / 2500, -.12, .12), .22, .88);
+        return clamp(.56 + operation.chance + supportChance + clanBonus + (aided ? .12 + balance.ratio * .35 : 0) + clamp((power - 300) / 2500, -.12, .12), .22, .88);
     }
     function fight(raw, input, randomFn) {
         let state = normalize(raw), rng = typeof randomFn === 'function' ? randomFn : Math.random;
@@ -185,7 +186,7 @@
         let activeSupport = state.support;
         let playerSupported = !!(activeSupport && activeSupport.faction === faction);
         let enemySupported = !!(activeSupport && activeSupport.faction !== faction);
-        let chance = battleChance(state, { faction:faction, operation:operationId, power:power });
+        let chance = battleChance(state, { faction:faction, operation:operationId, power:power, clanBonus:input && input.clanBonus });
         let success = clamp(rng(), 0, .999999) < chance;
         let magnitude = success ? operation.delta : Math.max(5, Math.round(operation.delta * .58));
         if (activeSupport && ((success && enemySupported) || (!success && playerSupported))) {
@@ -397,7 +398,8 @@
         let state = currentState();
         if (!state.participated && !state.oath && typeof confirm === 'function' && !confirm('這是本季試戰。戰鬥後可改選陣營或回到中立；正式宣誓後才會鎖定。\n\n確定出戰？')) return;
         let power = playerPower(), expectedRevision = state.worldRevision;
-        let result = fight(state, { line:line, operation:operation, power:power });
+        let clanBonus = typeof global.clanHouseWarBonus === 'function' ? global.clanHouseWarBonus(player) : 0;
+        let result = fight(state, { line:line, operation:operation, power:power, clanBonus:clanBonus });
         if (!result.ok) { alert(result.error); renderDragonWarTab(); return; }
         if (!commitSharedWorld(result.state, expectedRevision)) { rejectStaleWorld(); return; }
         player.dragonWar = result.state;
@@ -469,11 +471,12 @@
         let status = state.oath ? `${FACTIONS[state.oath].name}·${progress.name}` : (faction ? `${faction.name}協力者` : '中立旅人');
         let factionButtons = ['light','dark'].map(id => `<button class="dragon-war-faction ${id}${state.affiliation === id ? ' selected' : ''}" onclick="dragonWarChooseFaction('${id}')" ${state.oath && state.oath !== id ? 'disabled' : ''}><strong>${id === 'light' ? '☀️' : '🌙'} ${FACTIONS[id].name}</strong><br><span class="text-xs opacity-80">${id === 'light' ? '信奉秩序與穩定，也必須面對隱瞞的歷史。' : '信奉改革與反抗，也可能走向激進。'}</span></button>`).join('');
         let locked = !faction || state.pendingOath || state.ended;
+        let clanBonus = typeof global.clanHouseWarBonus === 'function' ? global.clanHouseWarBonus(player) : 0;
         let lineCards = Object.keys(LINES).map(id => {
             let spec = LINES[id], line = state.lines[id], pos = (line.progress + 100) / 2;
             let lightN = objectiveCount(line.progress,'light'), darkN = objectiveCount(line.progress,'dark');
             let actions = Object.keys(OPERATIONS).map(op => {
-                let rate = faction ? Math.round(battleChance(state, { faction:state.affiliation, operation:op, power:power }) * 100) : 0;
+                let rate = faction ? Math.round(battleChance(state, { faction:state.affiliation, operation:op, power:power, clanBonus:clanBonus }) * 100) : 0;
                 return `<button onclick="dragonWarFight('${id}','${op}')" ${locked ? 'disabled' : ''} title="${op === 'advance' ? '穩定推進' : op === 'raid' ? '高風險高收益' : '成功率較高'}"><span>${OPERATIONS[op].name}</span><small>${faction ? `${rate}%` : '--'}</small></button>`;
             }).join('');
             return `<div class="dragon-war-line"><div class="dragon-war-line-head"><span>${spec.icon} ${spec.name}</span><span class="dragon-war-pill">光 ${lightN}：${darkN} 暗</span></div><div class="dragon-war-track" title="-100 為暗影完全壓制，+100 為光明完全壓制"><span class="dragon-war-marker" style="left:${pos}%"></span></div><div class="dragon-war-objectives">戰略點：${spec.objectives.map((x,i) => `<span style="color:${i < lightN ? '#fde047' : (i < darkN ? '#a5b4fc' : '#94a3b8')}">${esc(x)}</span>`).join(' · ')}</div><div class="dragon-war-actions mt-2">${actions}</div></div>`;

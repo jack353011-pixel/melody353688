@@ -137,6 +137,19 @@ test('battle odds and reinforcement effects are available for clear UI display',
     assert.equal(core.supportDescription(state.support, 'dark'), '成功率 -8%');
 });
 
+test('clan war-room bonus raises battle odds but is capped at five percent', () => {
+    const state = core.setAffiliation(null, 'light').state;
+    const normal = core.battleChance(state, { faction:'light', operation:'advance', power:300 });
+    const aided = core.battleChance(state, { faction:'light', operation:'advance', power:300, clanBonus:0.03 });
+    const capped = core.battleChance(state, { faction:'light', operation:'advance', power:300, clanBonus:99 });
+    assert.equal(Number((aided - normal).toFixed(2)), 0.03);
+    assert.equal(Number((capped - normal).toFixed(2)), 0.05);
+});
+
+test('war-room state is read once per war render instead of once per action button', () => {
+    assert.equal((source.match(/global\.clanHouseWarBonus\(player\)/g) || []).length, 2);
+});
+
 test('rank progress reports the next reputation milestone', () => {
     const progress = core.rankProgress(50);
     assert.equal(progress.name, '戰線騎士');
