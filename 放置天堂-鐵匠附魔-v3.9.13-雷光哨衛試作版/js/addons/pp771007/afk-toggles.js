@@ -69,6 +69,7 @@
         { id: 'nozoom', name: '手機取消雙擊放大', desc: '連點兩下不會放大畫面（兩指縮放照常）', group: '遊戲介面' },
         { id: 'statusicon', name: '手機狀態圖示縮小', desc: '手機上的狀態圖示縮成一半，不會蓋住戰鬥畫面', group: '遊戲介面' },
         { id: 'battlebuffs', name: '手機戰鬥狀態欄', desc: '戰鬥框下方直接顯示增益、異常與魔物追蹤', group: '遊戲介面' },
+        { id: 'hstage', name: '橫向戰鬥舞台（試驗）', desc: '只在說話之島周邊改用 2.5D 橫向列隊與輕微清場捲動；純視覺，不影響戰鬥數值', group: '遊戲介面', def: false },
         { id: 'trackinfo', name: '魔物追蹤剩餘時間', desc: '狀態欄顯示正在追蹤哪隻怪、還剩多久', group: '遊戲介面' },
         { id: 'locksafe', name: '上鎖裝備不被收購', desc: '潘朵拉的收購與遺物布告欄不會拿走你上鎖的裝備', group: '遊戲介面' },
         { id: 'relicguard', name: '快速廢品不選遺物', desc: '背包「快速廢品」按全選時自動跳過遺物', group: '遊戲介面' },
