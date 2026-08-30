@@ -15,30 +15,101 @@ iframe{display:block;width:100%;height:100%;border:0}
 const frame=document.getElementById('game');
 let tries=0;
 function patchGame(){
-  if(tries++>120)return;
+  if(tries++>160)return;
   try{
     const w=frame.contentWindow;
     const g=w.eval('typeof game!=="undefined" ? game : null');
     if(!g){setTimeout(patchGame,250);return;}
-    if(g.__npcForestFix)return;
-    g.__npcForestFix=true;
+    if(g.__customGameplayPatch)return;
+    g.__customGameplayPatch=true;
+
+    // 霧影森林不顯示初心村 NPC，避免 NPC 出現在水域。
     const villageNpcs=g.npcs;
     const originalUpdate=g.update;
     const originalRender=g.render;
     g.update=function(dt){
-      const old=this.npcs;
       if(this.world && this.world.mapId==='mistForest') this.npcs=[];
       else this.npcs=villageNpcs;
       try{return originalUpdate.call(this,dt)}finally{this.npcs=villageNpcs}
     };
     g.render=function(){
-      const old=this.npcs;
       if(this.world && this.world.mapId==='mistForest') this.npcs=[];
+      else this.npcs=villageNpcs;
       try{return originalRender.call(this)}finally{this.npcs=villageNpcs}
     };
-  }catch(e){
-    setTimeout(patchGame,250);
-  }
+
+    // 新增多種怪物：不同等級、血量、攻擊、移速與外觀。
+    const TYPES={
+      slime:{name:'史萊姆',level:1,hp:60,def:3,exp:45,job:30,atk:12,range:38,cd:1.2,speed:65,color:'#2ecc71',shape:'slime'},
+      forestWolf:{name:'森林狼',level:2,hp:95,def:5,exp:68,job:42,atk:18,range:42,cd:.95,speed:90,color:'#8e9aa8',shape:'wolf'},
+      rockBeetle:{name:'岩甲蟲',level:3,hp:150,def:11,exp:92,job:58,atk:16,range:40,cd:1.35,speed:46,color:'#8d6e63',shape:'beetle'},
+      goblin:{name:'哥布林斥候',level:4,hp:125,def:7,exp:105,job:64,atk:23,range:45,cd:1.05,speed:72,color:'#7cb342',shape:'goblin'},
+      shadowFox:{name:'影狐',level:5,hp:115,def:6,exp:125,job:78,atk:27,range:48,cd:.9,speed:105,color:'#6c63ff',shape:'fox'},
+      poisonMushroom:{name:'毒蕈妖',level:6,hp:210,def:8,exp:150,job:92,atk:30,range:40,cd:1.45,speed:52,color:'#c04bcf',shape:'mushroom'},
+      treeSpirit:{name:'古木樹精',level:7,hp:280,def:14,exp:185,job:112,atk:34,range:46,cd:1.5,speed:42,color:'#6f9b45',shape:'tree'},
+      mistBat:{name:'霧影蝙蝠',level:8,hp:175,def:7,exp:175,job:108,atk:38,range:50,cd:.8,speed:120,color:'#9c88ff',shape:'bat'},
+      skullKnight:{name:'骸骨劍士',level:9,hp:320,def:17,exp:230,job:140,atk:44,range:48,cd:1.15,speed:62,color:'#d7dde4',shape:'skeleton'},
+      mistWolfKing:{name:'霧狼王',level:12,hp:700,def:24,exp:520,job:280,atk:68,range:58,cd:1.0,speed:82,color:'#63c5da',shape:'boss'}
+    };
+    function applyType(m,id){
+      const d=TYPES[id]||TYPES.slime;
+      m.monsterKind=id; m.name=d.name; m.level=d.level; m.maxHp=d.hp; m.hp=d.hp;
+      m.defense=d.def; m.expReward=d.exp; m.jobExpReward=d.job; m.attackPower=d.atk; m.attackRange=d.range;
+      m.attackCooldown=d.cd; m.attackTimer=Math.random()*d.cd*.5; m.speed=d.speed; m.monsterColor=d.color; m.monsterShape=d.shape;
+      m.radius=id==='mistWolfKing'?20:16;
+      return m;
+    }
+    const originalSpawn=g.spawnMonsters;
+    g.spawnMonsters=function(count){
+      const pool=this.world && this.world.mapId==='mistForest'
+        ? [['forestWolf',20],['rockBeetle',14],['shadowFox',14],['poisonMushroom',14],['treeSpirit',12],['mistBat',10],['skullKnight',5],['mistWolfKing',2]]
+        : [['slime',45],['forestWolf',24],['rockBeetle',17],['goblin',10]];
+      const total=pool.reduce((a,x)=>a+x[1],0);
+      for(let i=0;i<count;i++){
+        let placed=false,attempts=0;
+        while(!placed&&attempts<100){
+          const c=2+Math.floor(Math.random()*Math.max(1,this.world.cols-4));
+          const r=2+Math.floor(Math.random()*Math.max(1,this.world.rows-4));
+          if(!this.world.isSolid(c,r)){
+            const mx=c*this.world.tileSize+this.world.tileSize/2;
+            const my=r*this.world.tileSize+this.world.tileSize/2;
+            let roll=Math.random()*total, id=pool[0][0];
+            for(const pair of pool){roll-=pair[1];if(roll<=0){id=pair[0];break;}}
+            this.monsters.push(applyType(new w.eval('new Monster('+mx+','+my+',game.world,game.astar)'),id));
+            placed=true;
+          }
+          attempts++;
+        }
+      }
+    };
+
+    const originalMonsterRender=w.eval('Monster.prototype.render');
+    w.eval(`
+      Monster.prototype.render=function(ctx,isTargeted){
+        ctx.save(); ctx.translate(this.x,this.y);
+        if(this.isDead){
+          let scale=Math.max(0,this.deathTimer/0.5); ctx.scale(scale,scale); ctx.globalAlpha=scale; ctx.fillStyle='#95a5a6'; ctx.beginPath(); ctx.arc(0,0,16,0,Math.PI*2); ctx.fill(); ctx.restore(); return;
+        }
+        if(isTargeted){ctx.save();ctx.rotate(Date.now()/200);ctx.beginPath();ctx.ellipse(0,14,18,9,0,0,Math.PI*2);ctx.strokeStyle='rgba(231,76,60,.9)';ctx.lineWidth=2;ctx.setLineDash([6,4]);ctx.stroke();ctx.restore();}
+        ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(0,10,14,6,0,0,Math.PI*2);ctx.fill();
+        const bob=(this.state==='CHASE')?Math.abs(Math.sin(Date.now()/100))*6:Math.abs(Math.sin(Date.now()/300))*2;
+        const color=this.hitFlash>0?'#fff':(this.monsterColor||'#2ecc71'); const shape=this.monsterShape||'slime';
+        ctx.fillStyle=color;ctx.strokeStyle=this.hitFlash>0?'#fff':'rgba(0,0,0,.45)';ctx.lineWidth=1.5;
+        if(shape==='slime'){ctx.beginPath();ctx.moveTo(-14,10-bob);ctx.bezierCurveTo(-14,-15-bob,14,-15-bob,14,10-bob);ctx.fill();ctx.stroke();}
+        else if(shape==='wolf'||shape==='fox'||shape==='boss'){ctx.beginPath();ctx.ellipse(0,1-bob,16,11,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(-11,-7-bob);ctx.lineTo(-13,-18-bob);ctx.lineTo(-4,-10-bob);ctx.moveTo(7,-9-bob);ctx.lineTo(14,-18-bob);ctx.lineTo(13,-4-bob);ctx.stroke();ctx.fillStyle='rgba(255,255,255,.78)';ctx.beginPath();ctx.arc(7,-2-bob,2.2,0,Math.PI*2);ctx.fill();}
+        else if(shape==='beetle'){ctx.beginPath();ctx.ellipse(0,0-bob,17,13,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(-10,-8-bob);ctx.lineTo(-19,-15-bob);ctx.moveTo(10,-8-bob);ctx.lineTo(19,-15-bob);ctx.moveTo(-12,4-bob);ctx.lineTo(-20,9-bob);ctx.moveTo(12,4-bob);ctx.lineTo(20,9-bob);ctx.stroke();}
+        else if(shape==='goblin'){ctx.beginPath();ctx.arc(0,-2-bob,13,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(-10,-8-bob);ctx.lineTo(-18,-13-bob);ctx.lineTo(-9,-1-bob);ctx.moveTo(10,-8-bob);ctx.lineTo(18,-13-bob);ctx.lineTo(9,-1-bob);ctx.stroke();}
+        else if(shape==='mushroom'){ctx.fillRect(-4,-1-bob,8,15);ctx.beginPath();ctx.arc(0,-6-bob,17,Math.PI,0);ctx.lineTo(14,2-bob);ctx.lineTo(-14,2-bob);ctx.closePath();ctx.fill();ctx.stroke();}
+        else if(shape==='tree'){ctx.fillStyle='#6d4c41';ctx.fillRect(-6,-2-bob,12,17);ctx.fillStyle=color;ctx.beginPath();ctx.arc(-7,-7-bob,11,0,Math.PI*2);ctx.arc(7,-8-bob,11,0,Math.PI*2);ctx.arc(0,-14-bob,13,0,Math.PI*2);ctx.fill();ctx.stroke();}
+        else if(shape==='bat'){const flap=Math.sin(Date.now()/90)*3;ctx.beginPath();ctx.moveTo(0,-2-bob);ctx.lineTo(-22,-10-bob-flap);ctx.lineTo(-11,5-bob);ctx.lineTo(0,2-bob);ctx.lineTo(11,5-bob);ctx.lineTo(22,-10-bob-flap);ctx.closePath();ctx.fill();ctx.stroke();}
+        else if(shape==='skeleton'){ctx.fillStyle='#dfe5eb';ctx.beginPath();ctx.arc(0,-8-bob,10,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#2c3138';ctx.beginPath();ctx.arc(-4,-9-bob,2.4,0,Math.PI*2);ctx.arc(4,-9-bob,2.4,0,Math.PI*2);ctx.fill();}
+        if(isTargeted||this.hp<this.maxHp){ctx.fillStyle='#000';ctx.fillRect(-18,-26-bob,36,5);ctx.fillStyle='#e74c3c';ctx.fillRect(-17,-25-bob,34*(this.hp/this.maxHp),3);ctx.fillStyle='#fff';ctx.font='bold 12px "Segoe UI"';ctx.textAlign='center';ctx.fillText('Lv.'+this.level+' '+this.name,0,-29-bob);}
+        ctx.restore();
+      };
+    `);
+    g.monsters=[];
+    g.spawnMonsters(g.world && g.world.mapId==='mistForest'?16:12);
+  }catch(e){setTimeout(patchGame,250);}
 }
 frame.addEventListener('load',patchGame);
 setTimeout(patchGame,500);
