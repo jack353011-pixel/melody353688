@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>2D MMORPG</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#05070b}
+iframe{display:block;width:100%;height:100%;border:0}
+</style>
+</head>
+<body>
+<iframe id="game" src="game.html" title="2D MMORPG"></iframe>
+<script>
+const frame=document.getElementById('game');
+let tries=0;
+function patchGame(){
+  if(tries++>120)return;
+  try{
+    const w=frame.contentWindow;
+    const g=w.eval('typeof game!=="undefined" ? game : null');
+    if(!g){setTimeout(patchGame,250);return;}
+    if(g.__npcForestFix)return;
+    g.__npcForestFix=true;
+    const villageNpcs=g.npcs;
+    const originalUpdate=g.update;
+    const originalRender=g.render;
+    g.update=function(dt){
+      const old=this.npcs;
+      if(this.world && this.world.mapId==='mistForest') this.npcs=[];
+      else this.npcs=villageNpcs;
+      try{return originalUpdate.call(this,dt)}finally{this.npcs=villageNpcs}
+    };
+    g.render=function(){
+      const old=this.npcs;
+      if(this.world && this.world.mapId==='mistForest') this.npcs=[];
+      try{return originalRender.call(this)}finally{this.npcs=villageNpcs}
+    };
+  }catch(e){
+    setTimeout(patchGame,250);
+  }
+}
+frame.addEventListener('load',patchGame);
+setTimeout(patchGame,500);
+</script>
+</body>
+</html>
