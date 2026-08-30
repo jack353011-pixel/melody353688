@@ -16,12 +16,12 @@ iframe{display:block;width:100%;height:100%;border:0;background:#05070b}
   const frame=document.getElementById('game');
   try{
     if('serviceWorker' in navigator){
-      await navigator.serviceWorker.register('./sw.js?v=2',{scope:'./'});
+      await navigator.serviceWorker.register('./sw.js?v=3',{scope:'./'});
       await navigator.serviceWorker.ready;
-      await new Promise(r=>setTimeout(r,500));
+      await new Promise(r=>setTimeout(r,700));
     }
   }catch(e){console.warn('Service worker registration failed',e);}
-  frame.src='./game.html?v=20260830-forest-npc-fix3';
+  frame.src='./game.html?v=20260830-forest-npc-fix4';
 })();
 </script>
 </body>
