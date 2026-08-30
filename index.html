@@ -13,12 +13,22 @@ iframe{display:block;width:100%;height:100%;border:0;background:#05070b}
 <iframe id="game" src="./game.html" title="2D MMORPG"></iframe>
 <script>
 const frame=document.getElementById('game');
-frame.addEventListener('error',()=>{ window.location.href='./game.html'; });
-setTimeout(()=>{
+let villageNpcs=null;
+function isolateForestNpcs(){
   try{
-    if(!frame.contentDocument || !frame.contentDocument.body){ window.location.href='./game.html'; }
+    const w=frame.contentWindow;
+    if(!w || !w.game || !w.game.world) return;
+    const g=w.game;
+    if(!villageNpcs && Array.isArray(g.npcs)) villageNpcs=g.npcs.slice();
+    if(g.world.mapId==='mistForest'){
+      g.npcs=[];
+    }else if(g.world.mapId==='village' && villageNpcs){
+      g.npcs=villageNpcs;
+    }
   }catch(_){ }
-},1500);
+}
+frame.addEventListener('load',()=>{ setTimeout(isolateForestNpcs,250); });
+setInterval(isolateForestNpcs,200);
 </script>
 </body>
 </html>
