@@ -10,25 +10,19 @@ iframe{display:block;width:100%;height:100%;border:0;background:#05070b}
 </style>
 </head>
 <body>
-<iframe id="game" src="./game.html" title="2D MMORPG"></iframe>
+<iframe id="game" title="2D MMORPG"></iframe>
 <script>
-const frame=document.getElementById('game');
-let villageNpcs=null;
-function isolateForestNpcs(){
+(async function(){
+  const frame=document.getElementById('game');
   try{
-    const w=frame.contentWindow;
-    if(!w || !w.game || !w.game.world) return;
-    const g=w.game;
-    if(!villageNpcs && Array.isArray(g.npcs)) villageNpcs=g.npcs.slice();
-    if(g.world.mapId==='mistForest'){
-      g.npcs=[];
-    }else if(g.world.mapId==='village' && villageNpcs){
-      g.npcs=villageNpcs;
+    if('serviceWorker' in navigator){
+      await navigator.serviceWorker.register('./sw.js',{scope:'./'});
+      await navigator.serviceWorker.ready;
+      await new Promise(r=>setTimeout(r,300));
     }
-  }catch(_){ }
-}
-frame.addEventListener('load',()=>{ setTimeout(isolateForestNpcs,250); });
-setInterval(isolateForestNpcs,200);
+  }catch(e){console.warn('SW registration failed',e);}
+  frame.src='./game.html?v=20260830-forest-npc-fix2';
+})();
 </script>
 </body>
 </html>
